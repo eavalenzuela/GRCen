@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Notifications - GRCen{% endblock %}
+{% block content %}
+<h1>Notifications</h1>
+
+{% if notifications %}
+<table>
+    <thead>
+        <tr><th>Title</th><th>Message</th><th>Time</th><th>Status</th><th></th></tr>
+    </thead>
+    <tbody>
+        {% for notif in notifications %}
+        <tr class="{% if not notif.read %}unread{% endif %}">
+            <td>{{ notif.title }}</td>
+            <td>{{ notif.message or '—' }}</td>
+            <td>{{ notif.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+            <td>{{ 'Read' if notif.read else 'Unread' }}</td>
+            <td>
+                {% if not notif.read %}
+                <button hx-post="/api/alerts/notifications/{{ notif.id }}/read"
+                        hx-target="closest tr" hx-swap="outerHTML"
+                        class="btn btn-sm">Mark Read</button>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No notifications.</p>
+{% endif %}
+{% endblock %}

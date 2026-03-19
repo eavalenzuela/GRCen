@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}GRCen{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="/static/js/htmx.min.js"></script>
+</head>
+<body>
+    {% if user %}
+    <nav class="navbar">
+        <div class="nav-brand"><a href="/">GRCen</a></div>
+        <div class="nav-links">
+            <a href="/assets">Assets</a>
+            <a href="/imports">Import</a>
+            <a href="/exports">Export</a>
+            <a href="/alerts">Alerts</a>
+            <a href="/notifications" class="notif-link">
+                Notifications
+                <span id="notif-badge"
+                      hx-get="/api/alerts/notifications/count"
+                      hx-trigger="load, every 60s"
+                      hx-swap="innerHTML"
+                      hx-target="#notif-badge">
+                    {% if notif_count %}({{ notif_count }}){% endif %}
+                </span>
+            </a>
+            <a href="/logout">Logout ({{ user.username }})</a>
+        </div>
+    </nav>
+    {% endif %}
+
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

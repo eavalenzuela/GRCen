@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - GRCen{% endblock %}
+{% block content %}
+<h1>Dashboard</h1>
+
+<div class="grid">
+    <div class="card">
+        <h2>Assets</h2>
+        <p class="stat">{{ total_assets }}</p>
+        <a href="/assets" class="btn">View All</a>
+    </div>
+    <div class="card">
+        <h2>Asset Types</h2>
+        <ul>
+            {% for t in asset_types %}
+            <li><a href="/assets?type={{ t.value }}">{{ t.value | replace('_', ' ') | title }}</a></li>
+            {% endfor %}
+        </ul>
+    </div>
+    <div class="card">
+        <h2>Upcoming Alerts</h2>
+        {% if alerts %}
+        <ul>
+            {% for alert in alerts %}
+            <li>{{ alert.title }} — {{ alert.next_fire_at }}</li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p>No alerts configured.</p>
+        {% endif %}
+    </div>
+</div>
+
+<h2>Recent Assets</h2>
+<table>
+    <thead>
+        <tr><th>Name</th><th>Type</th><th>Status</th><th>Owner</th></tr>
+    </thead>
+    <tbody>
+        {% for asset in recent_assets %}
+        <tr>
+            <td><a href="/assets/{{ asset.id }}">{{ asset.name }}</a></td>
+            <td>{{ asset.type.value | replace('_', ' ') | title }}</td>
+            <td>{{ asset.status.value | title }}</td>
+            <td>{{ asset.owner or '—' }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

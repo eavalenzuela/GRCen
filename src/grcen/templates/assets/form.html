@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}{% if asset %}Edit {{ asset.name }}{% else %}New Asset{% endif %} - GRCen{% endblock %}
+{% block content %}
+<h1>{% if asset %}Edit {{ asset.name }}{% else %}New Asset{% endif %}</h1>
+
+<form method="post" action="{% if asset %}/assets/{{ asset.id }}/edit{% else %}/assets/new{% endif %}">
+    {% if not asset %}
+    <div class="form-group">
+        <label for="type">Type</label>
+        <select id="type" name="type" required>
+            {% for t in asset_types %}
+            <option value="{{ t.value }}">{{ t.value | replace('_', ' ') | title }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    {% endif %}
+
+    <div class="form-group">
+        <label for="name">Name</label>
+        <input type="text" id="name" name="name" value="{{ asset.name if asset else '' }}" required>
+    </div>
+
+    <div class="form-group">
+        <label for="description">Description</label>
+        <textarea id="description" name="description" rows="4">{{ asset.description if asset and asset.description else '' }}</textarea>
+    </div>
+
+    <div class="form-group">
+        <label for="status">Status</label>
+        <select id="status" name="status">
+            <option value="active" {% if asset and asset.status.value == 'active' %}selected{% endif %}>Active</option>
+            <option value="inactive" {% if asset and asset.status.value == 'inactive' %}selected{% endif %}>Inactive</option>
+            <option value="draft" {% if asset and asset.status.value == 'draft' %}selected{% endif %}>Draft</option>
+            <option value="archived" {% if asset and asset.status.value == 'archived' %}selected{% endif %}>Archived</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="owner">Owner</label>
+        <input type="text" id="owner" name="owner" value="{{ asset.owner if asset and asset.owner else '' }}">
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">{% if asset %}Update{% else %}Create{% endif %}</button>
+        <a href="{% if asset %}/assets/{{ asset.id }}{% else %}/assets{% endif %}" class="btn">Cancel</a>
+    </div>
+</form>
+{% endblock %}

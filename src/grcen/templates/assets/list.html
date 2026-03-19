@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Assets - GRCen{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Assets</h1>
+    <a href="/assets/new" class="btn btn-primary">New Asset</a>
+</div>
+
+<div class="filters">
+    <label>Filter by type:</label>
+    <select hx-get="/assets" hx-target="body" hx-push-url="true" name="type"
+            onchange="this.closest('[hx-get]') || (window.location.href='/assets?type='+this.value)">
+        <option value="">All Types</option>
+        {% for t in asset_types %}
+        <option value="{{ t.value }}" {% if current_type and current_type.value == t.value %}selected{% endif %}>
+            {{ t.value | replace('_', ' ') | title }}
+        </option>
+        {% endfor %}
+    </select>
+
+    <input type="search" placeholder="Search assets..."
+           hx-get="/api/assets/search" hx-trigger="keyup changed delay:300ms"
+           hx-target="#search-results" name="q">
+</div>
+
+<div id="search-results"></div>
+
+<table>
+    <thead>
+        <tr><th>Name</th><th>Type</th><th>Status</th><th>Owner</th><th>Created</th></tr>
+    </thead>
+    <tbody>
+        {% for asset in assets %}
+        <tr>
+            <td><a href="/assets/{{ asset.id }}">{{ asset.name }}</a></td>
+            <td>{{ asset.type.value | replace('_', ' ') | title }}</td>
+            <td><span class="badge badge-{{ asset.status.value }}">{{ asset.status.value | title }}</span></td>
+            <td>{{ asset.owner or '—' }}</td>
+            <td>{{ asset.created_at.strftime('%Y-%m-%d') }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% if pages > 1 %}
+<div class="pagination">
+    {% for p in range(1, pages + 1) %}
+    <a href="/assets?page={{ p }}{% if current_type %}&type={{ current_type.value }}{% endif %}"
+       class="{% if p == page %}active{% endif %}">{{ p }}</a>
+    {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

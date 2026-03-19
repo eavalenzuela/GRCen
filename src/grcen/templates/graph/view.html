@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Graph: {{ asset.name }} - GRCen{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Graph: {{ asset.name }}</h1>
+    <a href="/assets/{{ asset.id }}" class="btn">Back to Asset</a>
+</div>
+
+<div class="graph-controls">
+    <label>Depth:</label>
+    <select id="depth-select">
+        <option value="1" selected>1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+    </select>
+</div>
+
+<div id="cy" style="width:100%; height:600px; border:1px solid #ddd; border-radius:8px;"></div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/cytoscape.min.js"></script>
+<script src="/static/js/graph.js"></script>
+<script>
+    initGraph('{{ asset.id }}', 1);
+    document.getElementById('depth-select').addEventListener('change', function() {
+        initGraph('{{ asset.id }}', parseInt(this.value));
+    });
+</script>
+{% endblock %}

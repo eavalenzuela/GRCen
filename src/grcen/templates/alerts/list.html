@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Alerts - GRCen{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Alerts</h1>
+</div>
+
+{% if alerts %}
+<table>
+    <thead>
+        <tr><th>Title</th><th>Asset</th><th>Schedule</th><th>Cron</th><th>Next Fire</th><th>Enabled</th><th></th></tr>
+    </thead>
+    <tbody>
+        {% for alert in alerts %}
+        <tr>
+            <td>{{ alert.title }}</td>
+            <td><a href="/assets/{{ alert.asset_id }}">View Asset</a></td>
+            <td>{{ alert.schedule_type.value | title }}</td>
+            <td>{{ alert.cron_expression or '—' }}</td>
+            <td>{{ alert.next_fire_at.strftime('%Y-%m-%d %H:%M') if alert.next_fire_at else '—' }}</td>
+            <td>{{ 'Yes' if alert.enabled else 'No' }}</td>
+            <td>
+                <button hx-delete="/api/alerts/{{ alert.id }}"
+                        hx-confirm="Delete this alert?"
+                        hx-target="closest tr" hx-swap="outerHTML"
+                        class="btn btn-sm btn-danger">Delete</button>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No alerts configured. Create alerts from an asset's detail page.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Import - GRCen{% endblock %}
+{% block content %}
+<h1>Bulk Import</h1>
+
+<div class="card">
+    <h2>Import Assets</h2>
+    <p>Upload a CSV or JSON file with columns: <code>name, type, description, status, owner</code></p>
+
+    <h4>Step 1: Preview</h4>
+    <form id="preview-form" hx-post="/api/imports/assets/preview" hx-target="#preview-results"
+          hx-encoding="multipart/form-data">
+        <div class="form-row">
+            <input type="file" name="file" accept=".csv,.json" required>
+            <button type="submit" class="btn">Preview</button>
+        </div>
+    </form>
+    <div id="preview-results"></div>
+
+    <h4>Step 2: Execute</h4>
+    <form hx-post="/api/imports/assets/execute" hx-target="#import-results"
+          hx-encoding="multipart/form-data" hx-confirm="Import all valid rows?">
+        <div class="form-row">
+            <input type="file" name="file" accept=".csv,.json" required>
+            <button type="submit" class="btn btn-primary">Import Assets</button>
+        </div>
+    </form>
+    <div id="import-results"></div>
+</div>
+
+<div class="card">
+    <h2>Import Relationships</h2>
+    <p>Upload a CSV or JSON file with columns: <code>source_name, source_type, target_name, target_type, relationship_type, description</code></p>
+    <p>Assets must already exist. They are matched by (name, type) pair.</p>
+
+    <form hx-post="/api/imports/relationships/execute" hx-target="#rel-import-results"
+          hx-encoding="multipart/form-data" hx-confirm="Import relationships?">
+        <div class="form-row">
+            <input type="file" name="file" accept=".csv,.json" required>
+            <button type="submit" class="btn btn-primary">Import Relationships</button>
+        </div>
+    </form>
+    <div id="rel-import-results"></div>
+</div>
+{% endblock %}
