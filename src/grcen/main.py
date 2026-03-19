@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from grcen.config import settings
-from grcen.database import close_pool, get_pool, init_pool
+from grcen.database import close_pool, get_pool, init_pool, init_schema
 from grcen.routers import (
     alerts,
     assets,
@@ -52,47 +52,12 @@ async def _tick_alerts():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_pool()
-    await _run_migrations()
+    await init_schema()
     scheduler.add_job(_tick_alerts, "interval", minutes=1, id="alert_ticker")
     scheduler.start()
     yield
     scheduler.shutdown()
     await close_pool()
-
-
-async def _run_migrations():
-    """Apply SQL migration files on startup."""
-    import os
-
-    pool = await get_pool()
-
-    # Ensure migrations tracking table exists
-    await pool.execute("""
-        CREATE TABLE IF NOT EXISTS _migrations (
-            name TEXT PRIMARY KEY,
-            applied_at TIMESTAMPTZ DEFAULT now()
-        )
-    """)
-
-    migrations_dir = os.path.join(os.path.dirname(__file__), "..", "..", "migrations")
-    migrations_dir = os.path.normpath(migrations_dir)
-
-    if not os.path.isdir(migrations_dir):
-        return
-
-    applied = {r["name"] for r in await pool.fetch("SELECT name FROM _migrations")}
-
-    files = sorted(f for f in os.listdir(migrations_dir) if f.endswith(".sql"))
-    for fname in files:
-        if fname in applied:
-            continue
-        sql = open(os.path.join(migrations_dir, fname)).read()
-        async with pool.acquire() as conn:
-            async with conn.transaction():
-                await conn.execute(sql)
-                await conn.execute(
-                    "INSERT INTO _migrations (name) VALUES ($1)", fname
-                )
 
 
 def create_app() -> FastAPI:
@@ -149,7 +114,7 @@ async def _create_admin():
     from grcen.services.auth import create_user
 
     pool = await init_pool()
-    await _run_migrations()
+    await init_schema()
 
     username = input("Username: ")
     password = input("Password: ")

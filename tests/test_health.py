@@ -1,7 +1,4 @@
 import pytest
-from httpx import ASGITransport, AsyncClient
-
-from grcen.main import app
 
 
 @pytest.mark.asyncio

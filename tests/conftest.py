@@ -2,7 +2,6 @@ import asyncio
 import os
 import uuid
 
-import asyncpg
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
@@ -13,7 +12,7 @@ os.environ["DATABASE_URL"] = os.environ.get(
 )
 os.environ["SECRET_KEY"] = "test-secret"
 
-from grcen.database import close_pool, init_pool, get_pool  # noqa: E402
+from grcen.database import close_pool, init_pool, init_schema  # noqa: E402
 from grcen.main import app  # noqa: E402
 
 
@@ -27,24 +26,7 @@ def event_loop():
 @pytest_asyncio.fixture(scope="session")
 async def pool():
     p = await init_pool()
-    # Apply migrations
-    migrations_dir = os.path.join(os.path.dirname(__file__), "..", "migrations")
-    migrations_dir = os.path.normpath(migrations_dir)
-    await p.execute("""
-        CREATE TABLE IF NOT EXISTS _migrations (
-            name TEXT PRIMARY KEY,
-            applied_at TIMESTAMPTZ DEFAULT now()
-        )
-    """)
-    applied = {r["name"] for r in await p.fetch("SELECT name FROM _migrations")}
-    for fname in sorted(os.listdir(migrations_dir)):
-        if not fname.endswith(".sql") or fname in applied:
-            continue
-        sql = open(os.path.join(migrations_dir, fname)).read()
-        async with p.acquire() as conn:
-            async with conn.transaction():
-                await conn.execute(sql)
-                await conn.execute("INSERT INTO _migrations (name) VALUES ($1)", fname)
+    await init_schema()
     yield p
     await close_pool()
 
@@ -52,7 +34,6 @@ async def pool():
 @pytest_asyncio.fixture(autouse=True)
 async def clean_tables(pool):
     yield
-    # Clean up after each test
     for table in ("notifications", "alerts", "attachments", "relationships", "assets", "users"):
         await pool.execute(f"DELETE FROM {table}")
 
@@ -70,7 +51,5 @@ async def auth_client(pool, client):
     from grcen.services.auth import create_user
 
     user = await create_user(pool, f"admin_{uuid.uuid4().hex[:8]}", "testpass", is_admin=True)
-    # Login
-    resp = await client.post("/login", data={"username": user.username, "password": "testpass"})
-    # Client retains cookies
+    await client.post("/login", data={"username": user.username, "password": "testpass"})
     return client
