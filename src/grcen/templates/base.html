@@ -24,7 +24,7 @@
             <a href="/alerts">Alerts</a>
             {% endif %}
             {% if has_perm(user.role, Permission.MANAGE_USERS) %}
-            <a href="/admin/users">Admin</a>
+            <a href="/admin/users">Users</a>
             {% endif %}
             {% if has_perm(user.role, Permission.VIEW_AUDIT) %}
             <a href="/admin/audit">Audit Log</a>

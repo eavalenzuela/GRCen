@@ -17,6 +17,7 @@ from grcen.services import relationship as rel_svc
 from grcen.permissions import UserRole
 from grcen.services import auth as auth_svc
 from grcen.services import audit_service as audit_svc
+from grcen.services import oidc_settings
 from grcen.services import review_service as review_svc
 from grcen.services import risk_service as risk_svc
 
@@ -97,10 +98,19 @@ def _extract_metadata(form, asset_type: AssetType) -> dict:
 
 
 @router.get("/login", response_class=HTMLResponse)
-async def login_page(request: Request, user: User | None = Depends(get_current_user_or_none)):
+async def login_page(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User | None = Depends(get_current_user_or_none),
+):
     if user:
         return RedirectResponse("/", status_code=302)
-    return templates.TemplateResponse("auth/login.html", {"request": request})
+    oidc_cfg = await oidc_settings.get_settings(pool)
+    return templates.TemplateResponse("auth/login.html", {
+        "request": request,
+        "oidc_enabled": oidc_cfg.enabled,
+        "oidc_display_name": oidc_cfg.display_name,
+    })
 
 
 @router.post("/login")
@@ -110,8 +120,14 @@ async def login_submit(request: Request, pool: asyncpg.Pool = Depends(get_db)):
     password = form.get("password", "")
     user = await auth_svc.authenticate_user(pool, str(username), str(password))
     if not user:
+        oidc_cfg = await oidc_settings.get_settings(pool)
         return templates.TemplateResponse(
-            "auth/login.html", {"request": request, "error": "Invalid credentials"}
+            "auth/login.html", {
+                "request": request,
+                "error": "Invalid credentials",
+                "oidc_enabled": oidc_cfg.enabled,
+                "oidc_display_name": oidc_cfg.display_name,
+            }
         )
     request.session["user_id"] = str(user.id)
     await audit_svc.log_audit_event(
@@ -127,8 +143,27 @@ async def login_submit(request: Request, pool: asyncpg.Pool = Depends(get_db)):
 
 
 @router.get("/logout")
-async def logout(request: Request):
+async def logout(request: Request, pool: asyncpg.Pool = Depends(get_db)):
+    oidc_id_token = request.session.get("oidc_id_token")
     request.session.clear()
+
+    oidc_cfg = await oidc_settings.get_settings(pool)
+    if oidc_id_token and oidc_cfg.enabled:
+        try:
+            from grcen.routers.oidc import get_oauth
+
+            oauth = await get_oauth(pool)
+            metadata = await oauth.oidc.load_server_metadata()
+            end_session = metadata.get("end_session_endpoint")
+            if end_session:
+                redirect_uri = str(request.url_for("login_page"))
+                return RedirectResponse(
+                    f"{end_session}?post_logout_redirect_uri={redirect_uri}",
+                    status_code=302,
+                )
+        except Exception:
+            pass
+
     return RedirectResponse("/login", status_code=302)
 
 
@@ -330,6 +365,15 @@ async def asset_detail(
     atts = await att_svc.list_attachments(pool, asset_id)
     alerts = await alert_svc.list_alerts(pool, asset_id)
     notif_count = await alert_svc.count_unread_notifications(pool)
+    # For Person assets, find linked user account
+    linked_user = None
+    if asset.type == AssetType.PERSON:
+        row = await pool.fetchrow(
+            "SELECT id, username, role, is_active FROM users WHERE person_asset_id = $1",
+            asset_id,
+        )
+        if row:
+            linked_user = dict(row)
     return templates.TemplateResponse(
         "assets/detail.html",
         {
@@ -342,6 +386,7 @@ async def asset_detail(
             "asset_types": list(AssetType),
             "notif_count": notif_count,
             "asset_custom_fields": CUSTOM_FIELDS.get(asset.type, []),
+            "linked_user": linked_user,
         },
     )
 
@@ -719,6 +764,9 @@ async def admin_user_edit(
     if not edit_user:
         return HTMLResponse("Not found", status_code=404)
     notif_count = await alert_svc.count_unread_notifications(pool)
+    person_assets = await pool.fetch(
+        "SELECT id, name FROM assets WHERE type = 'person' ORDER BY name"
+    )
     return templates.TemplateResponse(
         "admin/user_form.html",
         {
@@ -727,6 +775,7 @@ async def admin_user_edit(
             "edit_user": edit_user,
             "roles": list(UserRole),
             "notif_count": notif_count,
+            "person_assets": person_assets,
         },
     )
 
@@ -750,6 +799,10 @@ async def admin_user_update_submit(
             "UPDATE users SET hashed_password = $1, updated_at = now() WHERE id = $2",
             hashed, user_id,
         )
+    # Update person asset link
+    person_asset_raw = str(form.get("person_asset_id", "")).strip()
+    person_asset_id = UUID(person_asset_raw) if person_asset_raw else None
+    await auth_svc.set_person_asset_link(pool, user_id, person_asset_id)
     updated_user = await auth_svc.get_user_by_id(pool, user_id)
     if old_user and updated_user:
         diff = audit_svc.compute_diff(old_user.__dict__, updated_user.__dict__, _USER_FIELDS)
@@ -887,3 +940,52 @@ async def admin_audit_settings_submit(
         field_level = f"field_level_{et}" in form
         await audit_svc.update_audit_config(pool, et, enabled=enabled, field_level=field_level)
     return RedirectResponse("/admin/audit/settings", status_code=302)
+
+
+# --- OIDC Settings ---
+
+
+@router.get("/admin/oidc-settings", response_class=HTMLResponse)
+async def admin_oidc_settings(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+):
+    oidc_cfg = await oidc_settings.get_settings(pool)
+    notif_count = await alert_svc.count_unread_notifications(pool)
+    return templates.TemplateResponse(
+        "admin/oidc_settings.html",
+        {
+            "request": request,
+            "user": user,
+            "oidc": oidc_cfg,
+            "roles": list(UserRole),
+            "notif_count": notif_count,
+        },
+    )
+
+
+@router.post("/admin/oidc-settings")
+async def admin_oidc_settings_submit(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+):
+    form = await request.form()
+    await oidc_settings.update_settings(
+        pool,
+        issuer_url=str(form.get("issuer_url", "")).strip(),
+        client_id=str(form.get("client_id", "")).strip(),
+        client_secret=str(form.get("client_secret", "")).strip(),
+        scopes=str(form.get("scopes", "openid email profile")).strip(),
+        role_claim=str(form.get("role_claim", "groups")).strip(),
+        role_mapping=str(form.get("role_mapping", "{}")).strip(),
+        default_role=str(form.get("default_role", "viewer")).strip(),
+        display_name=str(form.get("display_name", "SSO")).strip(),
+    )
+    # Reset cached OAuth client so it picks up new settings
+    from grcen.routers.oidc import reset_oauth
+
+    reset_oauth()
+
+    return RedirectResponse("/admin/oidc-settings", status_code=302)

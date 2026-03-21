@@ -33,6 +33,17 @@ async def clean_tables(pool):
     await pool.execute("UPDATE audit_config SET enabled = true, field_level = true")
     from grcen.services import audit_service
     audit_service._config_cache = None
+    # Reset OIDC config to defaults
+    await pool.execute("DELETE FROM oidc_config")
+    await pool.execute("""
+        INSERT INTO oidc_config (key, value) VALUES
+            ('issuer_url', ''), ('client_id', ''), ('client_secret', ''),
+            ('scopes', 'openid email profile'), ('role_claim', 'groups'),
+            ('role_mapping', '{}'), ('default_role', 'viewer'), ('display_name', 'SSO')
+        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+    """)
+    from grcen.services import oidc_settings
+    oidc_settings._cache = None
 
 
 @pytest_asyncio.fixture

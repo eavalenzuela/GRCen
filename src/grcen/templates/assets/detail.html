@@ -42,6 +42,17 @@
     <div class="detail-field"><strong>Updated:</strong> {{ asset.updated_at.strftime('%Y-%m-%d %H:%M') }}</div>
 </div>
 
+{% if linked_user %}
+<div class="detail-grid" style="margin-top:0.5rem">
+    <div class="detail-field">
+        <strong>User Account:</strong>
+        {{ linked_user.username }}
+        <span class="badge">{{ linked_user.role | title }}</span>
+        {% if not linked_user.is_active %}<span class="badge badge-inactive">Inactive</span>{% endif %}
+    </div>
+</div>
+{% endif %}
+
 {% if asset.description %}
 <div class="description">
     <h3>Description</h3>

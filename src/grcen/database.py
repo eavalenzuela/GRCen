@@ -134,6 +134,12 @@ CREATE INDEX IF NOT EXISTS ix_audit_log_entity_type ON audit_log (entity_type);
 CREATE INDEX IF NOT EXISTS ix_audit_log_action ON audit_log (action);
 CREATE INDEX IF NOT EXISTS ix_audit_log_user_id ON audit_log (user_id);
 CREATE INDEX IF NOT EXISTS ix_audit_log_created_at ON audit_log (created_at DESC);
+
+CREATE TABLE IF NOT EXISTS oidc_config (
+    key         VARCHAR(50) PRIMARY KEY,
+    value       TEXT NOT NULL DEFAULT '',
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 """
 
 MIGRATION_SQL = """
@@ -173,6 +179,27 @@ WHERE a.owner IS NOT NULL
 
 CREATE INDEX IF NOT EXISTS ix_assets_owner_id ON assets (owner_id);
 
+-- OIDC: Add oidc_sub column for stable OIDC subject identifier
+DO $$ BEGIN
+    ALTER TABLE users ADD COLUMN oidc_sub VARCHAR(255);
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+
+CREATE UNIQUE INDEX IF NOT EXISTS ix_users_oidc_sub
+    ON users (oidc_sub) WHERE oidc_sub IS NOT NULL;
+
+-- OIDC: Link user account to a Person asset
+DO $$ BEGIN
+    ALTER TABLE users ADD COLUMN person_asset_id UUID REFERENCES assets(id) ON DELETE SET NULL;
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+
+-- OIDC: Email column for user display and matching
+DO $$ BEGIN
+    ALTER TABLE users ADD COLUMN email VARCHAR(255);
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+
 -- Seed default audit config
 INSERT INTO audit_config (entity_type, enabled, field_level)
 VALUES
@@ -182,6 +209,18 @@ VALUES
     ('alert', true, true),
     ('user', true, true)
 ON CONFLICT (entity_type) DO NOTHING;
+
+-- Seed default OIDC config
+INSERT INTO oidc_config (key, value) VALUES
+    ('issuer_url', ''),
+    ('client_id', ''),
+    ('client_secret', ''),
+    ('scopes', 'openid email profile'),
+    ('role_claim', 'groups'),
+    ('role_mapping', '{}'),
+    ('default_role', 'viewer'),
+    ('display_name', 'SSO')
+ON CONFLICT (key) DO NOTHING;
 """
 
 

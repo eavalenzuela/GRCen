@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}OIDC/SSO Settings - GRCen{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>OIDC/SSO Settings</h1>
+</div>
+
+<p><a href="/admin/users">&larr; Back to Users</a></p>
+
+{% if oidc.enabled %}
+<div class="alert" style="background:#dcfce7; color:#166534; border:1px solid #bbf7d0;">
+    SSO is <strong>enabled</strong>. The login page shows a "Sign in with {{ oidc.display_name }}" button.
+</div>
+{% else %}
+<div class="alert" style="background:#fef3c7; color:#92400e; border:1px solid #fde68a;">
+    SSO is <strong>disabled</strong>. Fill in the Issuer URL, Client ID, and Client Secret to enable it.
+</div>
+{% endif %}
+
+<form method="post" action="/admin/oidc-settings" class="card">
+    <h3>Provider</h3>
+    <div class="form-group">
+        <label for="issuer_url">Issuer URL</label>
+        <input type="url" id="issuer_url" name="issuer_url" value="{{ oidc.issuer_url }}"
+               placeholder="https://your-idp.example.com/realms/your-realm">
+    </div>
+    <div class="form-group">
+        <label for="client_id">Client ID</label>
+        <input type="text" id="client_id" name="client_id" value="{{ oidc.client_id }}"
+               placeholder="grcen">
+    </div>
+    <div class="form-group">
+        <label for="client_secret">Client Secret</label>
+        <input type="password" id="client_secret" name="client_secret" value="{{ oidc.client_secret }}"
+               placeholder="Enter client secret">
+    </div>
+    <div class="form-group">
+        <label for="scopes">Scopes</label>
+        <input type="text" id="scopes" name="scopes" value="{{ oidc.scopes }}"
+               placeholder="openid email profile">
+    </div>
+    <div class="form-group">
+        <label for="display_name">Login Button Label</label>
+        <input type="text" id="display_name" name="display_name" value="{{ oidc.display_name }}"
+               placeholder="SSO">
+        <small>Shown as "Sign in with ..."</small>
+    </div>
+
+    <h3 style="margin-top:2rem;">Role Mapping</h3>
+    <div class="form-group">
+        <label for="role_claim">Role Claim Path</label>
+        <input type="text" id="role_claim" name="role_claim" value="{{ oidc.role_claim }}"
+               placeholder="groups">
+        <small>Dot-separated path into the userinfo/ID token (e.g. <code>realm_access.roles</code>)</small>
+    </div>
+    <div class="form-group">
+        <label for="role_mapping">Group-to-Role Mapping (JSON)</label>
+        <textarea id="role_mapping" name="role_mapping" rows="4"
+                  placeholder='{"idp-admins": "admin", "idp-editors": "editor"}'>{{ oidc.role_mapping }}</textarea>
+        <small>Maps IdP group names to GRCen roles: admin, editor, viewer, auditor</small>
+    </div>
+    <div class="form-group">
+        <label for="default_role">Default Role</label>
+        <select id="default_role" name="default_role">
+            {% for r in roles %}
+            <option value="{{ r.value }}" {% if oidc.default_role == r.value %}selected{% endif %}>
+                {{ r.value | title }}
+            </option>
+            {% endfor %}
+        </select>
+        <small>Assigned when no group matches the mapping</small>
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Save Settings</button>
+    </div>
+</form>
+{% endblock %}

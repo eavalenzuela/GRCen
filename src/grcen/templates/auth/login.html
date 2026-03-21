@@ -15,7 +15,13 @@
             <label for="password">Password</label>
             <input type="password" id="password" name="password" required>
         </div>
-        <button type="submit" class="btn btn-primary">Login</button>
+        <button type="submit" class="btn btn-primary" style="width:100%">Login</button>
     </form>
+    {% if oidc_enabled %}
+    <div style="text-align:center; margin:1.5rem 0; color:var(--text-muted)">or</div>
+    <a href="/auth/oidc/login" class="btn" style="width:100%; text-align:center; display:block;">
+        Sign in with {{ oidc_display_name }}
+    </a>
+    {% endif %}
 </div>
 {% endblock %}

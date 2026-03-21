@@ -20,6 +20,7 @@ from grcen.routers import (
     exports,
     graph,
     imports,
+    oidc,
     pages,
     relationships,
 )
@@ -77,6 +78,7 @@ def create_app() -> FastAPI:
     app.include_router(exports.router)
     app.include_router(alerts.router)
     app.include_router(auth.router)
+    app.include_router(oidc.router)
 
     # Page routers
     app.include_router(pages.router)

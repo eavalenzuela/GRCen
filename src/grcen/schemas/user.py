@@ -15,6 +15,9 @@ class UserResponse(BaseModel):
     username: str
     is_active: bool
     role: str
+    email: str | None = None
+    person_asset_id: UUID | None = None
+    is_sso: bool = False
     created_at: datetime
     updated_at: datetime
 
