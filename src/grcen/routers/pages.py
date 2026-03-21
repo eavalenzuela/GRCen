@@ -366,6 +366,33 @@ async def asset_delete_submit(
     return RedirectResponse("/assets", status_code=302)
 
 
+@router.post("/assets/{asset_id}/clone")
+async def asset_clone_submit(
+    request: Request,
+    asset_id: UUID,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.CREATE)),
+):
+    form = await request.form()
+    clone_rels = "clone_relationships" in form
+    clone = await asset_svc.clone_asset(
+        pool, asset_id, clone_relationships=clone_rels, updated_by=user.id,
+    )
+    if not clone:
+        return HTMLResponse("Not found", status_code=404)
+    await audit_svc.log_audit_event(
+        pool,
+        user_id=user.id,
+        username=user.username,
+        action="clone",
+        entity_type="asset",
+        entity_id=clone.id,
+        entity_name=clone.name,
+        changes={"cloned_from": {"new": str(asset_id)}},
+    )
+    return RedirectResponse(f"/assets/{clone.id}", status_code=302)
+
+
 # --- Graph page ---
 
 

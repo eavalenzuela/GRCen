@@ -168,6 +168,63 @@ async def delete_asset(pool: asyncpg.Pool, asset_id: UUID) -> bool:
     return result == "DELETE 1"
 
 
+async def clone_asset(
+    pool: asyncpg.Pool,
+    asset_id: UUID,
+    *,
+    new_name: str | None = None,
+    clone_relationships: bool = False,
+    updated_by: UUID | None = None,
+) -> Asset | None:
+    """Clone an asset, optionally including its relationships."""
+    original = await get_asset(pool, asset_id)
+    if not original:
+        return None
+    name = new_name or f"{original.name} (Copy)"
+    new_id = uuid.uuid4()
+    row = await pool.fetchrow(
+        """
+        INSERT INTO assets (id, type, name, description, status, owner, metadata, updated_by)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        RETURNING *
+        """,
+        new_id,
+        original.type.value,
+        name,
+        original.description,
+        original.status.value,
+        original.owner,
+        json.dumps(original.metadata_ or {}),
+        updated_by,
+    )
+    if clone_relationships:
+        # Clone relationships where the original is source
+        rels = await pool.fetch(
+            "SELECT * FROM relationships WHERE source_asset_id = $1",
+            asset_id,
+        )
+        for rel in rels:
+            await pool.execute(
+                """INSERT INTO relationships (id, source_asset_id, target_asset_id, relationship_type, description)
+                   VALUES ($1, $2, $3, $4, $5)""",
+                uuid.uuid4(), new_id, rel["target_asset_id"],
+                rel["relationship_type"], rel["description"],
+            )
+        # Clone relationships where the original is target
+        rels = await pool.fetch(
+            "SELECT * FROM relationships WHERE target_asset_id = $1",
+            asset_id,
+        )
+        for rel in rels:
+            await pool.execute(
+                """INSERT INTO relationships (id, source_asset_id, target_asset_id, relationship_type, description)
+                   VALUES ($1, $2, $3, $4, $5)""",
+                uuid.uuid4(), rel["source_asset_id"], new_id,
+                rel["relationship_type"], rel["description"],
+            )
+    return Asset.from_row(row)
+
+
 async def search_assets(
     pool: asyncpg.Pool, query_str: str, limit: int = 20
 ) -> list[Asset]:

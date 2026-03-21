@@ -10,6 +10,14 @@
         {% if has_perm(user.role, Permission.EDIT) %}
         <a href="/assets/{{ asset.id }}/edit" class="btn">Edit</a>
         {% endif %}
+        {% if has_perm(user.role, Permission.CREATE) %}
+        <form method="post" action="/assets/{{ asset.id }}/clone" style="display:inline">
+            <label style="font-size:0.8rem;cursor:pointer;">
+                <input type="checkbox" name="clone_relationships" style="vertical-align:middle;"> + rels
+            </label>
+            <button type="submit" class="btn">Clone</button>
+        </form>
+        {% endif %}
         {% if has_perm(user.role, Permission.DELETE) %}
         <form method="post" action="/assets/{{ asset.id }}/delete" style="display:inline"
               onsubmit="return confirm('Delete this asset?')">
