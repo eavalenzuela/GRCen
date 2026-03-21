@@ -1,36 +1,18 @@
 # GRCen
-GRCen (pronounced 'gurken') is a free and open source GRC tool for anyone who wants to manage a GRC program without shoehorning another tool into doing it that's not meant to.
 
-## Asset Types
+GRCen (pronounced "gurken") is a free and open-source Governance, Risk, and Compliance (GRC) tool. It is free as in freedom — licensed under an open-source license — and free as in cost. No subscriptions, or per-seat pricing.
 
-* People
-* Policies
-* Products
-* Systems
-* Devices
-* Data Categories
-* Audits
-* Requirements
-* Processes
-* Intellectual Property
-* Risks
-* Organizational Units
+GRCen is purpose-built to map assets (organizational assets, not just physical ones), ownership, and relationships as they actually exist in your organization. It runs on a simple stack — Python, PostgreSQL, and plain HTML templates — with no heavyweight frameworks, no JavaScript build step, and minimal moving parts. Deploy it with Docker Compose and you're up in minutes.
 
-## Design Philosophy
+## Key Features
 
-The purpose of a GRC system is to provide a complete map of ownership and relationships of assets. This requires the ability to link any and all objects, with links that describe the relationship between them. In order for this information to be useful, it needs to be searchable from any node in the graph, and give an immediate understanding of what and how that node relates to other assets.
-
-A visual representation of objects' relationships is important.
-
-Objects must be associable with evidence, documents, and locations (e.g. URLs).
-
-## Key features
-
-* Asset and relation database
-* Visual node graphs for selected objects
-* Bulk import of assets (and relationships)
-* Customizable exports
-* Schedulable alerts (e.g. for annual reviews, audits, other processes, etc)
+- **Asset graph** — 12 built-in asset types (People, Policies, Systems, Risks, Devices, and more) linked by described relationships. Search from any node to understand how it connects to everything else.
+- **Visual relationship graphs** — Interactive node graphs that show how assets relate at a glance.
+- **Bulk import & export** — Import assets and relationships from CSV or JSON. Export filtered datasets in multiple formats.
+- **Schedulable alerts** — Set reminders for annual reviews, audits, certifications, or any recurring process.
+- **Role-based access control** — Four roles (Admin, Editor, Viewer, Auditor) with granular permissions. Ready for future OIDC/SSO integration.
+- **Configurable audit trail** — Track who changed what and when. Admins choose which entity types are logged and whether to capture field-level diffs.
+- **Custom fields** — Extend asset types with additional metadata fields without changing the schema.
 
 ## Quick Start
 
@@ -40,92 +22,27 @@ Objects must be associable with evidence, documents, and locations (e.g. URLs).
 docker compose up --build
 ```
 
-This starts PostgreSQL 16 and the GRCen app on `http://localhost:8000`. Data persists across restarts via a Docker volume.
+This starts PostgreSQL and GRCen on `http://localhost:8000`. Data persists across restarts via a Docker volume.
 
-Create an admin user:
+Create your first admin user:
 
 ```bash
 docker compose exec app grcen createadmin
 ```
 
-### Containerd (nerdctl)
-
-If you use containerd instead of Docker, [nerdctl](https://github.com/containerd/nerdctl) is a drop-in replacement. Requires `buildkitd` running for image builds.
-
-```bash
-nerdctl compose up --build
-```
-
-Create an admin user:
-
-```bash
-nerdctl compose exec app grcen createadmin
-```
+If you use containerd instead of Docker, substitute `nerdctl` for `docker`.
 
 ### Local Development
 
 Requirements: Python 3.12+, a running PostgreSQL instance.
 
 ```bash
-# Create and activate a virtualenv
 python3 -m venv .venv
 source .venv/bin/activate
-
-# Install with dev dependencies
 pip install -e ".[dev]"
-
-# Configure database connection
-cp .env.example .env
-# Edit .env with your PostgreSQL credentials
-
-# Create admin user
+cp .env.example .env   # edit with your PostgreSQL credentials
 grcen createadmin
-
-Or with nerdctl:
-```bash
-sudo nerdctl compose exec app grcen createadmin
-```
-
-# Run the dev server (with auto-reload)
 grcen runserver
 ```
 
-The app will be available at `http://localhost:8000`. Schema tables are created automatically on startup.
-
-### Running Tests
-
-Tests require a PostgreSQL database (default: `grcen_test` on localhost).
-
-```bash
-# Create the test database
-createdb grcen_test
-
-# Run tests
-pytest
-```
-
-Override the test database URL with `TEST_DATABASE_URL`:
-
-```bash
-TEST_DATABASE_URL=postgresql://user:pass@host:5432/mydb pytest
-```
-
-Or with nerdctl:
-```bash
-sudo nerdctl compose exec db psql -U grcen -c "CREATE DATABASE grcen_test"
-```
-
-### Environment Variables
-
-| Variable | Default | Description |
-|---|---|---|
-| `DATABASE_URL` | `postgresql://grcen:grcen@localhost:5432/grcen` | PostgreSQL connection string |
-| `SECRET_KEY` | `change-me-to-a-random-secret-key` | Session signing key |
-| `DEBUG` | `false` | Enable debug mode and auto-reload |
-| `UPLOAD_DIR` | `./uploads` | File attachment storage path |
-
-### Linting
-
-```bash
-ruff check src/
-```
+The app will be available at `http://localhost:8000`. Database tables are created automatically on startup.
