@@ -40,6 +40,80 @@
         <input type="text" id="owner" name="owner" value="{{ asset.owner if asset and asset.owner else '' }}">
     </div>
 
+    <div id="custom-fields">
+        {% if asset and asset_custom_fields %}
+            {# Edit mode: render fields for the known asset type #}
+            {% for f in asset_custom_fields %}
+            <div class="form-group">
+                <label for="meta_{{ f.name }}">{{ f.label }}{% if f.help_text %} <small>({{ f.help_text }})</small>{% endif %}</label>
+                {% if f.field_type == "enum" %}
+                <select id="meta_{{ f.name }}" name="metadata.{{ f.name }}">
+                    <option value="">— Select —</option>
+                    {% for c in f.choices %}
+                    <option value="{{ c }}" {% if asset.metadata_ and asset.metadata_.get(f.name) == c %}selected{% endif %}>{{ c | replace('_', ' ') | title }}</option>
+                    {% endfor %}
+                </select>
+                {% elif f.field_type == "boolean" %}
+                <input type="checkbox" id="meta_{{ f.name }}" name="metadata.{{ f.name }}" value="on"
+                       {% if asset.metadata_ and asset.metadata_.get(f.name) %}checked{% endif %}>
+                {% elif f.field_type == "date" %}
+                <input type="date" id="meta_{{ f.name }}" name="metadata.{{ f.name }}"
+                       value="{{ asset.metadata_.get(f.name, '') if asset.metadata_ else '' }}">
+                {% elif f.field_type == "integer" %}
+                <input type="number" id="meta_{{ f.name }}" name="metadata.{{ f.name }}"
+                       value="{{ asset.metadata_.get(f.name, '') if asset.metadata_ else '' }}">
+                {% else %}
+                <input type="text" id="meta_{{ f.name }}" name="metadata.{{ f.name }}"
+                       value="{{ asset.metadata_.get(f.name, '') if asset.metadata_ else '' }}">
+                {% endif %}
+            </div>
+            {% endfor %}
+        {% elif not asset and custom_fields %}
+            {# Create mode: render all fields, show/hide via JS based on selected type #}
+            {% for type_key, fields in custom_fields.items() %}
+            {% for f in fields %}
+            <div class="form-group custom-field-group" data-asset-type="{{ type_key.value }}" style="display:none">
+                <label for="meta_{{ type_key.value }}_{{ f.name }}">{{ f.label }}{% if f.help_text %} <small>({{ f.help_text }})</small>{% endif %}</label>
+                {% if f.field_type == "enum" %}
+                <select id="meta_{{ type_key.value }}_{{ f.name }}" name="metadata.{{ f.name }}">
+                    <option value="">— Select —</option>
+                    {% for c in f.choices %}
+                    <option value="{{ c }}">{{ c | replace('_', ' ') | title }}</option>
+                    {% endfor %}
+                </select>
+                {% elif f.field_type == "boolean" %}
+                <input type="checkbox" id="meta_{{ type_key.value }}_{{ f.name }}" name="metadata.{{ f.name }}" value="on">
+                {% elif f.field_type == "date" %}
+                <input type="date" id="meta_{{ type_key.value }}_{{ f.name }}" name="metadata.{{ f.name }}">
+                {% elif f.field_type == "integer" %}
+                <input type="number" id="meta_{{ type_key.value }}_{{ f.name }}" name="metadata.{{ f.name }}">
+                {% else %}
+                <input type="text" id="meta_{{ type_key.value }}_{{ f.name }}" name="metadata.{{ f.name }}">
+                {% endif %}
+            </div>
+            {% endfor %}
+            {% endfor %}
+            <script>
+            (function() {
+                var typeSelect = document.getElementById('type');
+                function showFields() {
+                    var selected = typeSelect.value;
+                    document.querySelectorAll('.custom-field-group').forEach(function(el) {
+                        var show = el.dataset.assetType === selected;
+                        el.style.display = show ? '' : 'none';
+                        // Disable hidden inputs so they don't submit
+                        el.querySelectorAll('input, select').forEach(function(inp) {
+                            inp.disabled = !show;
+                        });
+                    });
+                }
+                typeSelect.addEventListener('change', showFields);
+                showFields();
+            })();
+            </script>
+        {% endif %}
+    </div>
+
     <div class="form-actions">
         <button type="submit" class="btn btn-primary">{% if asset %}Update{% else %}Create{% endif %}</button>
         <a href="{% if asset %}/assets/{{ asset.id }}{% else %}/assets{% endif %}" class="btn">Cancel</a>

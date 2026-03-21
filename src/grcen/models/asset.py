@@ -1,4 +1,5 @@
 import enum
+import json
 from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
@@ -37,6 +38,7 @@ class Asset:
     metadata_: dict | None
     created_at: datetime
     updated_at: datetime
+    updated_by: UUID | None = None
 
     @classmethod
     def from_row(cls, row) -> "Asset":
@@ -47,7 +49,8 @@ class Asset:
             description=row["description"],
             status=AssetStatus(row["status"]),
             owner=row["owner"],
-            metadata_=row["metadata"],
+            metadata_=json.loads(row["metadata"]) if isinstance(row["metadata"], str) else row["metadata"],
             created_at=row["created_at"],
             updated_at=row["updated_at"],
+            updated_by=row.get("updated_by"),
         )

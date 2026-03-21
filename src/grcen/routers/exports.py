@@ -4,7 +4,8 @@ from fastapi.responses import StreamingResponse
 
 from grcen.models.asset import AssetStatus, AssetType
 from grcen.models.user import User
-from grcen.routers.deps import get_current_user, get_db
+from grcen.permissions import Permission
+from grcen.routers.deps import get_db, require_permission
 from grcen.services.export_service import export_assets
 
 router = APIRouter(prefix="/api/exports", tags=["exports"])
@@ -17,7 +18,7 @@ async def export(
     status: AssetStatus | None = None,
     columns: str | None = None,
     pool: asyncpg.Pool = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    _user: User = Depends(require_permission(Permission.EXPORT)),
 ):
     asset_types = [AssetType(t) for t in types.split(",")] if types else None
     cols = columns.split(",") if columns else None

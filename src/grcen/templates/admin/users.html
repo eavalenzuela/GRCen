@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}User Management - GRCen{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>User Management</h1>
+    <a href="/admin/users/new" class="btn btn-primary">New User</a>
+</div>
+
+<table>
+    <thead>
+        <tr>
+            <th>Username</th>
+            <th>Role</th>
+            <th>Active</th>
+            <th>Created</th>
+            <th>Updated</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for u in users %}
+        <tr>
+            <td>{{ u.username }}</td>
+            <td><span class="badge">{{ u.role.value | title }}</span></td>
+            <td>{{ "Yes" if u.is_active else "No" }}</td>
+            <td>{{ u.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+            <td>{{ u.updated_at.strftime('%Y-%m-%d %H:%M') }}</td>
+            <td>
+                <a href="/admin/users/{{ u.id }}/edit" class="btn btn-sm">Edit</a>
+                {% if u.id != user.id %}
+                <form method="post" action="/admin/users/{{ u.id }}/toggle-active" style="display:inline">
+                    <button type="submit" class="btn btn-sm">
+                        {{ "Deactivate" if u.is_active else "Activate" }}
+                    </button>
+                </form>
+                <form method="post" action="/admin/users/{{ u.id }}/delete" style="display:inline"
+                      onsubmit="return confirm('Delete user {{ u.username }}?')">
+                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                </form>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

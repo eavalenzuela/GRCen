@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Audit Settings - GRCen{% endblock %}
+
+{% block content %}
+<h1>Audit Settings</h1>
+<p><a href="/admin/audit">&larr; Back to Audit Log</a></p>
+
+<form method="post" action="/admin/audit/settings">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Entity Type</th>
+                <th>Enabled</th>
+                <th>Field-Level Diffs</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cfg in configs %}
+            <tr>
+                <td>{{ cfg.entity_type }}</td>
+                <td>
+                    <input type="checkbox" name="enabled_{{ cfg.entity_type }}"
+                           {% if cfg.enabled %}checked{% endif %}>
+                </td>
+                <td>
+                    <input type="checkbox" name="field_level_{{ cfg.entity_type }}"
+                           {% if cfg.field_level %}checked{% endif %}>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <button type="submit" class="btn" style="margin-top:1rem;">Save Settings</button>
+</form>
+{% endblock %}

@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 
 import asyncpg
 
+from grcen.custom_fields import CUSTOM_FIELDS, coerce_value
 from grcen.models.asset import AssetStatus, AssetType
 
 
@@ -76,6 +77,7 @@ async def execute_asset_import(
                 if errs:
                     result.errors.extend(errs)
                     continue
+                metadata = _extract_metadata_from_row(row)
                 await conn.execute(
                     """
                     INSERT INTO assets (id, type, name, description, status, owner, metadata)
@@ -87,11 +89,31 @@ async def execute_asset_import(
                     row.get("description", ""),
                     row.get("status", "active"),
                     row.get("owner", ""),
-                    json.dumps({}),
+                    json.dumps(metadata),
                 )
                 result.created += 1
 
     return result
+
+
+_BASE_COLUMNS = {"name", "type", "description", "status", "owner"}
+
+
+def _extract_metadata_from_row(row: dict) -> dict:
+    """Extract custom field values from an import row into a metadata dict."""
+    try:
+        asset_type = AssetType(row["type"])
+    except (ValueError, KeyError):
+        return {}
+    field_defs = {f.name: f for f in CUSTOM_FIELDS.get(asset_type, [])}
+    metadata = {}
+    for key, val in row.items():
+        if key in _BASE_COLUMNS or key not in field_defs:
+            continue
+        raw = str(val).strip() if val is not None else ""
+        if raw:
+            metadata[key] = coerce_value(field_defs[key], raw)
+    return metadata
 
 
 def _validate_relationship_row(row: dict, idx: int) -> list[str]:

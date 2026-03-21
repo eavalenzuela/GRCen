@@ -4,12 +4,18 @@
 <div class="page-header">
     <h1>{{ asset.name }}</h1>
     <div class="actions">
+        {% if has_perm(user.role, Permission.VIEW_GRAPH) %}
         <a href="/graph/{{ asset.id }}" class="btn">View Graph</a>
+        {% endif %}
+        {% if has_perm(user.role, Permission.EDIT) %}
         <a href="/assets/{{ asset.id }}/edit" class="btn">Edit</a>
+        {% endif %}
+        {% if has_perm(user.role, Permission.DELETE) %}
         <form method="post" action="/assets/{{ asset.id }}/delete" style="display:inline"
               onsubmit="return confirm('Delete this asset?')">
             <button type="submit" class="btn btn-danger">Delete</button>
         </form>
+        {% endif %}
     </div>
 </div>
 
@@ -28,11 +34,34 @@
 </div>
 {% endif %}
 
+{% if asset_custom_fields and asset.metadata_ %}
+<div class="custom-details">
+    <h3>Details</h3>
+    <div class="detail-grid">
+        {% for f in asset_custom_fields %}
+        {% set val = asset.metadata_.get(f.name) %}
+        {% if val is not none and val != '' %}
+        <div class="detail-field">
+            <strong>{{ f.label }}:</strong>
+            {% if f.field_type == "boolean" %}
+                {{ "Yes" if val else "No" }}
+            {% elif f.field_type == "enum" %}
+                {{ val | replace('_', ' ') | title }}
+            {% else %}
+                {{ val }}
+            {% endif %}
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
 <h2>Relationships</h2>
 <div id="relationships">
     {% if relationships %}
     <table>
-        <thead><tr><th>Direction</th><th>Related Asset</th><th>Type</th><th>Description</th><th></th></tr></thead>
+        <thead><tr><th>Direction</th><th>Related Asset</th><th>Type</th><th>Description</th>{% if has_perm(user.role, Permission.DELETE) %}<th></th>{% endif %}</tr></thead>
         <tbody>
             {% for rel in relationships %}
             <tr>
@@ -46,12 +75,14 @@
                 </td>
                 <td>{{ rel.relationship_type }}</td>
                 <td>{{ rel.description or '—' }}</td>
+                {% if has_perm(user.role, Permission.DELETE) %}
                 <td>
                     <button hx-delete="/api/relationships/{{ rel.id }}"
                             hx-confirm="Remove this relationship?"
                             hx-target="closest tr" hx-swap="outerHTML"
                             class="btn btn-sm btn-danger">Remove</button>
                 </td>
+                {% endif %}
             </tr>
             {% endfor %}
         </tbody>
@@ -60,6 +91,7 @@
     <p>No relationships yet.</p>
     {% endif %}
 
+    {% if has_perm(user.role, Permission.CREATE) %}
     <h4>Add Relationship</h4>
     <form hx-post="/api/relationships/" hx-target="#relationships" hx-swap="innerHTML"
           hx-on::after-request="if(event.detail.successful) location.reload()">
@@ -75,25 +107,28 @@
             <button type="submit" class="btn btn-primary">Add</button>
         </div>
     </form>
+    {% endif %}
 </div>
 
 <h2>Attachments</h2>
 <div id="attachments">
     {% if attachments %}
     <table>
-        <thead><tr><th>Name</th><th>Kind</th><th>Link/Path</th><th></th></tr></thead>
+        <thead><tr><th>Name</th><th>Kind</th><th>Link/Path</th>{% if has_perm(user.role, Permission.DELETE) %}<th></th>{% endif %}</tr></thead>
         <tbody>
             {% for att in attachments %}
             <tr>
                 <td>{{ att.name }}</td>
                 <td>{{ att.kind.value }}</td>
                 <td>{{ att.url_or_path or '—' }}</td>
+                {% if has_perm(user.role, Permission.DELETE) %}
                 <td>
                     <button hx-delete="/api/assets/{{ asset.id }}/attachments/{{ att.id }}"
                             hx-confirm="Remove this attachment?"
                             hx-target="closest tr" hx-swap="outerHTML"
                             class="btn btn-sm btn-danger">Remove</button>
                 </td>
+                {% endif %}
             </tr>
             {% endfor %}
         </tbody>
@@ -102,6 +137,7 @@
     <p>No attachments yet.</p>
     {% endif %}
 
+    {% if has_perm(user.role, Permission.CREATE) %}
     <h4>Add URL Attachment</h4>
     <form hx-post="/api/assets/{{ asset.id }}/attachments/"
           hx-on::after-request="if(event.detail.successful) location.reload()">
@@ -121,6 +157,7 @@
             <button type="submit" class="btn btn-primary">Upload</button>
         </div>
     </form>
+    {% endif %}
 </div>
 
 <h2>Alerts</h2>

@@ -5,7 +5,10 @@ from grcen.config import settings
 pool: asyncpg.Pool | None = None
 
 SCHEMA_SQL = """
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
+DO $$ BEGIN
+    CREATE EXTENSION IF NOT EXISTS pg_trgm;
+EXCEPTION WHEN unique_violation THEN NULL;
+END $$;
 
 DO $$ BEGIN
     CREATE TYPE asset_type AS ENUM (
@@ -25,6 +28,9 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TYPE schedule_type AS ENUM ('once', 'recurring');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
+DO $$ BEGIN CREATE TYPE user_role AS ENUM ('admin', 'editor', 'viewer', 'auditor');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
 CREATE TABLE IF NOT EXISTS assets (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     type        asset_type  NOT NULL,
@@ -34,7 +40,8 @@ CREATE TABLE IF NOT EXISTS assets (
     owner       VARCHAR(255),
     metadata    JSONB DEFAULT '{}',
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_by  UUID
 );
 
 CREATE INDEX IF NOT EXISTS ix_assets_type ON assets (type);
@@ -93,9 +100,67 @@ CREATE TABLE IF NOT EXISTS users (
     hashed_password VARCHAR(255) NOT NULL,
     is_active       BOOLEAN NOT NULL DEFAULT true,
     is_admin        BOOLEAN NOT NULL DEFAULT false,
+    role            user_role NOT NULL DEFAULT 'viewer',
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+DO $$ BEGIN
+    ALTER TABLE assets ADD CONSTRAINT fk_assets_updated_by
+        FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+CREATE TABLE IF NOT EXISTS audit_config (
+    entity_type  VARCHAR(50) PRIMARY KEY,
+    enabled      BOOLEAN NOT NULL DEFAULT true,
+    field_level  BOOLEAN NOT NULL DEFAULT true,
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS audit_log (
+    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id      UUID,
+    username     VARCHAR(150) NOT NULL,
+    action       VARCHAR(50) NOT NULL,
+    entity_type  VARCHAR(50) NOT NULL,
+    entity_id    UUID,
+    entity_name  VARCHAR(255),
+    changes      JSONB,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS ix_audit_log_entity_type ON audit_log (entity_type);
+CREATE INDEX IF NOT EXISTS ix_audit_log_action ON audit_log (action);
+CREATE INDEX IF NOT EXISTS ix_audit_log_user_id ON audit_log (user_id);
+CREATE INDEX IF NOT EXISTS ix_audit_log_created_at ON audit_log (created_at DESC);
+"""
+
+MIGRATION_SQL = """
+-- Add role column to existing users tables that lack it
+DO $$ BEGIN
+    ALTER TABLE users ADD COLUMN role user_role NOT NULL DEFAULT 'viewer';
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+
+-- Migrate is_admin flag to role
+UPDATE users SET role = 'admin' WHERE is_admin = true AND role = 'viewer';
+
+-- Add updated_by to existing assets tables that lack it
+DO $$ BEGIN
+    ALTER TABLE assets ADD COLUMN updated_by UUID REFERENCES users(id) ON DELETE SET NULL;
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+
+-- Seed default audit config
+INSERT INTO audit_config (entity_type, enabled, field_level)
+VALUES
+    ('asset', true, true),
+    ('relationship', true, true),
+    ('attachment', true, true),
+    ('alert', true, true),
+    ('user', true, true)
+ON CONFLICT (entity_type) DO NOTHING;
 """
 
 
@@ -130,3 +195,4 @@ async def init_schema() -> None:
     """Create all tables and types if they don't already exist."""
     p = await get_pool()
     await p.execute(SCHEMA_SQL)
+    await p.execute(MIGRATION_SQL)

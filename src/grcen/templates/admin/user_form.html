@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}{{ "Edit User" if edit_user else "New User" }} - GRCen{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>{{ "Edit User" if edit_user else "New User" }}</h1>
+</div>
+
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+<form method="post" action="{{ '/admin/users/' ~ edit_user.id ~ '/edit' if edit_user else '/admin/users/new' }}">
+    <div class="form-group">
+        <label for="username">Username</label>
+        {% if edit_user %}
+        <input type="text" id="username" name="username" value="{{ edit_user.username }}" disabled>
+        <input type="hidden" name="username" value="{{ edit_user.username }}">
+        {% else %}
+        <input type="text" id="username" name="username" required>
+        {% endif %}
+    </div>
+
+    <div class="form-group">
+        <label for="password">Password{% if edit_user %} (leave blank to keep current){% endif %}</label>
+        <input type="password" id="password" name="password" {{ "required" if not edit_user else "" }}>
+    </div>
+
+    <div class="form-group">
+        <label for="role">Role</label>
+        <select id="role" name="role" required>
+            {% for r in roles %}
+            <option value="{{ r.value }}" {% if edit_user and edit_user.role == r %}selected{% endif %}>
+                {{ r.value | title }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">{{ "Update" if edit_user else "Create" }}</button>
+        <a href="/admin/users" class="btn">Cancel</a>
+    </div>
+</form>
+{% endblock %}

@@ -37,6 +37,11 @@ async def list_attachments(pool: asyncpg.Pool, asset_id: UUID) -> list[Attachmen
     return [Attachment.from_row(r) for r in rows]
 
 
+async def get_attachment(pool: asyncpg.Pool, att_id: UUID) -> Attachment | None:
+    row = await pool.fetchrow("SELECT * FROM attachments WHERE id = $1", att_id)
+    return Attachment.from_row(row) if row else None
+
+
 async def delete_attachment(pool: asyncpg.Pool, att_id: UUID) -> bool:
     result = await pool.execute("DELETE FROM attachments WHERE id = $1", att_id)
     return result == "DELETE 1"

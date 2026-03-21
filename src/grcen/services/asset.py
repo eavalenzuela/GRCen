@@ -16,11 +16,12 @@ async def create_asset(
     status: str = "active",
     owner: str | None = None,
     metadata_: dict | None = None,
+    updated_by: UUID | None = None,
 ) -> Asset:
     row = await pool.fetchrow(
         """
-        INSERT INTO assets (id, type, name, description, status, owner, metadata)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO assets (id, type, name, description, status, owner, metadata, updated_by)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING *
         """,
         uuid.uuid4(),
@@ -30,6 +31,7 @@ async def create_asset(
         status,
         owner,
         json.dumps(metadata_ or {}),
+        updated_by,
     )
     return Asset.from_row(row)
 
@@ -73,6 +75,7 @@ async def update_asset(
     status: str | None = None,
     owner: str | None = None,
     metadata_: dict | None = None,
+    updated_by: UUID | None = None,
 ) -> Asset | None:
     # Build SET clause dynamically from provided fields
     sets: list[str] = []
@@ -92,6 +95,11 @@ async def update_asset(
     if metadata_ is not None:
         sets.append(f"metadata = ${idx}")
         vals.append(json.dumps(metadata_))
+        idx += 1
+
+    if updated_by is not None:
+        sets.append(f"updated_by = ${idx}")
+        vals.append(updated_by)
         idx += 1
 
     if not sets:

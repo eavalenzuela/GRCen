@@ -35,6 +35,7 @@ class AssetResponse(BaseModel):
     metadata_: dict | None
     created_at: datetime
     updated_at: datetime
+    updated_by: UUID | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

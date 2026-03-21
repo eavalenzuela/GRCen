@@ -45,7 +45,21 @@ This starts PostgreSQL 16 and the GRCen app on `http://localhost:8000`. Data per
 Create an admin user:
 
 ```bash
-docker compose exec app python -m grcen.main createadmin
+docker compose exec app grcen createadmin
+```
+
+### Containerd (nerdctl)
+
+If you use containerd instead of Docker, [nerdctl](https://github.com/containerd/nerdctl) is a drop-in replacement. Requires `buildkitd` running for image builds.
+
+```bash
+nerdctl compose up --build
+```
+
+Create an admin user:
+
+```bash
+nerdctl compose exec app grcen createadmin
 ```
 
 ### Local Development
@@ -66,6 +80,11 @@ cp .env.example .env
 
 # Create admin user
 grcen createadmin
+
+Or with nerdctl:
+```bash
+sudo nerdctl compose exec app grcen createadmin
+```
 
 # Run the dev server (with auto-reload)
 grcen runserver
@@ -89,6 +108,11 @@ Override the test database URL with `TEST_DATABASE_URL`:
 
 ```bash
 TEST_DATABASE_URL=postgresql://user:pass@host:5432/mydb pytest
+```
+
+Or with nerdctl:
+```bash
+sudo nerdctl compose exec db psql -U grcen -c "CREATE DATABASE grcen_test"
 ```
 
 ### Environment Variables

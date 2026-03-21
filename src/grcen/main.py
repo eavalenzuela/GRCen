@@ -5,7 +5,8 @@ from datetime import UTC, datetime
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -80,6 +81,18 @@ def create_app() -> FastAPI:
     # Page routers
     app.include_router(pages.router)
 
+    @app.exception_handler(HTTPException)
+    async def http_exception_handler(request: Request, exc: HTTPException):
+        if exc.status_code == 403 and "text/html" in request.headers.get("accept", ""):
+            from grcen.routers.pages import templates
+            return templates.TemplateResponse(
+                "errors/403.html", {"request": request, "user": None}, status_code=403
+            )
+        if exc.status_code == 401 and "text/html" in request.headers.get("accept", ""):
+            from fastapi.responses import RedirectResponse
+            return RedirectResponse("/login", status_code=302)
+        return HTMLResponse(content=exc.detail, status_code=exc.status_code)
+
     @app.get("/health")
     async def health():
         return {"status": "ok"}
@@ -111,6 +124,7 @@ def cli():
 
 
 async def _create_admin():
+    from grcen.permissions import UserRole
     from grcen.services.auth import create_user
 
     pool = await init_pool()
@@ -119,6 +133,6 @@ async def _create_admin():
     username = input("Username: ")
     password = input("Password: ")
 
-    user = await create_user(pool, username, password, is_admin=True)
-    print(f"Admin user '{user.username}' created (id={user.id})")
+    user = await create_user(pool, username, password, role=UserRole.ADMIN)
+    print(f"Admin user '{user.username}' created (id={user.id}, role={user.role.value})")
     await close_pool()

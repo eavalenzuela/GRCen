@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Audit Log - GRCen{% endblock %}
+
+{% block content %}
+<h1>Audit Log</h1>
+
+{% if has_perm(user.role, Permission.MANAGE_USERS) %}
+<p><a href="/admin/audit/settings">Audit Settings</a></p>
+{% endif %}
+
+<form method="get" action="/admin/audit" class="filter-bar" style="display:flex;gap:0.5rem;margin-bottom:1rem;flex-wrap:wrap;">
+    <input type="text" name="entity_type" value="{{ filter_entity_type }}" placeholder="Entity type" style="padding:0.4rem;">
+    <input type="text" name="action" value="{{ filter_action }}" placeholder="Action" style="padding:0.4rem;">
+    <input type="text" name="username" value="{{ filter_username }}" placeholder="Username" style="padding:0.4rem;">
+    <button type="submit" class="btn">Filter</button>
+    <a href="/admin/audit" class="btn btn-secondary">Clear</a>
+</form>
+
+<p>{{ total }} entries{% if total > 50 %} (page {{ page }} of {{ pages }}){% endif %}</p>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>When</th>
+            <th>User</th>
+            <th>Action</th>
+            <th>Entity Type</th>
+            <th>Entity Name</th>
+            <th>Changes</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for log in logs %}
+        <tr>
+            <td>{{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+            <td>{{ log.username }}</td>
+            <td>{{ log.action }}</td>
+            <td>{{ log.entity_type }}</td>
+            <td>{{ log.entity_name or '-' }}</td>
+            <td>
+                {% if log.changes %}
+                <details>
+                    <summary>View changes</summary>
+                    <pre style="font-size:0.85rem;max-width:400px;overflow-x:auto;">{{ log.changes }}</pre>
+                </details>
+                {% else %}
+                -
+                {% endif %}
+            </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6">No audit log entries found.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% if pages > 1 %}
+<div class="pagination" style="margin-top:1rem;">
+    {% if page > 1 %}
+    <a href="/admin/audit?page={{ page - 1 }}&entity_type={{ filter_entity_type }}&action={{ filter_action }}&username={{ filter_username }}">&laquo; Previous</a>
+    {% endif %}
+    <span>Page {{ page }} of {{ pages }}</span>
+    {% if page < pages %}
+    <a href="/admin/audit?page={{ page + 1 }}&entity_type={{ filter_entity_type }}&action={{ filter_action }}&username={{ filter_username }}">Next &raquo;</a>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

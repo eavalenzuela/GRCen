@@ -5,18 +5,41 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
+from grcen.custom_fields import CUSTOM_FIELDS, coerce_value
 from grcen.models.asset import AssetType
 from grcen.models.user import User
-from grcen.routers.deps import get_current_user, get_current_user_or_none, get_db
+from grcen.permissions import Permission, has_permission
+from grcen.routers.deps import get_current_user, get_current_user_or_none, get_db, require_permission
 from grcen.services import alert_service as alert_svc
 from grcen.services import asset as asset_svc
 from grcen.services import attachment as att_svc
 from grcen.services import relationship as rel_svc
-from grcen.services.auth import authenticate_user
+from grcen.permissions import UserRole
+from grcen.services import auth as auth_svc
+from grcen.services import audit_service as audit_svc
+
+_ASSET_FIELDS = ["name", "description", "status", "owner", "metadata"]
+_USER_FIELDS = ["username", "role", "is_active"]
 
 templates = Jinja2Templates(directory="src/grcen/templates")
+templates.env.globals["has_perm"] = has_permission
+templates.env.globals["Permission"] = Permission
 
 router = APIRouter(tags=["pages"])
+
+
+def _extract_metadata(form, asset_type: AssetType) -> dict:
+    """Extract custom field values from form data into a metadata dict."""
+    metadata = {}
+    for field_def in CUSTOM_FIELDS.get(asset_type, []):
+        key = f"metadata.{field_def.name}"
+        raw = str(form.get(key, ""))
+        # Checkboxes are absent from form when unchecked
+        if field_def.field_type == "boolean":
+            metadata[field_def.name] = key in form
+        elif raw:
+            metadata[field_def.name] = coerce_value(field_def, raw)
+    return metadata
 
 
 # --- Auth pages ---
@@ -34,12 +57,21 @@ async def login_submit(request: Request, pool: asyncpg.Pool = Depends(get_db)):
     form = await request.form()
     username = form.get("username", "")
     password = form.get("password", "")
-    user = await authenticate_user(pool, str(username), str(password))
+    user = await auth_svc.authenticate_user(pool, str(username), str(password))
     if not user:
         return templates.TemplateResponse(
             "auth/login.html", {"request": request, "error": "Invalid credentials"}
         )
     request.session["user_id"] = str(user.id)
+    await audit_svc.log_audit_event(
+        pool,
+        user_id=user.id,
+        username=user.username,
+        action="login",
+        entity_type="user",
+        entity_id=user.id,
+        entity_name=user.username,
+    )
     return RedirectResponse("/", status_code=302)
 
 
@@ -56,7 +88,7 @@ async def logout(request: Request):
 async def dashboard(
     request: Request,
     pool: asyncpg.Pool = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission(Permission.VIEW)),
 ):
     assets, total = await asset_svc.list_assets(pool, page=1, page_size=10)
     alerts = await alert_svc.list_alerts(pool)
@@ -84,7 +116,7 @@ async def asset_list(
     type: AssetType | None = None,
     page: int = 1,
     pool: asyncpg.Pool = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission(Permission.VIEW)),
 ):
     items, total = await asset_svc.list_assets(pool, asset_type=type, page=page, page_size=25)
     notif_count = await alert_svc.count_unread_notifications(pool)
@@ -107,7 +139,7 @@ async def asset_list(
 @router.get("/assets/new", response_class=HTMLResponse)
 async def asset_new(
     request: Request,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission(Permission.CREATE)),
     pool: asyncpg.Pool = Depends(get_db),
 ):
     notif_count = await alert_svc.count_unread_notifications(pool)
@@ -119,6 +151,7 @@ async def asset_new(
             "asset": None,
             "asset_types": list(AssetType),
             "notif_count": notif_count,
+            "custom_fields": CUSTOM_FIELDS,
         },
     )
 
@@ -127,16 +160,30 @@ async def asset_new(
 async def asset_create_submit(
     request: Request,
     pool: asyncpg.Pool = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission(Permission.CREATE)),
 ):
     form = await request.form()
+    asset_type = AssetType(form["type"])
+    metadata = _extract_metadata(form, asset_type)
     asset = await asset_svc.create_asset(
         pool,
-        type=AssetType(form["type"]),
+        type=asset_type,
         name=str(form["name"]),
         description=str(form.get("description", "")),
         status=str(form.get("status", "active")),
         owner=str(form.get("owner", "")),
+        metadata_=metadata,
+        updated_by=user.id,
+    )
+    await audit_svc.log_audit_event(
+        pool,
+        user_id=user.id,
+        username=user.username,
+        action="create",
+        entity_type="asset",
+        entity_id=asset.id,
+        entity_name=asset.name,
+        changes=audit_svc.create_snapshot(asset.__dict__, _ASSET_FIELDS),
     )
     return RedirectResponse(f"/assets/{asset.id}", status_code=302)
 
@@ -146,7 +193,7 @@ async def asset_detail(
     request: Request,
     asset_id: UUID,
     pool: asyncpg.Pool = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission(Permission.VIEW)),
 ):
     asset = await asset_svc.get_asset(pool, asset_id)
     if not asset:
@@ -166,6 +213,7 @@ async def asset_detail(
             "alerts": alerts,
             "asset_types": list(AssetType),
             "notif_count": notif_count,
+            "asset_custom_fields": CUSTOM_FIELDS.get(asset.type, []),
         },
     )
 
@@ -175,7 +223,7 @@ async def asset_edit(
     request: Request,
     asset_id: UUID,
     pool: asyncpg.Pool = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission(Permission.EDIT)),
 ):
     asset = await asset_svc.get_asset(pool, asset_id)
     if not asset:
@@ -189,6 +237,8 @@ async def asset_edit(
             "asset": asset,
             "asset_types": list(AssetType),
             "notif_count": notif_count,
+            "custom_fields": CUSTOM_FIELDS,
+            "asset_custom_fields": CUSTOM_FIELDS.get(asset.type, []),
         },
     )
 
@@ -198,17 +248,34 @@ async def asset_update_submit(
     request: Request,
     asset_id: UUID,
     pool: asyncpg.Pool = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission(Permission.EDIT)),
 ):
     form = await request.form()
-    await asset_svc.update_asset(
+    old = await asset_svc.get_asset(pool, asset_id)
+    metadata = _extract_metadata(form, old.type) if old else {}
+    updated = await asset_svc.update_asset(
         pool,
         asset_id,
         name=str(form["name"]),
         description=str(form.get("description", "")),
         status=str(form.get("status", "active")),
         owner=str(form.get("owner", "")),
+        metadata_=metadata,
+        updated_by=user.id,
     )
+    if old and updated:
+        diff = audit_svc.compute_diff(old.__dict__, updated.__dict__, _ASSET_FIELDS)
+        if diff:
+            await audit_svc.log_audit_event(
+                pool,
+                user_id=user.id,
+                username=user.username,
+                action="update",
+                entity_type="asset",
+                entity_id=asset_id,
+                entity_name=updated.name,
+                changes=diff,
+            )
     return RedirectResponse(f"/assets/{asset_id}", status_code=302)
 
 
@@ -216,9 +283,21 @@ async def asset_update_submit(
 async def asset_delete_submit(
     asset_id: UUID,
     pool: asyncpg.Pool = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission(Permission.DELETE)),
 ):
+    old = await asset_svc.get_asset(pool, asset_id)
     await asset_svc.delete_asset(pool, asset_id)
+    if old:
+        await audit_svc.log_audit_event(
+            pool,
+            user_id=user.id,
+            username=user.username,
+            action="delete",
+            entity_type="asset",
+            entity_id=old.id,
+            entity_name=old.name,
+            changes=audit_svc.delete_snapshot(old.__dict__, _ASSET_FIELDS),
+        )
     return RedirectResponse("/assets", status_code=302)
 
 
@@ -230,7 +309,7 @@ async def graph_page(
     request: Request,
     asset_id: UUID,
     pool: asyncpg.Pool = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission(Permission.VIEW_GRAPH)),
 ):
     asset = await asset_svc.get_asset(pool, asset_id)
     if not asset:
@@ -254,7 +333,7 @@ async def graph_page(
 async def import_page(
     request: Request,
     pool: asyncpg.Pool = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission(Permission.IMPORT)),
 ):
     notif_count = await alert_svc.count_unread_notifications(pool)
     return templates.TemplateResponse(
@@ -270,7 +349,7 @@ async def import_page(
 async def export_page(
     request: Request,
     pool: asyncpg.Pool = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission(Permission.EXPORT)),
 ):
     notif_count = await alert_svc.count_unread_notifications(pool)
     return templates.TemplateResponse(
@@ -291,7 +370,7 @@ async def export_page(
 async def alerts_page(
     request: Request,
     pool: asyncpg.Pool = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission(Permission.VIEW)),
 ):
     alerts = await alert_svc.list_alerts(pool)
     notif_count = await alert_svc.count_unread_notifications(pool)
@@ -313,7 +392,7 @@ async def alerts_page(
 async def notifications_page(
     request: Request,
     pool: asyncpg.Pool = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission(Permission.VIEW)),
 ):
     notifs = await alert_svc.list_notifications(pool)
     notif_count = await alert_svc.count_unread_notifications(pool)
@@ -326,3 +405,263 @@ async def notifications_page(
             "notif_count": notif_count,
         },
     )
+
+
+# --- Admin pages ---
+
+
+@router.get("/admin/users", response_class=HTMLResponse)
+async def admin_users(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+):
+    users = await auth_svc.list_users(pool)
+    notif_count = await alert_svc.count_unread_notifications(pool)
+    return templates.TemplateResponse(
+        "admin/users.html",
+        {
+            "request": request,
+            "user": user,
+            "users": users,
+            "roles": list(UserRole),
+            "notif_count": notif_count,
+        },
+    )
+
+
+@router.get("/admin/users/new", response_class=HTMLResponse)
+async def admin_user_new(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+):
+    notif_count = await alert_svc.count_unread_notifications(pool)
+    return templates.TemplateResponse(
+        "admin/user_form.html",
+        {
+            "request": request,
+            "user": user,
+            "edit_user": None,
+            "roles": list(UserRole),
+            "notif_count": notif_count,
+        },
+    )
+
+
+@router.post("/admin/users/new")
+async def admin_user_create_submit(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+):
+    form = await request.form()
+    username = str(form["username"]).strip()
+    password = str(form["password"]).strip()
+    role = UserRole(form["role"])
+    if not username or not password:
+        notif_count = await alert_svc.count_unread_notifications(pool)
+        return templates.TemplateResponse(
+            "admin/user_form.html",
+            {
+                "request": request,
+                "user": user,
+                "edit_user": None,
+                "roles": list(UserRole),
+                "notif_count": notif_count,
+                "error": "Username and password are required.",
+            },
+        )
+    new_user = await auth_svc.create_user(pool, username, password, role=role)
+    await audit_svc.log_audit_event(
+        pool,
+        user_id=user.id,
+        username=user.username,
+        action="create",
+        entity_type="user",
+        entity_id=new_user.id,
+        entity_name=new_user.username,
+        changes=audit_svc.create_snapshot(new_user.__dict__, _USER_FIELDS),
+    )
+    return RedirectResponse("/admin/users", status_code=302)
+
+
+@router.get("/admin/users/{user_id}/edit", response_class=HTMLResponse)
+async def admin_user_edit(
+    request: Request,
+    user_id: UUID,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+):
+    edit_user = await auth_svc.get_user_by_id(pool, user_id)
+    if not edit_user:
+        return HTMLResponse("Not found", status_code=404)
+    notif_count = await alert_svc.count_unread_notifications(pool)
+    return templates.TemplateResponse(
+        "admin/user_form.html",
+        {
+            "request": request,
+            "user": user,
+            "edit_user": edit_user,
+            "roles": list(UserRole),
+            "notif_count": notif_count,
+        },
+    )
+
+
+@router.post("/admin/users/{user_id}/edit")
+async def admin_user_update_submit(
+    request: Request,
+    user_id: UUID,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+):
+    form = await request.form()
+    old_user = await auth_svc.get_user_by_id(pool, user_id)
+    role = UserRole(form["role"])
+    await auth_svc.update_user_role(pool, user_id, role)
+    # Update password if provided
+    password = str(form.get("password", "")).strip()
+    if password:
+        hashed = auth_svc.hash_password(password)
+        await pool.execute(
+            "UPDATE users SET hashed_password = $1, updated_at = now() WHERE id = $2",
+            hashed, user_id,
+        )
+    updated_user = await auth_svc.get_user_by_id(pool, user_id)
+    if old_user and updated_user:
+        diff = audit_svc.compute_diff(old_user.__dict__, updated_user.__dict__, _USER_FIELDS)
+        if password:
+            diff["password"] = {"old": "***", "new": "***"}
+        if diff:
+            await audit_svc.log_audit_event(
+                pool,
+                user_id=user.id,
+                username=user.username,
+                action="update",
+                entity_type="user",
+                entity_id=user_id,
+                entity_name=updated_user.username,
+                changes=diff,
+            )
+    return RedirectResponse("/admin/users", status_code=302)
+
+
+@router.post("/admin/users/{user_id}/toggle-active")
+async def admin_user_toggle_active(
+    user_id: UUID,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+):
+    target = await auth_svc.get_user_by_id(pool, user_id)
+    if not target:
+        return HTMLResponse("Not found", status_code=404)
+    if target.id == user.id:
+        return RedirectResponse("/admin/users", status_code=302)
+    new_active = not target.is_active
+    await auth_svc.set_user_active(pool, user_id, new_active)
+    action = "activate" if new_active else "deactivate"
+    await audit_svc.log_audit_event(
+        pool,
+        user_id=user.id,
+        username=user.username,
+        action=action,
+        entity_type="user",
+        entity_id=user_id,
+        entity_name=target.username,
+        changes={"is_active": {"old": target.is_active, "new": new_active}},
+    )
+    return RedirectResponse("/admin/users", status_code=302)
+
+
+@router.post("/admin/users/{user_id}/delete")
+async def admin_user_delete_submit(
+    user_id: UUID,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+):
+    if user_id == user.id:
+        return RedirectResponse("/admin/users", status_code=302)
+    target = await auth_svc.get_user_by_id(pool, user_id)
+    await auth_svc.delete_user(pool, user_id)
+    if target:
+        await audit_svc.log_audit_event(
+            pool,
+            user_id=user.id,
+            username=user.username,
+            action="delete",
+            entity_type="user",
+            entity_id=user_id,
+            entity_name=target.username,
+            changes=audit_svc.delete_snapshot(target.__dict__, _USER_FIELDS),
+        )
+    return RedirectResponse("/admin/users", status_code=302)
+
+
+# --- Audit log pages ---
+
+
+@router.get("/admin/audit", response_class=HTMLResponse)
+async def admin_audit_log(
+    request: Request,
+    page: int = 1,
+    entity_type: str | None = None,
+    action: str | None = None,
+    username: str | None = None,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.VIEW_AUDIT)),
+):
+    logs, total = await audit_svc.list_audit_logs(
+        pool, entity_type=entity_type, action=action, username=username, page=page
+    )
+    notif_count = await alert_svc.count_unread_notifications(pool)
+    return templates.TemplateResponse(
+        "admin/audit_log.html",
+        {
+            "request": request,
+            "user": user,
+            "logs": logs,
+            "total": total,
+            "page": page,
+            "pages": (total + 49) // 50,
+            "filter_entity_type": entity_type or "",
+            "filter_action": action or "",
+            "filter_username": username or "",
+            "notif_count": notif_count,
+        },
+    )
+
+
+@router.get("/admin/audit/settings", response_class=HTMLResponse)
+async def admin_audit_settings(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+):
+    configs = await audit_svc.get_audit_config_all(pool)
+    notif_count = await alert_svc.count_unread_notifications(pool)
+    return templates.TemplateResponse(
+        "admin/audit_settings.html",
+        {
+            "request": request,
+            "user": user,
+            "configs": configs,
+            "notif_count": notif_count,
+        },
+    )
+
+
+@router.post("/admin/audit/settings")
+async def admin_audit_settings_submit(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+):
+    form = await request.form()
+    configs = await audit_svc.get_audit_config_all(pool)
+    for cfg in configs:
+        et = cfg["entity_type"]
+        enabled = f"enabled_{et}" in form
+        field_level = f"field_level_{et}" in form
+        await audit_svc.update_audit_config(pool, et, enabled=enabled, field_level=field_level)
+    return RedirectResponse("/admin/audit/settings", status_code=302)

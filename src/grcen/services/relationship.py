@@ -116,8 +116,11 @@ async def delete_relationship(pool: asyncpg.Pool, rel_id: UUID) -> bool:
 
 
 def _asset_from_prefixed(row, prefix: str) -> Asset:
+    import json
+
     from grcen.models.asset import AssetStatus, AssetType
 
+    raw_meta = row[f"{prefix}metadata"]
     return Asset(
         id=row[f"{prefix}id"],
         type=AssetType(row[f"{prefix}type"]),
@@ -125,7 +128,7 @@ def _asset_from_prefixed(row, prefix: str) -> Asset:
         description=row[f"{prefix}description"],
         status=AssetStatus(row[f"{prefix}status"]),
         owner=row[f"{prefix}owner"],
-        metadata_=row[f"{prefix}metadata"],
+        metadata_=json.loads(raw_meta) if isinstance(raw_meta, str) else raw_meta,
         created_at=row[f"{prefix}created_at"],
         updated_at=row[f"{prefix}updated_at"],
     )
