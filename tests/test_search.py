@@ -9,25 +9,39 @@ from grcen.services import asset as asset_svc
 @pytest.fixture
 async def sample_assets(pool):
     """Create a variety of assets for search testing."""
+    # Create owner assets first (Person/OU) so they can be referenced as owners
+    hr = await asset_svc.create_asset(
+        pool, type=AssetType.ORGANIZATIONAL_UNIT, name="HR", status="active",
+    )
+    platform_team = await asset_svc.create_asset(
+        pool, type=AssetType.ORGANIZATIONAL_UNIT, name="Platform Team", status="active",
+    )
+    legal = await asset_svc.create_asset(
+        pool, type=AssetType.ORGANIZATIONAL_UNIT, name="Legal", status="active",
+    )
+    it = await asset_svc.create_asset(
+        pool, type=AssetType.ORGANIZATIONAL_UNIT, name="IT", status="active",
+    )
+
     a1 = await asset_svc.create_asset(
         pool, type=AssetType.PERSON, name="Alice Smith", status="active",
-        owner="HR", description="Senior engineer",
+        owner_id=hr.id, description="Senior engineer",
     )
     a2 = await asset_svc.create_asset(
         pool, type=AssetType.SYSTEM, name="Prod API", status="active",
-        owner="Platform Team", metadata_={"environment": "production", "criticality": "critical"},
+        owner_id=platform_team.id, metadata_={"environment": "production", "criticality": "critical"},
     )
     a3 = await asset_svc.create_asset(
         pool, type=AssetType.POLICY, name="Data Retention Policy", status="draft",
-        owner="Legal",
+        owner_id=legal.id,
     )
     a4 = await asset_svc.create_asset(
         pool, type=AssetType.RISK, name="Vendor Lock-in", status="active",
-        owner="Alice Smith", metadata_={"likelihood": "likely", "impact": "major"},
+        owner_id=a1.id, metadata_={"likelihood": "likely", "impact": "major"},
     )
     a5 = await asset_svc.create_asset(
         pool, type=AssetType.DEVICE, name="Office Laptop Fleet", status="inactive",
-        owner="IT",
+        owner_id=it.id,
     )
     return [a1, a2, a3, a4, a5]
 
@@ -38,7 +52,7 @@ async def sample_assets(pool):
 @pytest.mark.asyncio
 async def test_search_by_name(pool, sample_assets):
     items, total = await asset_svc.list_assets(pool, q="Alice")
-    # Matches "Alice Smith" by name AND "Vendor Lock-in" by owner
+    # Matches "Alice Smith" by name AND "Vendor Lock-in" by owner name
     assert total == 2
     names = {a.name for a in items}
     assert "Alice Smith" in names
@@ -54,8 +68,10 @@ async def test_search_by_description(pool, sample_assets):
 @pytest.mark.asyncio
 async def test_search_by_owner(pool, sample_assets):
     items, total = await asset_svc.list_assets(pool, q="Platform")
-    assert total == 1
-    assert items[0].name == "Prod API"
+    # Matches "Prod API" (owner = Platform Team) and the "Platform Team" OU itself
+    assert total == 2
+    names = {a.name for a in items}
+    assert "Prod API" in names
 
 
 @pytest.mark.asyncio
@@ -131,7 +147,8 @@ async def test_created_before_filter(pool, sample_assets):
 @pytest.mark.asyncio
 async def test_no_filters_returns_all(pool, sample_assets):
     items, total = await asset_svc.list_assets(pool)
-    assert total == 5
+    # 5 main assets + 4 owner OUs = 9
+    assert total == 9
 
 
 @pytest.mark.asyncio
@@ -152,7 +169,6 @@ async def test_asset_list_page_with_search(auth_client, pool, sample_assets):
     resp = await auth_client.get("/assets?q=Alice")
     assert resp.status_code == 200
     assert b"Alice Smith" in resp.content
-    assert b"Prod API" not in resp.content
 
 
 @pytest.mark.asyncio
@@ -175,7 +191,8 @@ async def test_asset_list_page_with_metadata_filter(auth_client, pool, sample_as
 async def test_asset_list_page_shows_result_count(auth_client, pool, sample_assets):
     resp = await auth_client.get("/assets?status=active")
     assert resp.status_code == 200
-    assert b"3 assets found" in resp.content
+    # 4 owner OUs (all active) + Alice Smith + Prod API + Vendor Lock-in = 7
+    assert b"7 assets found" in resp.content
 
 
 @pytest.mark.asyncio

@@ -30,7 +30,14 @@
 <div class="detail-grid">
     <div class="detail-field"><strong>Type:</strong> {{ asset.type.value | replace('_', ' ') | title }}</div>
     <div class="detail-field"><strong>Status:</strong> <span class="badge badge-{{ asset.status.value }}">{{ asset.status.value | title }}</span></div>
-    <div class="detail-field"><strong>Owner:</strong> {{ asset.owner or '—' }}</div>
+    <div class="detail-field">
+        <strong>{% if asset.type.value == 'person' %}Manager{% else %}Owner{% endif %}:</strong>
+        {% if asset.owner_id %}
+        <a href="/assets/{{ asset.owner_id }}">{{ asset.owner or '—' }}</a>
+        {% else %}
+        {{ asset.owner or '—' }}
+        {% endif %}
+    </div>
     <div class="detail-field"><strong>Created:</strong> {{ asset.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
     <div class="detail-field"><strong>Updated:</strong> {{ asset.updated_at.strftime('%Y-%m-%d %H:%M') }}</div>
 </div>
@@ -69,19 +76,19 @@
 <div id="relationships">
     {% if relationships %}
     <table>
-        <thead><tr><th>Direction</th><th>Related Asset</th><th>Type</th><th>Description</th>{% if has_perm(user.role, Permission.DELETE) %}<th></th>{% endif %}</tr></thead>
+        <thead><tr><th>Relationship</th><th>Related Asset</th><th>Description</th>{% if has_perm(user.role, Permission.DELETE) %}<th></th>{% endif %}</tr></thead>
         <tbody>
             {% for rel in relationships %}
+            {% set is_outgoing = rel.source_asset_id == asset.id %}
             <tr>
-                <td>{% if rel.source_asset_id == asset.id %}outgoing{% else %}incoming{% endif %}</td>
+                <td>{{ rel_label(rel.relationship_type, is_outgoing) }}</td>
                 <td>
-                    {% if rel.source_asset_id == asset.id %}
+                    {% if is_outgoing %}
                     <a href="/assets/{{ rel.target_asset.id }}">{{ rel.target_asset.name }}</a>
                     {% else %}
                     <a href="/assets/{{ rel.source_asset.id }}">{{ rel.source_asset.name }}</a>
                     {% endif %}
                 </td>
-                <td>{{ rel.relationship_type }}</td>
                 <td>{{ rel.description or '—' }}</td>
                 {% if has_perm(user.role, Permission.DELETE) %}
                 <td>

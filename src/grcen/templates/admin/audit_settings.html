@@ -10,21 +10,25 @@
         <thead>
             <tr>
                 <th>Entity Type</th>
-                <th>Enabled</th>
+                <th>Audit Events Enabled</th>
                 <th>Field-Level Diffs</th>
             </tr>
         </thead>
         <tbody>
             {% for cfg in configs %}
             <tr>
-                <td>{{ cfg.entity_type }}</td>
+                <td>{{ cfg.entity_type | replace('_', ' ') | title }}</td>
                 <td>
                     <input type="checkbox" name="enabled_{{ cfg.entity_type }}"
-                           {% if cfg.enabled %}checked{% endif %}>
+                           id="enabled_{{ cfg.entity_type }}"
+                           {% if cfg.enabled %}checked{% endif %}
+                           onchange="toggleFieldLevel('{{ cfg.entity_type }}')">
                 </td>
                 <td>
                     <input type="checkbox" name="field_level_{{ cfg.entity_type }}"
-                           {% if cfg.field_level %}checked{% endif %}>
+                           id="field_level_{{ cfg.entity_type }}"
+                           {% if cfg.field_level %}checked{% endif %}
+                           {% if not cfg.enabled %}disabled style="opacity:0.4;"{% endif %}>
                 </td>
             </tr>
             {% endfor %}
@@ -32,4 +36,19 @@
     </table>
     <button type="submit" class="btn" style="margin-top:1rem;">Save Settings</button>
 </form>
+
+<script>
+function toggleFieldLevel(entityType) {
+    var enabled = document.getElementById('enabled_' + entityType);
+    var fieldLevel = document.getElementById('field_level_' + entityType);
+    if (!enabled.checked) {
+        fieldLevel.disabled = true;
+        fieldLevel.checked = false;
+        fieldLevel.style.opacity = '0.4';
+    } else {
+        fieldLevel.disabled = false;
+        fieldLevel.style.opacity = '1';
+    }
+}
+</script>
 {% endblock %}

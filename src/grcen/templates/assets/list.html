@@ -14,53 +14,61 @@
             <label>Search</label>
             <input type="text" name="q" value="{{ filter_q }}" placeholder="Name, description, or owner...">
         </div>
-        <div class="form-group" style="margin-bottom:0;min-width:140px;">
-            <label>Type</label>
-            <select name="type">
-                <option value="">All Types</option>
-                {% for t in asset_types %}
-                <option value="{{ t.value }}" {% if current_type and current_type.value == t.value %}selected{% endif %}>
-                    {{ t.value | replace('_', ' ') | title }}
-                </option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="form-group" style="margin-bottom:0;min-width:120px;">
-            <label>Status</label>
-            <select name="status">
-                <option value="">All</option>
-                {% for s in statuses %}
-                <option value="{{ s }}" {% if filter_status == s %}selected{% endif %}>{{ s | title }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="form-group" style="margin-bottom:0;min-width:140px;">
-            <label>Owner</label>
-            <input type="text" name="owner" value="{{ filter_owner }}" placeholder="Owner...">
-        </div>
-    </div>
-    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:end;margin-top:0.5rem;">
-        <div class="form-group" style="margin-bottom:0;min-width:140px;">
-            <label>Created after</label>
-            <input type="date" name="created_after" value="{{ filter_created_after }}">
-        </div>
-        <div class="form-group" style="margin-bottom:0;min-width:140px;">
-            <label>Created before</label>
-            <input type="date" name="created_before" value="{{ filter_created_before }}">
-        </div>
-        <div class="form-group" style="margin-bottom:0;min-width:140px;">
-            <label>Metadata field</label>
-            <input type="text" name="meta_key" value="{{ filter_meta_key }}" placeholder="e.g. likelihood">
-        </div>
-        <div class="form-group" style="margin-bottom:0;min-width:140px;">
-            <label>Metadata value</label>
-            <input type="text" name="meta_value" value="{{ filter_meta_value }}" placeholder="e.g. critical">
-        </div>
         <div style="display:flex;gap:0.5rem;align-items:end;padding-bottom:0.1rem;">
             <button type="submit" class="btn btn-primary">Search</button>
             <a href="/assets" class="btn">Clear</a>
+            <button type="button" class="btn" onclick="toggleAdvanced()" id="advanced-toggle">Advanced</button>
         </div>
     </div>
+    <div id="advanced-filters" style="display:none;margin-top:0.75rem;">
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:end;">
+            <div class="form-group" style="margin-bottom:0;min-width:140px;">
+                <label>Type</label>
+                <select name="type">
+                    <option value="">All Types</option>
+                    {% for t in asset_types %}
+                    <option value="{{ t.value }}" {% if current_type and current_type.value == t.value %}selected{% endif %}>
+                        {{ t.value | replace('_', ' ') | title }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group" style="margin-bottom:0;min-width:120px;">
+                <label>Status</label>
+                <select name="status">
+                    <option value="">All</option>
+                    {% for s in statuses %}
+                    <option value="{{ s }}" {% if filter_status == s %}selected{% endif %}>{{ s | title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group" style="margin-bottom:0;min-width:140px;">
+                <label>Owner</label>
+                <input type="text" name="owner" value="{{ filter_owner }}" placeholder="Owner...">
+            </div>
+        </div>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:end;margin-top:0.5rem;">
+            <div class="form-group" style="margin-bottom:0;min-width:140px;">
+                <label>Created after</label>
+                <input type="date" name="created_after" value="{{ filter_created_after }}">
+            </div>
+            <div class="form-group" style="margin-bottom:0;min-width:140px;">
+                <label>Created before</label>
+                <input type="date" name="created_before" value="{{ filter_created_before }}">
+            </div>
+            <div class="form-group" style="margin-bottom:0;min-width:140px;">
+                <label>Metadata field</label>
+                <input type="text" name="meta_key" value="{{ filter_meta_key }}" placeholder="e.g. likelihood">
+            </div>
+            <div class="form-group" style="margin-bottom:0;min-width:140px;">
+                <label>Metadata value</label>
+                <input type="text" name="meta_value" value="{{ filter_meta_value }}" placeholder="e.g. critical">
+            </div>
+        </div>
+    </div>
+    {# Persist sort in form submission #}
+    <input type="hidden" name="sort" value="{{ sort }}">
+    <input type="hidden" name="order" value="{{ order }}">
 </form>
 
 <p style="margin-bottom:0.75rem;color:var(--text-muted);font-size:0.875rem;">
@@ -68,17 +76,35 @@
     {% if pages > 1 %} (page {{ page }} of {{ pages }}){% endif %}
 </p>
 
+{% macro sort_header(col, label) %}
+{% set new_order = 'desc' if sort == col and order == 'asc' else 'asc' %}
+{% set arrow = '▲' if sort == col and order == 'asc' else ('▼' if sort == col and order == 'desc' else '') %}
+<th><a href="/assets?sort={{ col }}&order={{ new_order }}{{ filter_params | replace('&sort=' ~ sort, '') | replace('&order=' ~ order, '') }}" style="text-decoration:none;color:inherit;">{{ label }} {{ arrow }}</a></th>
+{% endmacro %}
+
 <table>
     <thead>
-        <tr><th>Name</th><th>Type</th><th>Status</th><th>Owner</th><th>Created</th></tr>
+        <tr>
+            {{ sort_header('name', 'Name') }}
+            {{ sort_header('type', 'Type') }}
+            {{ sort_header('status', 'Status') }}
+            {{ sort_header('owner', 'Owner') }}
+            {{ sort_header('created_at', 'Created') }}
+        </tr>
     </thead>
     <tbody>
         {% for asset in assets %}
         <tr>
             <td><a href="/assets/{{ asset.id }}">{{ asset.name }}</a></td>
-            <td>{{ asset.type.value | replace('_', ' ') | title }}</td>
+            <td><a href="/assets?type={{ asset.type.value }}">{{ asset.type.value | replace('_', ' ') | title }}</a></td>
             <td><span class="badge badge-{{ asset.status.value }}">{{ asset.status.value | title }}</span></td>
-            <td>{{ asset.owner or '—' }}</td>
+            <td>
+                {% if asset.owner_id %}
+                <a href="/assets/{{ asset.owner_id }}">{{ asset.owner or '—' }}</a>
+                {% else %}
+                {{ asset.owner or '—' }}
+                {% endif %}
+            </td>
             <td>{{ asset.created_at.strftime('%Y-%m-%d') }}</td>
         </tr>
         {% else %}
@@ -95,4 +121,18 @@
     {% endfor %}
 </div>
 {% endif %}
+
+<script>
+function toggleAdvanced() {
+    var el = document.getElementById('advanced-filters');
+    el.style.display = el.style.display === 'none' ? '' : 'none';
+}
+// Auto-show advanced filters if any filter is active
+(function() {
+    var hasFilter = {{ 'true' if (current_type or filter_status or filter_owner or filter_created_after or filter_created_before or filter_meta_key) else 'false' }};
+    if (hasFilter) {
+        document.getElementById('advanced-filters').style.display = '';
+    }
+})();
+</script>
 {% endblock %}

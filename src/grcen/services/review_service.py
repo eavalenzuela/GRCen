@@ -51,16 +51,18 @@ async def get_reviews(
     Each result has: id, name, type, owner, due_date, due_field, status.
     Sorted by due_date ascending (most urgent first).
     """
-    where = "status = 'active'"
+    where = "a.status = 'active'"
     vals: list = []
     idx = 1
     if asset_type:
-        where += f" AND type = ${idx}"
+        where += f" AND a.type = ${idx}"
         vals.append(asset_type)
         idx += 1
 
     rows = await pool.fetch(
-        f"SELECT id, type, name, owner, metadata FROM assets WHERE {where} ORDER BY name",
+        f"""SELECT a.id, a.type, a.name, COALESCE(o.name, a.owner) AS owner, a.metadata
+            FROM assets a LEFT JOIN assets o ON o.id = a.owner_id
+            WHERE {where} ORDER BY a.name""",
         *vals,
     )
 

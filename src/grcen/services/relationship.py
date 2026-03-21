@@ -36,10 +36,10 @@ async def get_relationship(pool: asyncpg.Pool, rel_id: UUID) -> Relationship | N
         """
         SELECT r.*,
                s.id as s_id, s.type as s_type, s.name as s_name, s.description as s_description,
-               s.status as s_status, s.owner as s_owner, s.metadata as s_metadata,
+               s.status as s_status, s.owner as s_owner, s.owner_id as s_owner_id, s.metadata as s_metadata,
                s.created_at as s_created_at, s.updated_at as s_updated_at,
                t.id as t_id, t.type as t_type, t.name as t_name, t.description as t_description,
-               t.status as t_status, t.owner as t_owner, t.metadata as t_metadata,
+               t.status as t_status, t.owner as t_owner, t.owner_id as t_owner_id, t.metadata as t_metadata,
                t.created_at as t_created_at, t.updated_at as t_updated_at
         FROM relationships r
         JOIN assets s ON s.id = r.source_asset_id
@@ -63,10 +63,10 @@ async def list_relationships_for_asset(
         """
         SELECT r.*,
                s.id as s_id, s.type as s_type, s.name as s_name, s.description as s_description,
-               s.status as s_status, s.owner as s_owner, s.metadata as s_metadata,
+               s.status as s_status, s.owner as s_owner, s.owner_id as s_owner_id, s.metadata as s_metadata,
                s.created_at as s_created_at, s.updated_at as s_updated_at,
                t.id as t_id, t.type as t_type, t.name as t_name, t.description as t_description,
-               t.status as t_status, t.owner as t_owner, t.metadata as t_metadata,
+               t.status as t_status, t.owner as t_owner, t.owner_id as t_owner_id, t.metadata as t_metadata,
                t.created_at as t_created_at, t.updated_at as t_updated_at
         FROM relationships r
         JOIN assets s ON s.id = r.source_asset_id
@@ -127,7 +127,8 @@ def _asset_from_prefixed(row, prefix: str) -> Asset:
         name=row[f"{prefix}name"],
         description=row[f"{prefix}description"],
         status=AssetStatus(row[f"{prefix}status"]),
-        owner=row[f"{prefix}owner"],
+        owner=row.get(f"{prefix}owner"),
+        owner_id=row.get(f"{prefix}owner_id"),
         metadata_=json.loads(raw_meta) if isinstance(raw_meta, str) else raw_meta,
         created_at=row[f"{prefix}created_at"],
         updated_at=row[f"{prefix}updated_at"],

@@ -82,9 +82,9 @@ async def get_top_risks(pool: asyncpg.Pool, limit: int = 5) -> list[dict]:
     """Return top N active risks sorted by computed score descending."""
     rows = await pool.fetch(
         """
-        SELECT id, name, owner, metadata
-        FROM assets
-        WHERE type = 'risk' AND status = 'active'
+        SELECT a.id, a.name, COALESCE(o.name, a.owner) AS owner, a.metadata
+        FROM assets a LEFT JOIN assets o ON o.id = a.owner_id
+        WHERE a.type = 'risk' AND a.status = 'active'
         """
     )
     import json

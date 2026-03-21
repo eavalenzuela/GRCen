@@ -11,6 +11,8 @@ from grcen.schemas.relationship import (
     RelationshipResponse,
     RelationshipUpdate,
 )
+from grcen.models.asset import AssetType
+from grcen.services import asset as asset_svc
 from grcen.services import relationship as rel_svc
 from grcen.services import audit_service as audit_svc
 
@@ -35,11 +37,18 @@ async def create_relationship(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.CREATE)),
 ):
+    # Auto-convert owns→manages when target is a Person
+    rel_type = data.relationship_type
+    if rel_type == "owns":
+        target = await asset_svc.get_asset(pool, data.target_asset_id)
+        if target and target.type == AssetType.PERSON:
+            rel_type = "manages"
+
     rel = await rel_svc.create_relationship(
         pool,
         source_asset_id=data.source_asset_id,
         target_asset_id=data.target_asset_id,
-        relationship_type=data.relationship_type,
+        relationship_type=rel_type,
         description=data.description,
     )
     await audit_svc.log_audit_event(

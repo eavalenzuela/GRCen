@@ -78,9 +78,19 @@ async def execute_asset_import(
                     result.errors.extend(errs)
                     continue
                 metadata = _extract_metadata_from_row(row)
+                # Resolve owner name to UUID
+                owner_id = None
+                owner_text = row.get("owner", "").strip()
+                if owner_text:
+                    owner_row = await conn.fetchrow(
+                        "SELECT id FROM assets WHERE name = $1 AND type IN ('person', 'organizational_unit') LIMIT 1",
+                        owner_text,
+                    )
+                    if owner_row:
+                        owner_id = owner_row["id"]
                 await conn.execute(
                     """
-                    INSERT INTO assets (id, type, name, description, status, owner, metadata)
+                    INSERT INTO assets (id, type, name, description, status, owner_id, metadata)
                     VALUES ($1, $2, $3, $4, $5, $6, $7)
                     """,
                     uuid.uuid4(),
@@ -88,7 +98,7 @@ async def execute_asset_import(
                     row["name"],
                     row.get("description", ""),
                     row.get("status", "active"),
-                    row.get("owner", ""),
+                    owner_id,
                     json.dumps(metadata),
                 )
                 result.created += 1
@@ -161,6 +171,11 @@ async def execute_relationship_import(
                     )
                     continue
 
+                # Auto-convert owns→manages when target is a person
+                rel_type = row["relationship_type"]
+                if rel_type == "owns" and row.get("target_type") == "person":
+                    rel_type = "manages"
+
                 await conn.execute(
                     """
                     INSERT INTO relationships
@@ -170,7 +185,7 @@ async def execute_relationship_import(
                     uuid.uuid4(),
                     source["id"],
                     target["id"],
-                    row["relationship_type"],
+                    rel_type,
                     row.get("description", ""),
                 )
                 result.created += 1

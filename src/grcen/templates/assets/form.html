@@ -36,8 +36,23 @@
     </div>
 
     <div class="form-group">
-        <label for="owner">Owner</label>
-        <input type="text" id="owner" name="owner" value="{{ asset.owner if asset and asset.owner else '' }}">
+        <label for="owner_search" id="owner-label">
+            {% if asset and asset.type.value == 'person' %}Manager{% else %}Owner{% endif %}
+        </label>
+        <div style="position:relative;">
+            <input type="text" id="owner_search" placeholder="Search person or org unit..."
+                   hx-get="/api/owner-search" hx-trigger="keyup changed delay:300ms"
+                   hx-target="#owner-results" hx-include="[name='q']"
+                   autocomplete="off"
+                   value="{{ asset.owner if asset and asset.owner else '' }}">
+            <input type="hidden" name="q" id="owner_q" value="">
+            <div id="owner-results" class="autocomplete-results"></div>
+            <input type="hidden" name="owner_id" id="owner_id"
+                   value="{{ asset.owner_id if asset and asset.owner_id else '' }}">
+        </div>
+        {% if asset and asset.owner %}
+        <small style="color:var(--text-muted);">Current: {{ asset.owner }}</small>
+        {% endif %}
     </div>
 
     <div id="custom-fields">
@@ -93,24 +108,6 @@
             </div>
             {% endfor %}
             {% endfor %}
-            <script>
-            (function() {
-                var typeSelect = document.getElementById('type');
-                function showFields() {
-                    var selected = typeSelect.value;
-                    document.querySelectorAll('.custom-field-group').forEach(function(el) {
-                        var show = el.dataset.assetType === selected;
-                        el.style.display = show ? '' : 'none';
-                        // Disable hidden inputs so they don't submit
-                        el.querySelectorAll('input, select').forEach(function(inp) {
-                            inp.disabled = !show;
-                        });
-                    });
-                }
-                typeSelect.addEventListener('change', showFields);
-                showFields();
-            })();
-            </script>
         {% endif %}
     </div>
 
@@ -119,4 +116,37 @@
         <a href="{% if asset %}/assets/{{ asset.id }}{% else %}/assets{% endif %}" class="btn">Cancel</a>
     </div>
 </form>
+
+<script>
+function selectOwner(id, name) {
+    document.getElementById('owner_search').value = name;
+    document.getElementById('owner_id').value = id;
+    document.getElementById('owner-results').innerHTML = '';
+}
+
+// Sync the search text to the q hidden field for hx-include
+document.getElementById('owner_search').addEventListener('input', function() {
+    document.getElementById('owner_q').value = this.value;
+});
+
+{% if not asset %}
+(function() {
+    var typeSelect = document.getElementById('type');
+    var ownerLabel = document.getElementById('owner-label');
+    function showFields() {
+        var selected = typeSelect.value;
+        document.querySelectorAll('.custom-field-group').forEach(function(el) {
+            var show = el.dataset.assetType === selected;
+            el.style.display = show ? '' : 'none';
+            el.querySelectorAll('input, select').forEach(function(inp) {
+                inp.disabled = !show;
+            });
+        });
+        ownerLabel.textContent = selected === 'person' ? 'Manager' : 'Owner';
+    }
+    typeSelect.addEventListener('change', showFields);
+    showFields();
+})();
+{% endif %}
+</script>
 {% endblock %}

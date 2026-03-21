@@ -20,12 +20,61 @@ from grcen.services import audit_service as audit_svc
 from grcen.services import review_service as review_svc
 from grcen.services import risk_service as risk_svc
 
+# Static mapping: relationship_type -> (outgoing_label, incoming_label)
+RELATIONSHIP_LABELS: dict[str, tuple[str, str]] = {
+    "manages": ("manages", "managed by"),
+    "owns": ("owns", "owned by"),
+    "leads": ("leads", "led by"),
+    "member_of": ("member of", "has member"),
+    "governs": ("governs", "governed by"),
+    "depends_on": ("depends on", "depended on by"),
+    "deployed_on": ("deployed on", "hosts"),
+    "authenticates_via": ("authenticates via", "authenticates"),
+    "authenticates": ("authenticates", "authenticated by"),
+    "runs_on": ("runs on", "hosts"),
+    "deploys_to": ("deploys to", "deployed from"),
+    "monitors": ("monitors", "monitored by"),
+    "protects": ("protects", "protected by"),
+    "processes": ("processes", "processed by"),
+    "stores": ("stores", "stored in"),
+    "references": ("references", "referenced by"),
+    "assesses": ("assesses", "assessed by"),
+    "reviews": ("reviews", "reviewed by"),
+    "satisfied_by": ("satisfied by", "satisfies"),
+    "implemented_by": ("implemented by", "implements"),
+    "operates_on": ("operates on", "operated on by"),
+    "scans": ("scans", "scanned by"),
+    "approves_changes_to": ("approves changes to", "changes approved by"),
+    "threatens": ("threatens", "threatened by"),
+    "mitigated_by": ("mitigated by", "mitigates"),
+    "trained_on": ("trained on", "trains"),
+    "used_by": ("used by", "uses"),
+    "describes": ("describes", "described by"),
+    "defines": ("defines", "defined by"),
+    "sends_data_to": ("sends data to", "receives data from"),
+    "connects_to": ("connects to", "connected from"),
+    "links_to": ("links to", "linked from"),
+    "replaced_by": ("replaced by", "replaces"),
+    "mirrors": ("mirrors", "mirrored by"),
+    "enforces": ("enforces", "enforced by"),
+    "classifies": ("classifies", "classified by"),
+}
+
+
+def _rel_direction_label(rel_type: str, is_outgoing: bool) -> str:
+    """Return a human-readable direction label for a relationship."""
+    labels = RELATIONSHIP_LABELS.get(rel_type)
+    if labels:
+        return labels[0] if is_outgoing else labels[1]
+    return rel_type if is_outgoing else f"incoming: {rel_type}"
+
 _ASSET_FIELDS = ["name", "description", "status", "owner", "metadata"]
 _USER_FIELDS = ["username", "role", "is_active"]
 
 templates = Jinja2Templates(directory="src/grcen/templates")
 templates.env.globals["has_perm"] = has_permission
 templates.env.globals["Permission"] = Permission
+templates.env.globals["rel_label"] = _rel_direction_label
 
 router = APIRouter(tags=["pages"])
 
@@ -132,6 +181,8 @@ async def asset_list(
     created_before: str | None = None,
     meta_key: str | None = None,
     meta_value: str | None = None,
+    sort: str = "name",
+    order: str = "asc",
     page: int = 1,
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.VIEW)),
@@ -150,6 +201,8 @@ async def asset_list(
         created_after=created_after,
         created_before=created_before,
         metadata_filters=metadata_filters,
+        sort=sort,
+        order=order,
     )
     notif_count = await alert_svc.count_unread_notifications(pool)
     # Build filter params string for pagination links
@@ -168,6 +221,10 @@ async def asset_list(
         filter_params += f"&created_before={created_before}"
     if meta_key and meta_value:
         filter_params += f"&meta_key={meta_key}&meta_value={meta_value}"
+    if sort != "name":
+        filter_params += f"&sort={sort}"
+    if order != "asc":
+        filter_params += f"&order={order}"
     return templates.TemplateResponse(
         "assets/list.html",
         {
@@ -189,6 +246,8 @@ async def asset_list(
             "filter_meta_value": meta_value or "",
             "filter_params": filter_params,
             "statuses": ["active", "inactive", "draft", "archived"],
+            "sort": sort,
+            "order": order,
         },
     )
 
@@ -226,13 +285,21 @@ async def asset_create_submit(
         score = risk_svc.compute_risk_score(metadata.get("likelihood"), metadata.get("impact"))
         if score is not None:
             metadata["inherent_risk_score"] = score
+    owner_id = None
+    owner_id_str = str(form.get("owner_id", "")).strip()
+    if owner_id_str:
+        from uuid import UUID as _UUID
+        try:
+            owner_id = _UUID(owner_id_str)
+        except ValueError:
+            pass
     asset = await asset_svc.create_asset(
         pool,
         type=asset_type,
         name=str(form["name"]),
         description=str(form.get("description", "")),
         status=str(form.get("status", "active")),
-        owner=str(form.get("owner", "")),
+        owner_id=owner_id,
         metadata_=metadata,
         updated_by=user.id,
     )
@@ -318,13 +385,21 @@ async def asset_update_submit(
         score = risk_svc.compute_risk_score(metadata.get("likelihood"), metadata.get("impact"))
         if score is not None:
             metadata["inherent_risk_score"] = score
+    owner_id = None
+    owner_id_str = str(form.get("owner_id", "")).strip()
+    if owner_id_str:
+        from uuid import UUID as _UUID
+        try:
+            owner_id = _UUID(owner_id_str)
+        except ValueError:
+            pass
     updated = await asset_svc.update_asset(
         pool,
         asset_id,
         name=str(form["name"]),
         description=str(form.get("description", "")),
         status=str(form.get("status", "active")),
-        owner=str(form.get("owner", "")),
+        owner_id=owner_id,
         metadata_=metadata,
         updated_by=user.id,
     )
@@ -391,6 +466,34 @@ async def asset_clone_submit(
         changes={"cloned_from": {"new": str(asset_id)}},
     )
     return RedirectResponse(f"/assets/{clone.id}", status_code=302)
+
+
+# --- Owner autocomplete (returns HTML fragment for htmx) ---
+
+
+@router.get("/api/owner-search", response_class=HTMLResponse)
+async def owner_search(
+    request: Request,
+    q: str = "",
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.VIEW)),
+):
+    if len(q) < 2:
+        return HTMLResponse("")
+    results = await asset_svc.search_assets(
+        pool, q, types=[AssetType.PERSON, AssetType.ORGANIZATIONAL_UNIT],
+    )
+    html = ""
+    for a in results[:10]:
+        label = a.type.value.replace("_", " ").title()
+        html += (
+            f'<div class="autocomplete-item" '
+            f"onclick=\"selectOwner('{a.id}', '{a.name}')\">"
+            f"{a.name} <small>({label})</small></div>"
+        )
+    if not html:
+        html = '<div class="autocomplete-item" style="color:var(--text-muted)">No results</div>'
+    return HTMLResponse(html)
 
 
 # --- Graph page ---

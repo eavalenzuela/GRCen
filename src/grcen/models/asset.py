@@ -34,7 +34,8 @@ class Asset:
     name: str
     description: str | None
     status: AssetStatus
-    owner: str | None
+    owner: str | None  # display name (resolved from owner_id JOIN)
+    owner_id: UUID | None  # FK to assets table
     metadata_: dict | None
     created_at: datetime
     updated_at: datetime
@@ -42,13 +43,16 @@ class Asset:
 
     @classmethod
     def from_row(cls, row) -> "Asset":
+        # Prefer JOINed owner_name over legacy text column
+        owner_display = row.get("owner_name") if "owner_name" in row.keys() else row.get("owner")
         return cls(
             id=row["id"],
             type=AssetType(row["type"]),
             name=row["name"],
             description=row["description"],
             status=AssetStatus(row["status"]),
-            owner=row["owner"],
+            owner=owner_display,
+            owner_id=row.get("owner_id"),
             metadata_=json.loads(row["metadata"]) if isinstance(row["metadata"], str) else row["metadata"],
             created_at=row["created_at"],
             updated_at=row["updated_at"],

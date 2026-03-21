@@ -50,10 +50,14 @@ async def list_assets(
 @router.get("/search")
 async def search_assets(
     q: str = "",
+    types: str = "",
     pool: asyncpg.Pool = Depends(get_db),
     _user: User = Depends(require_permission(Permission.VIEW)),
 ):
-    results = await asset_svc.search_assets(pool, q)
+    type_list = None
+    if types:
+        type_list = [AssetType(t.strip()) for t in types.split(",") if t.strip()]
+    results = await asset_svc.search_assets(pool, q, types=type_list)
     return [AssetResponse.model_validate(a, from_attributes=True) for a in results]
 
 
@@ -69,7 +73,7 @@ async def create_asset(
         name=data.name,
         description=data.description,
         status=data.status.value,
-        owner=data.owner,
+        owner_id=data.owner_id,
         metadata_=data.metadata_,
         updated_by=user.id,
     )

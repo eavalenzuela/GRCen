@@ -21,16 +21,19 @@ async def export_assets(
 
     if asset_types:
         placeholders = ", ".join(f"${i}" for i in range(idx, idx + len(asset_types)))
-        conditions.append(f"type IN ({placeholders})")
+        conditions.append(f"a.type IN ({placeholders})")
         params.extend(t.value for t in asset_types)
         idx += len(asset_types)
     if status:
-        conditions.append(f"status = ${idx}")
+        conditions.append(f"a.status = ${idx}")
         params.append(status.value)
         idx += 1
 
     where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
-    rows = await pool.fetch(f"SELECT * FROM assets {where} ORDER BY name", *params)
+    rows = await pool.fetch(
+        f"SELECT a.*, o.name AS owner_name FROM assets a LEFT JOIN assets o ON o.id = a.owner_id {where} ORDER BY a.name",
+        *params,
+    )
 
     base_columns = ["id", "type", "name", "description", "status", "owner", "created_at"]
 
@@ -54,8 +57,11 @@ async def export_assets(
         if isinstance(metadata, str):
             metadata = json.loads(metadata)
         for col in selected:
-            if col in ("id", "type", "name", "description", "status", "owner", "created_at", "updated_at"):
+            if col in ("id", "type", "name", "description", "status", "created_at", "updated_at"):
                 val = row.get(col, "")
+                item[col] = str(val) if val is not None else ""
+            elif col == "owner":
+                val = row.get("owner_name") or row.get("owner", "")
                 item[col] = str(val) if val is not None else ""
             else:
                 val = metadata.get(col, "")

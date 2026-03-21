@@ -152,6 +152,27 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_column THEN NULL;
 END $$;
 
+-- Add owner_id FK column to assets
+DO $$ BEGIN
+    ALTER TABLE assets ADD COLUMN owner_id UUID REFERENCES assets(id) ON DELETE SET NULL;
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+
+-- Populate owner_id from owner text (best-effort name lookup)
+UPDATE assets a
+SET owner_id = (
+    SELECT o.id FROM assets o
+    WHERE o.name = a.owner
+      AND o.type IN ('person', 'organizational_unit')
+    ORDER BY o.created_at
+    LIMIT 1
+)
+WHERE a.owner IS NOT NULL
+  AND a.owner != ''
+  AND a.owner_id IS NULL;
+
+CREATE INDEX IF NOT EXISTS ix_assets_owner_id ON assets (owner_id);
+
 -- Seed default audit config
 INSERT INTO audit_config (entity_type, enabled, field_level)
 VALUES

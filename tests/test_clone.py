@@ -9,9 +9,12 @@ from grcen.services import relationship as rel_svc
 
 @pytest.mark.asyncio
 async def test_clone_asset_basic(pool):
+    owner = await asset_svc.create_asset(
+        pool, type=AssetType.ORGANIZATIONAL_UNIT, name="HR", status="active",
+    )
     original = await asset_svc.create_asset(
         pool, type=AssetType.PERSON, name="Original Person", status="active",
-        owner="HR", description="A person", metadata_={"title": "Engineer"},
+        owner_id=owner.id, description="A person", metadata_={"title": "Engineer"},
     )
     clone = await asset_svc.clone_asset(pool, original.id)
     assert clone is not None
@@ -19,7 +22,7 @@ async def test_clone_asset_basic(pool):
     assert clone.name == "Original Person (Copy)"
     assert clone.type == original.type
     assert clone.status == original.status
-    assert clone.owner == original.owner
+    assert clone.owner_id == original.owner_id
     assert clone.description == original.description
     assert clone.metadata_.get("title") == "Engineer"
 
