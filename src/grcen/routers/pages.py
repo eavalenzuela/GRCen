@@ -17,6 +17,8 @@ from grcen.services import relationship as rel_svc
 from grcen.permissions import UserRole
 from grcen.services import auth as auth_svc
 from grcen.services import audit_service as audit_svc
+from grcen.services import review_service as review_svc
+from grcen.services import risk_service as risk_svc
 
 _ASSET_FIELDS = ["name", "description", "status", "owner", "metadata"]
 _USER_FIELDS = ["username", "role", "is_active"]
@@ -93,6 +95,9 @@ async def dashboard(
     assets, total = await asset_svc.list_assets(pool, page=1, page_size=10)
     alerts = await alert_svc.list_alerts(pool)
     notif_count = await alert_svc.count_unread_notifications(pool)
+    heatmap = await risk_svc.get_risk_heatmap(pool)
+    top_risks = await risk_svc.get_top_risks(pool)
+    review_counts = await review_svc.get_review_counts(pool)
     return templates.TemplateResponse(
         "dashboard.html",
         {
@@ -103,6 +108,12 @@ async def dashboard(
             "alerts": alerts[:5],
             "notif_count": notif_count,
             "asset_types": list(AssetType),
+            "heatmap": heatmap,
+            "top_risks": top_risks,
+            "likelihood_levels": risk_svc.LIKELIHOOD_LEVELS,
+            "impact_levels": risk_svc.IMPACT_LEVELS,
+            "score_color": risk_svc.score_color,
+            "review_counts": review_counts,
         },
     )
 
@@ -114,12 +125,49 @@ async def dashboard(
 async def asset_list(
     request: Request,
     type: AssetType | None = None,
+    q: str | None = None,
+    status: str | None = None,
+    owner: str | None = None,
+    created_after: str | None = None,
+    created_before: str | None = None,
+    meta_key: str | None = None,
+    meta_value: str | None = None,
     page: int = 1,
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.VIEW)),
 ):
-    items, total = await asset_svc.list_assets(pool, asset_type=type, page=page, page_size=25)
+    metadata_filters = None
+    if meta_key and meta_value:
+        metadata_filters = {meta_key: meta_value}
+    items, total = await asset_svc.list_assets(
+        pool,
+        asset_type=type,
+        page=page,
+        page_size=25,
+        q=q,
+        status=status,
+        owner=owner,
+        created_after=created_after,
+        created_before=created_before,
+        metadata_filters=metadata_filters,
+    )
     notif_count = await alert_svc.count_unread_notifications(pool)
+    # Build filter params string for pagination links
+    filter_params = ""
+    if type:
+        filter_params += f"&type={type.value}"
+    if q:
+        filter_params += f"&q={q}"
+    if status:
+        filter_params += f"&status={status}"
+    if owner:
+        filter_params += f"&owner={owner}"
+    if created_after:
+        filter_params += f"&created_after={created_after}"
+    if created_before:
+        filter_params += f"&created_before={created_before}"
+    if meta_key and meta_value:
+        filter_params += f"&meta_key={meta_key}&meta_value={meta_value}"
     return templates.TemplateResponse(
         "assets/list.html",
         {
@@ -132,6 +180,15 @@ async def asset_list(
             "current_type": type,
             "asset_types": list(AssetType),
             "notif_count": notif_count,
+            "filter_q": q or "",
+            "filter_status": status or "",
+            "filter_owner": owner or "",
+            "filter_created_after": created_after or "",
+            "filter_created_before": created_before or "",
+            "filter_meta_key": meta_key or "",
+            "filter_meta_value": meta_value or "",
+            "filter_params": filter_params,
+            "statuses": ["active", "inactive", "draft", "archived"],
         },
     )
 
@@ -165,6 +222,10 @@ async def asset_create_submit(
     form = await request.form()
     asset_type = AssetType(form["type"])
     metadata = _extract_metadata(form, asset_type)
+    if asset_type == AssetType.RISK:
+        score = risk_svc.compute_risk_score(metadata.get("likelihood"), metadata.get("impact"))
+        if score is not None:
+            metadata["inherent_risk_score"] = score
     asset = await asset_svc.create_asset(
         pool,
         type=asset_type,
@@ -253,6 +314,10 @@ async def asset_update_submit(
     form = await request.form()
     old = await asset_svc.get_asset(pool, asset_id)
     metadata = _extract_metadata(form, old.type) if old else {}
+    if old and old.type == AssetType.RISK:
+        score = risk_svc.compute_risk_score(metadata.get("likelihood"), metadata.get("impact"))
+        if score is not None:
+            metadata["inherent_risk_score"] = score
     updated = await asset_svc.update_asset(
         pool,
         asset_id,
@@ -358,6 +423,33 @@ async def export_page(
             "request": request,
             "user": user,
             "asset_types": list(AssetType),
+            "notif_count": notif_count,
+        },
+    )
+
+
+# --- Reviews page ---
+
+
+@router.get("/reviews", response_class=HTMLResponse)
+async def reviews_page(
+    request: Request,
+    type: str | None = None,
+    status: str | None = None,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.VIEW)),
+):
+    reviews = await review_svc.get_reviews(pool, asset_type=type, status_filter=status)
+    notif_count = await alert_svc.count_unread_notifications(pool)
+    return templates.TemplateResponse(
+        "reviews/index.html",
+        {
+            "request": request,
+            "user": user,
+            "reviews": reviews,
+            "asset_types": list(AssetType),
+            "current_type": type or "",
+            "current_status": status or "",
             "notif_count": notif_count,
         },
     )

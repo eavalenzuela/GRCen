@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Reviews - GRCen{% endblock %}
+
+{% block content %}
+<h1>Review Tracker</h1>
+
+<form method="get" action="/reviews" class="filter-bar" style="display:flex;gap:0.5rem;margin-bottom:1rem;flex-wrap:wrap;">
+    <select name="type" style="padding:0.4rem;">
+        <option value="">All Types</option>
+        {% for t in asset_types %}
+        <option value="{{ t.value }}" {% if current_type == t.value %}selected{% endif %}>
+            {{ t.value | replace('_', ' ') | title }}
+        </option>
+        {% endfor %}
+    </select>
+    <select name="status" style="padding:0.4rem;">
+        <option value="">All Statuses</option>
+        <option value="overdue" {% if current_status == 'overdue' %}selected{% endif %}>Overdue</option>
+        <option value="due_soon" {% if current_status == 'due_soon' %}selected{% endif %}>Due Soon (30 days)</option>
+        <option value="on_track" {% if current_status == 'on_track' %}selected{% endif %}>On Track</option>
+    </select>
+    <button type="submit" class="btn">Filter</button>
+    <a href="/reviews" class="btn btn-secondary">Clear</a>
+</form>
+
+<table>
+    <thead>
+        <tr>
+            <th>Asset</th>
+            <th>Type</th>
+            <th>Due Date</th>
+            <th>Status</th>
+            <th>Owner</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in reviews %}
+        <tr>
+            <td><a href="/assets/{{ item.id }}">{{ item.name }}</a></td>
+            <td>{{ item.type | replace('_', ' ') | title }}</td>
+            <td>{{ item.due_date.isoformat() }}</td>
+            <td>
+                {% if item.status == 'overdue' %}
+                <span class="badge review-overdue">Overdue</span>
+                {% elif item.status == 'due_soon' %}
+                <span class="badge review-due-soon">Due Soon</span>
+                {% else %}
+                <span class="badge review-on-track">On Track</span>
+                {% endif %}
+            </td>
+            <td>{{ item.owner or '-' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5">No reviews found matching your filters.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

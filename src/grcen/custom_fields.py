@@ -27,6 +27,8 @@ CUSTOM_FIELDS: dict[AssetType, list[FieldDef]] = {
         ),
         FieldDef("start_date", "Start Date", "date"),
         FieldDef("end_date", "End Date", "date"),
+        FieldDef("last_reviewed", "Last Reviewed", "date"),
+        FieldDef("next_review_due", "Next Review Due", "date"),
     ],
     AssetType.POLICY: [
         FieldDef("version", "Version", "text"),
@@ -58,6 +60,8 @@ CUSTOM_FIELDS: dict[AssetType, list[FieldDef]] = {
         ),
         FieldDef("developer", "Developer", "text"),
         FieldDef("url", "URL", "text"),
+        FieldDef("last_reviewed", "Last Reviewed", "date"),
+        FieldDef("next_review_due", "Next Review Due", "date"),
     ],
     AssetType.SYSTEM: [
         FieldDef(
@@ -87,6 +91,8 @@ CUSTOM_FIELDS: dict[AssetType, list[FieldDef]] = {
             choices=["public", "internal", "confidential", "restricted"],
         ),
         FieldDef("url", "URL", "text"),
+        FieldDef("last_reviewed", "Last Reviewed", "date"),
+        FieldDef("next_review_due", "Next Review Due", "date"),
     ],
     AssetType.DEVICE: [
         FieldDef(
@@ -123,6 +129,8 @@ CUSTOM_FIELDS: dict[AssetType, list[FieldDef]] = {
             ],
         ),
         FieldDef("cmdb_link", "CMDB Link", "text"),
+        FieldDef("last_reviewed", "Last Reviewed", "date"),
+        FieldDef("next_review_due", "Next Review Due", "date"),
     ],
     AssetType.DATA_CATEGORY: [
         FieldDef(
@@ -137,6 +145,8 @@ CUSTOM_FIELDS: dict[AssetType, list[FieldDef]] = {
         FieldDef("regulations", "Regulations", "text"),
         FieldDef("retention_period", "Retention Period", "text"),
         FieldDef("storage_locations", "Storage Locations", "text"),
+        FieldDef("last_reviewed", "Last Reviewed", "date"),
+        FieldDef("next_review_due", "Next Review Due", "date"),
     ],
     AssetType.AUDIT: [
         FieldDef(
@@ -180,6 +190,7 @@ CUSTOM_FIELDS: dict[AssetType, list[FieldDef]] = {
             ],
         ),
         FieldDef("due_date", "Due Date", "date"),
+        FieldDef("last_assessed", "Last Assessed", "date"),
         FieldDef("evidence_url", "Evidence URL", "text"),
     ],
     AssetType.PROCESS: [
@@ -293,9 +304,13 @@ CUSTOM_FIELDS: dict[AssetType, list[FieldDef]] = {
         ),
         FieldDef("risk_owner", "Risk Owner", "text"),
         FieldDef("identified_date", "Identified Date", "date"),
-        FieldDef("review_date", "Review Date", "date"),
+        FieldDef("last_reviewed", "Last Reviewed", "date"),
+        FieldDef("review_date", "Next Review Due", "date"),
         FieldDef("accepted_by", "Accepted By", "text"),
         FieldDef("accepted_date", "Accepted Date", "date"),
+        FieldDef("exception_approved", "Exception Approved", "date"),
+        FieldDef("exception_due", "Exception Due", "date"),
+        FieldDef("exception_approver", "Exception Approver", "text"),
     ],
     AssetType.ORGANIZATIONAL_UNIT: [
         FieldDef(
@@ -309,6 +324,8 @@ CUSTOM_FIELDS: dict[AssetType, list[FieldDef]] = {
         FieldDef("headcount", "Headcount", "integer"),
         FieldDef("cost_center", "Cost Center", "text"),
         FieldDef("ou_lead", "OU Lead", "text"),
+        FieldDef("last_reviewed", "Last Reviewed", "date"),
+        FieldDef("next_review_due", "Next Review Due", "date"),
     ],
 }
 

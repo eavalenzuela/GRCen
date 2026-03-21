@@ -19,6 +19,7 @@
             {% if has_perm(user.role, Permission.EXPORT) %}
             <a href="/exports">Export</a>
             {% endif %}
+            <a href="/reviews">Reviews</a>
             {% if has_perm(user.role, Permission.MANAGE_ALERTS) %}
             <a href="/alerts">Alerts</a>
             {% endif %}

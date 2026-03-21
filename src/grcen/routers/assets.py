@@ -24,13 +24,20 @@ _ASSET_FIELDS = ["name", "description", "status", "owner", "metadata"]
 @router.get("/", response_model=AssetListResponse)
 async def list_assets(
     type: AssetType | None = None,
+    q: str | None = None,
+    status: str | None = None,
+    owner: str | None = None,
+    created_after: str | None = None,
+    created_before: str | None = None,
     page: int = 1,
     page_size: int = 25,
     pool: asyncpg.Pool = Depends(get_db),
     _user: User = Depends(require_permission(Permission.VIEW)),
 ):
     items, total = await asset_svc.list_assets(
-        pool, asset_type=type, page=page, page_size=page_size
+        pool, asset_type=type, page=page, page_size=page_size,
+        q=q, status=status, owner=owner,
+        created_after=created_after, created_before=created_before,
     )
     return AssetListResponse(
         items=[AssetResponse.model_validate(a, from_attributes=True) for a in items],
