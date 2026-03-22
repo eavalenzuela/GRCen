@@ -1,431 +1,3430 @@
 [
   {
-    "name": "IT Department", "type": "organizational_unit", "description": "Central IT organization", "status": "active", "owner": "Alice Chen",
-    "metadata": {"unit_type": "department", "location": "HQ — San Francisco", "headcount": 45, "cost_center": "CC-1000", "ou_lead": "Alice Chen", "last_reviewed": "2025-12-15", "next_review_due": "2026-06-15"}
-  },
-  {
-    "name": "Engineering", "type": "organizational_unit", "description": "Software engineering division", "status": "active", "owner": "Bob Martinez",
-    "metadata": {"unit_type": "division", "parent_unit": "IT Department", "location": "HQ — San Francisco", "headcount": 30, "cost_center": "CC-1100", "ou_lead": "Bob Martinez", "last_reviewed": "2025-09-01", "next_review_due": "2026-03-01"}
-  },
-  {
-    "name": "Legal & Compliance", "type": "organizational_unit", "description": "Legal and regulatory compliance team", "status": "active", "owner": "General Counsel",
-    "metadata": {"unit_type": "department", "location": "HQ — San Francisco", "headcount": 8, "cost_center": "CC-2000", "ou_lead": "General Counsel", "last_reviewed": "2026-01-10", "next_review_due": "2026-04-10"}
-  },
-
-  {
-    "name": "Alice Chen", "type": "person", "description": "Chief Technology Officer", "status": "active", "owner": "Board",
-    "metadata": {"title": "Chief Technology Officer", "department": "IT Department", "email": "alice.chen@example.com", "employment_type": "full_time", "start_date": "2019-03-15", "last_reviewed": "2025-06-01", "next_review_due": "2026-03-01"}
-  },
-  {
-    "name": "Bob Martinez", "type": "person", "description": "VP Engineering", "status": "active", "owner": "Alice Chen",
-    "metadata": {"manager": "Alice Chen", "title": "VP Engineering", "department": "Engineering", "email": "bob.martinez@example.com", "employment_type": "full_time", "start_date": "2020-01-10", "last_reviewed": "2025-10-15", "next_review_due": "2026-04-15"}
-  },
-  {
-    "name": "Carol Davies", "type": "person", "description": "Security Lead", "status": "active", "owner": "Bob Martinez",
-    "metadata": {"manager": "Bob Martinez", "title": "Security Lead", "department": "IT Department", "email": "carol.davies@example.com", "employment_type": "full_time", "start_date": "2020-06-01", "last_reviewed": "2025-12-01", "next_review_due": "2026-06-01"}
-  },
-  {
-    "name": "Dan Kim", "type": "person", "description": "Compliance Officer", "status": "active", "owner": "General Counsel",
-    "metadata": {"manager": "General Counsel", "title": "Compliance Officer", "department": "Legal & Compliance", "email": "dan.kim@example.com", "employment_type": "full_time", "start_date": "2021-02-15", "last_reviewed": "2026-01-15", "next_review_due": "2026-07-15"}
-  },
-  {
-    "name": "Eve Novak", "type": "person", "description": "Data Protection Officer", "status": "active", "owner": "General Counsel",
-    "metadata": {"manager": "General Counsel", "title": "Data Protection Officer", "department": "Legal & Compliance", "email": "eve.novak@example.com", "employment_type": "full_time", "start_date": "2021-08-01", "last_reviewed": "2025-11-01", "next_review_due": "2026-04-01"}
-  },
-  {
-    "name": "Frank Osei", "type": "person", "description": "DevOps Lead", "status": "active", "owner": "Bob Martinez",
-    "metadata": {"manager": "Bob Martinez", "title": "DevOps Lead", "department": "Engineering", "email": "frank.osei@example.com", "employment_type": "full_time", "start_date": "2020-09-20", "last_reviewed": "2025-08-01", "next_review_due": "2026-02-01"}
-  },
-  {
-    "name": "Grace Liu", "type": "person", "description": "Junior Security Analyst (intern)", "status": "active", "owner": "Carol Davies",
-    "metadata": {"manager": "Carol Davies", "title": "Security Analyst Intern", "department": "IT Department", "email": "grace.liu@example.com", "employment_type": "intern", "start_date": "2026-01-15", "end_date": "2026-06-30", "last_reviewed": "2026-02-15", "next_review_due": "2026-05-15"}
-  },
-
-  {
-    "name": "Acceptable Use Policy", "type": "policy", "description": "Defines acceptable use of company systems and data", "status": "active", "owner": "Carol Davies",
-    "metadata": {"version": "3.0", "effective_date": "2025-01-15", "review_cadence": "annual", "review_date": "2026-01-15", "approver": "Alice Chen", "scope": "All employees and contractors", "classification": "internal"}
-  },
-  {
-    "name": "Data Retention Policy", "type": "policy", "description": "Governs how long data is retained and when it is purged", "status": "active", "owner": "Eve Novak",
-    "metadata": {"version": "2.1", "effective_date": "2025-03-01", "review_cadence": "annual", "review_date": "2026-03-01", "approver": "General Counsel", "scope": "All data stores and processing systems", "classification": "internal"}
-  },
-  {
-    "name": "Incident Response Policy", "type": "policy", "description": "Procedures for responding to security incidents", "status": "active", "owner": "Carol Davies",
-    "metadata": {"version": "4.2", "effective_date": "2025-06-01", "review_cadence": "annual", "review_date": "2026-06-01", "approver": "Alice Chen", "scope": "Security team and on-call engineers", "classification": "confidential"}
-  },
-  {
-    "name": "Access Control Policy", "type": "policy", "description": "Rules for granting and revoking system access", "status": "active", "owner": "Carol Davies",
-    "metadata": {"version": "2.0", "effective_date": "2025-04-01", "review_cadence": "annual", "review_date": "2026-04-01", "approver": "Alice Chen", "scope": "All systems and applications", "classification": "internal"}
-  },
-  {
-    "name": "Change Management Policy", "type": "policy", "description": "Process for approving and deploying changes", "status": "active", "owner": "Frank Osei",
-    "metadata": {"version": "1.5", "effective_date": "2025-02-01", "review_cadence": "annual", "review_date": "2026-02-01", "approver": "Bob Martinez", "scope": "Production systems and infrastructure", "classification": "internal"}
-  },
-  {
-    "name": "Remote Access Policy", "type": "policy", "description": "Governs VPN and remote access to corporate networks", "status": "draft", "owner": "Carol Davies",
-    "metadata": {"version": "0.1", "effective_date": "", "review_cadence": "annual", "review_date": "", "approver": "", "scope": "All remote employees and contractors", "classification": "internal"}
-  },
-  {
-    "name": "Data Classification Policy", "type": "policy", "description": "Defines data classification levels and handling requirements", "status": "archived", "owner": "Eve Novak",
-    "metadata": {"version": "1.0", "effective_date": "2023-01-01", "review_cadence": "annual", "review_date": "2024-01-01", "approver": "General Counsel", "scope": "All data assets", "classification": "internal"}
-  },
-
-  {
-    "name": "GRCen Platform", "type": "product", "description": "Internal GRC management tool", "status": "active", "owner": "Bob Martinez",
-    "metadata": {"version": "0.1.0", "lifecycle_stage": "development", "type": "internal", "developer": "Internal Engineering", "last_reviewed": "2026-02-15", "next_review_due": "2026-08-15"}
-  },
-  {
-    "name": "Customer Portal", "type": "product", "description": "Customer-facing web application", "status": "active", "owner": "Bob Martinez",
-    "metadata": {"version": "5.12.3", "lifecycle_stage": "ga", "type": "paid", "developer": "Internal Engineering", "url": "https://portal.example.com", "last_reviewed": "2025-09-01", "next_review_due": "2026-03-15"}
-  },
-  {
-    "name": "Mobile App", "type": "product", "description": "iOS and Android customer app", "status": "active", "owner": "Bob Martinez",
-    "metadata": {"version": "3.8.1", "lifecycle_stage": "ga", "type": "free", "developer": "Internal Engineering", "last_reviewed": "2026-01-01", "next_review_due": "2026-04-01"}
-  },
-  {
-    "name": "Legacy Billing Portal", "type": "product", "description": "Old billing interface replaced by Customer Portal", "status": "inactive", "owner": "Bob Martinez",
-    "metadata": {"version": "2.0.0", "lifecycle_stage": "eol", "type": "internal", "developer": "Internal Engineering", "last_reviewed": "2024-06-01", "next_review_due": "2025-06-01"}
-  },
-
-  {
-    "name": "Production Kubernetes Cluster", "type": "system", "description": "Primary production workload orchestration", "status": "active", "owner": "Frank Osei",
-    "metadata": {"environment": "production", "hosting": "cloud", "provider": "AWS", "region": "us-east-1, eu-west-1", "criticality": "critical", "data_classification": "confidential", "last_reviewed": "2025-09-15", "next_review_due": "2026-03-15"}
-  },
-  {
-    "name": "CI/CD Pipeline", "type": "system", "description": "Jenkins and ArgoCD deployment pipeline", "status": "active", "owner": "Frank Osei",
-    "metadata": {"environment": "production", "hosting": "cloud", "provider": "AWS", "region": "us-east-1", "criticality": "high", "data_classification": "internal", "last_reviewed": "2026-01-01", "next_review_due": "2026-07-01"}
-  },
-  {
-    "name": "Identity Provider", "type": "system", "description": "Okta SSO and MFA", "status": "active", "owner": "Carol Davies",
-    "metadata": {"environment": "production", "hosting": "saas", "provider": "Okta", "criticality": "critical", "data_classification": "confidential", "url": "https://example.okta.com", "last_reviewed": "2025-12-01", "next_review_due": "2026-04-01"}
-  },
-  {
-    "name": "Data Warehouse", "type": "system", "description": "Snowflake analytics platform", "status": "active", "owner": "Bob Martinez",
-    "metadata": {"environment": "production", "hosting": "saas", "provider": "Snowflake", "region": "us-east-1", "criticality": "high", "data_classification": "confidential", "last_reviewed": "2026-02-01", "next_review_due": "2026-08-01"}
-  },
-  {
-    "name": "Monitoring Stack", "type": "system", "description": "Prometheus, Grafana, PagerDuty integration", "status": "active", "owner": "Frank Osei",
-    "metadata": {"environment": "production", "hosting": "cloud", "provider": "AWS", "region": "us-east-1", "criticality": "high", "data_classification": "internal", "last_reviewed": "2026-01-15", "next_review_due": "2026-07-15"}
-  },
-  {
-    "name": "Secrets Manager", "type": "system", "description": "HashiCorp Vault for secrets and certificates", "status": "active", "owner": "Carol Davies",
-    "metadata": {"environment": "production", "hosting": "cloud", "provider": "AWS", "region": "us-east-1", "criticality": "critical", "data_classification": "restricted", "last_reviewed": "2025-10-01", "next_review_due": "2026-04-01"}
-  },
-  {
-    "name": "Staging Environment", "type": "system", "description": "Pre-production staging cluster", "status": "active", "owner": "Frank Osei",
-    "metadata": {"environment": "staging", "hosting": "cloud", "provider": "AWS", "region": "us-east-1", "criticality": "medium", "data_classification": "internal", "last_reviewed": "2026-01-01", "next_review_due": "2026-07-01"}
-  },
-
-  {
-    "name": "Developer Laptops", "type": "device", "description": "Company-issued MacBook Pros", "status": "active", "owner": "IT Department",
-    "metadata": {"device_type": "laptop", "manufacturer": "Apple", "model": "MacBook Pro 16-inch M3", "os": "macOS 15 Sequoia", "location": "Distributed — remote employees", "quantity": 35, "use": "employee_device", "last_reviewed": "2025-11-01", "next_review_due": "2026-04-01"}
-  },
-  {
-    "name": "Production Servers", "type": "device", "description": "AWS EC2 instances in us-east-1 and eu-west-1", "status": "active", "owner": "Frank Osei",
-    "metadata": {"device_type": "server", "manufacturer": "AWS", "model": "m6i.2xlarge", "os": "Amazon Linux 2023", "location": "us-east-1, eu-west-1", "quantity": 24, "use": "production_server", "last_reviewed": "2025-12-01", "next_review_due": "2026-06-01"}
-  },
-  {
-    "name": "Network Firewalls", "type": "device", "description": "Palo Alto firewalls at network perimeter", "status": "active", "owner": "Carol Davies",
-    "metadata": {"device_type": "networking_device", "manufacturer": "Palo Alto Networks", "model": "PA-3260", "os": "PAN-OS 11.1", "location": "AWS VPC perimeter", "quantity": 4, "use": "production_server", "last_reviewed": "2025-07-01", "next_review_due": "2026-01-01"}
-  },
-  {
-    "name": "VPN Appliances", "type": "device", "description": "WireGuard VPN concentrators", "status": "active", "owner": "Carol Davies",
-    "metadata": {"device_type": "networking_device", "manufacturer": "Custom", "model": "WireGuard on EC2", "os": "Ubuntu 24.04", "location": "us-east-1", "quantity": 2, "use": "production_server", "last_reviewed": "2026-01-15", "next_review_due": "2026-07-15"}
-  },
-  {
-    "name": "Lab Test Devices", "type": "device", "description": "Shared devices for QA and security testing", "status": "active", "owner": "Carol Davies",
-    "metadata": {"device_type": "laptop", "manufacturer": "Lenovo", "model": "ThinkPad T14s", "os": "Ubuntu 24.04", "location": "HQ — San Francisco", "quantity": 5, "use": "lab_device", "last_reviewed": "2026-02-01", "next_review_due": "2026-08-01"}
-  },
-
-  {
-    "name": "Customer PII", "type": "data_category", "description": "Names, emails, addresses, phone numbers", "status": "active", "owner": "Eve Novak",
-    "metadata": {"classification": "confidential", "pii": true, "phi": false, "regulated": true, "regulations": "GDPR, CCPA", "retention_period": "Duration of customer relationship + 3 years", "storage_locations": "Customer Portal DB, Data Warehouse", "last_reviewed": "2025-06-01", "next_review_due": "2025-12-01"}
-  },
-  {
-    "name": "Payment Card Data", "type": "data_category", "description": "Credit card numbers, CVVs, expiry dates", "status": "active", "owner": "Eve Novak",
-    "metadata": {"classification": "restricted", "pii": true, "phi": false, "regulated": true, "regulations": "PCI DSS", "retention_period": "Transaction completion + 90 days", "storage_locations": "Payment processor (Stripe) — not stored locally", "last_reviewed": "2025-12-15", "next_review_due": "2026-06-15"}
-  },
-  {
-    "name": "Employee Records", "type": "data_category", "description": "HR data including salary and performance reviews", "status": "active", "owner": "Eve Novak",
-    "metadata": {"classification": "confidential", "pii": true, "phi": false, "regulated": true, "regulations": "GDPR, local labor laws", "retention_period": "Employment + 7 years", "storage_locations": "HRIS, Data Warehouse", "last_reviewed": "2025-10-01", "next_review_due": "2026-04-01"}
-  },
-  {
-    "name": "Application Logs", "type": "data_category", "description": "System and application log data", "status": "active", "owner": "Frank Osei",
-    "metadata": {"classification": "internal", "pii": false, "phi": false, "regulated": false, "retention_period": "90 days", "storage_locations": "Monitoring Stack (Prometheus/Grafana)", "last_reviewed": "2026-02-01", "next_review_due": "2026-08-01"}
-  },
-  {
-    "name": "Analytics Data", "type": "data_category", "description": "Anonymized product usage metrics", "status": "active", "owner": "Bob Martinez",
-    "metadata": {"classification": "internal", "pii": false, "phi": false, "regulated": false, "retention_period": "Indefinite", "storage_locations": "Data Warehouse", "last_reviewed": "2026-01-01", "next_review_due": "2026-07-01"}
-  },
-
-  {
-    "name": "SOC 2 Type II Audit 2025", "type": "audit", "description": "Annual SOC 2 Type II examination", "status": "active", "owner": "Dan Kim",
-    "metadata": {"audit_type": "external", "framework": "SOC 2", "auditor": "Deloitte", "start_date": "2025-01-01", "end_date": "2025-12-31", "report_date": "2026-03-15", "result": "pending"}
-  },
-  {
-    "name": "PCI DSS Assessment 2025", "type": "audit", "description": "Annual PCI DSS compliance assessment", "status": "active", "owner": "Dan Kim",
-    "metadata": {"audit_type": "assessment", "framework": "PCI DSS v4.0", "auditor": "Coalfire", "start_date": "2025-06-01", "end_date": "2025-08-31", "report_date": "2025-10-01", "result": "pass"}
-  },
-  {
-    "name": "Internal Security Audit Q1 2026", "type": "audit", "description": "Quarterly internal security review", "status": "active", "owner": "Carol Davies",
-    "metadata": {"audit_type": "internal", "framework": "Internal security baseline", "auditor": "Carol Davies", "start_date": "2026-01-01", "end_date": "2026-03-31", "report_date": "2026-04-15", "result": "pending"}
-  },
-  {
-    "name": "Vendor Risk Assessment 2024", "type": "audit", "description": "Annual third-party vendor risk assessment", "status": "archived", "owner": "Dan Kim",
-    "metadata": {"audit_type": "assessment", "framework": "Vendor Risk", "auditor": "Dan Kim", "start_date": "2024-04-01", "end_date": "2024-06-30", "report_date": "2024-08-01", "result": "pass_with_exceptions"}
-  },
-
-  {
-    "name": "SOC 2 CC6.1", "type": "requirement", "description": "Logical and physical access controls", "status": "active", "owner": "Dan Kim",
-    "metadata": {"framework": "SOC 2", "reference_id": "CC6.1", "category": "Common Criteria", "compliance_status": "compliant", "due_date": "2026-06-30", "last_assessed": "2025-12-15", "evidence_url": "https://wiki.example.com/soc2/cc6.1"}
-  },
-  {
-    "name": "SOC 2 CC7.2", "type": "requirement", "description": "System monitoring and anomaly detection", "status": "active", "owner": "Dan Kim",
-    "metadata": {"framework": "SOC 2", "reference_id": "CC7.2", "category": "Common Criteria", "compliance_status": "compliant", "due_date": "2026-06-30", "last_assessed": "2025-12-15", "evidence_url": "https://wiki.example.com/soc2/cc7.2"}
-  },
-  {
-    "name": "PCI DSS Req 3", "type": "requirement", "description": "Protect stored cardholder data", "status": "active", "owner": "Dan Kim",
-    "metadata": {"framework": "PCI DSS v4.0", "reference_id": "Requirement 3", "category": "Protect Account Data", "compliance_status": "compliant", "due_date": "2026-08-31", "last_assessed": "2025-08-15", "evidence_url": "https://wiki.example.com/pci/req3"}
-  },
-  {
-    "name": "PCI DSS Req 6", "type": "requirement", "description": "Develop and maintain secure systems", "status": "active", "owner": "Dan Kim",
-    "metadata": {"framework": "PCI DSS v4.0", "reference_id": "Requirement 6", "category": "Maintain Secure Systems", "compliance_status": "compliant", "due_date": "2026-08-31", "last_assessed": "2025-08-15", "evidence_url": "https://wiki.example.com/pci/req6"}
-  },
-  {
-    "name": "GDPR Art. 17", "type": "requirement", "description": "Right to erasure (right to be forgotten)", "status": "active", "owner": "Eve Novak",
-    "metadata": {"framework": "GDPR", "reference_id": "Article 17", "category": "Data Subject Rights", "compliance_status": "compliant", "due_date": "2026-05-25", "last_assessed": "2025-11-01", "evidence_url": "https://wiki.example.com/gdpr/art17"}
-  },
-  {
-    "name": "GDPR Art. 32", "type": "requirement", "description": "Security of processing", "status": "active", "owner": "Eve Novak",
-    "metadata": {"framework": "GDPR", "reference_id": "Article 32", "category": "Security", "compliance_status": "partially_compliant", "due_date": "2026-04-15", "last_assessed": "2025-11-01", "evidence_url": "https://wiki.example.com/gdpr/art32"}
-  },
-  {
-    "name": "ISO 27001 A.8.1", "type": "requirement", "description": "Inventory of assets", "status": "active", "owner": "Dan Kim",
-    "metadata": {"framework": "ISO 27001:2022", "reference_id": "A.8.1", "category": "Asset Management", "compliance_status": "partially_compliant", "due_date": "2026-09-30", "last_assessed": "2025-09-15", "evidence_url": "https://wiki.example.com/iso27001/a81"}
-  },
-
-  {
-    "name": "Quarterly Access Review", "type": "process", "description": "Review all system access quarterly", "status": "active", "owner": "Carol Davies",
-    "metadata": {"frequency": "quarterly", "last_executed": "2026-01-15", "next_execution": "2026-04-15", "automation_level": "semi_automated", "sla": "Completed within 2 weeks of quarter start", "type": "operational"}
-  },
-  {
-    "name": "Vulnerability Scanning", "type": "process", "description": "Weekly automated vulnerability scans", "status": "active", "owner": "Carol Davies",
-    "metadata": {"frequency": "weekly", "last_executed": "2026-03-17", "next_execution": "2026-03-24", "automation_level": "fully_automated", "sla": "Critical findings triaged within 24 hours", "type": "operational"}
-  },
-  {
-    "name": "Change Approval Board", "type": "process", "description": "Weekly CAB meeting for production changes", "status": "active", "owner": "Frank Osei",
-    "metadata": {"frequency": "weekly", "last_executed": "2026-03-18", "next_execution": "2026-03-25", "automation_level": "manual", "sla": "Changes reviewed within 1 business day", "type": "management"}
-  },
-  {
-    "name": "Incident Triage", "type": "process", "description": "24/7 incident triage and escalation", "status": "active", "owner": "Carol Davies",
-    "metadata": {"frequency": "continuous", "automation_level": "semi_automated", "sla": "P1: 15 min response, P2: 1 hour, P3: 4 hours", "type": "operational"}
-  },
-  {
-    "name": "Data Subject Access Requests", "type": "process", "description": "Handle GDPR DSARs within 30 days", "status": "active", "owner": "Eve Novak",
-    "metadata": {"frequency": "ad_hoc", "last_executed": "2026-02-28", "automation_level": "semi_automated", "sla": "30 calendar days from receipt", "type": "operational"}
-  },
-  {
-    "name": "Backup & Recovery Testing", "type": "process", "description": "Monthly backup restoration drills", "status": "active", "owner": "Frank Osei",
-    "metadata": {"frequency": "monthly", "last_executed": "2026-03-01", "next_execution": "2026-04-01", "automation_level": "semi_automated", "sla": "Full restore completed within 4 hours", "type": "operational"}
-  },
-  {
-    "name": "Security Awareness Training", "type": "process", "description": "Annual security training for all employees", "status": "active", "owner": "Carol Davies",
-    "metadata": {"frequency": "annually", "last_executed": "2025-11-15", "next_execution": "2026-11-15", "automation_level": "semi_automated", "sla": "All employees completed within 30 days of launch", "type": "management"}
-  },
-
-  {
-    "name": "Recommendation Engine", "type": "intellectual_property", "description": "ML model for personalized recommendations", "status": "active", "owner": "Bob Martinez",
-    "metadata": {"ip_type": "trade_secret", "confidentiality": "confidential", "expiry_date": "2028-12-31"}
-  },
-  {
-    "name": "Platform Architecture", "type": "intellectual_property", "description": "Proprietary microservices architecture design", "status": "active", "owner": "Bob Martinez",
-    "metadata": {"ip_type": "trade_secret", "confidentiality": "internal", "expiry_date": "2028-12-31"}
-  },
-  {
-    "name": "Data Pipeline Framework", "type": "intellectual_property", "description": "Proprietary ETL framework for analytics ingestion", "status": "active", "owner": "Bob Martinez",
-    "metadata": {"ip_type": "proprietary_tech", "confidentiality": "confidential", "expiry_date": "2027-06-30"}
-  },
-
-  {
-    "name": "Ransomware — Production K8s Cluster", "type": "risk", "description": "Encryption of production workloads by threat actor", "status": "active", "owner": "Carol Davies",
-    "metadata": {"risk_category": "security", "threat_source": "external attacker", "risk_framework": "NIST", "severity": "critical", "likelihood": "possible", "impact": "catastrophic", "inherent_risk_score": 15, "residual_risk_score": 8, "treatment": "mitigate", "treatment_plan": "Network segmentation, immutable backups, EDR on nodes", "control_effectiveness": "effective", "risk_owner": "Carol Davies", "identified_date": "2024-06-01", "last_reviewed": "2025-12-15", "review_date": "2026-06-01"}
-  },
-  {
-    "name": "Ransomware — Data Warehouse", "type": "risk", "description": "Encryption of analytics data by threat actor", "status": "active", "owner": "Carol Davies",
-    "metadata": {"risk_category": "security", "threat_source": "external attacker", "risk_framework": "NIST", "severity": "high", "likelihood": "unlikely", "impact": "major", "inherent_risk_score": 8, "residual_risk_score": 4, "treatment": "mitigate", "treatment_plan": "Snowflake Time Travel, cross-region replication, access controls", "control_effectiveness": "effective", "risk_owner": "Carol Davies", "identified_date": "2024-06-01", "last_reviewed": "2025-12-15", "review_date": "2026-06-01"}
-  },
-  {
-    "name": "Data Breach — Customer Portal PII", "type": "risk", "description": "Unauthorized access to customer PII via web application", "status": "active", "owner": "Carol Davies",
-    "metadata": {"risk_category": "security", "threat_source": "external attacker", "risk_framework": "NIST", "severity": "critical", "likelihood": "possible", "impact": "catastrophic", "inherent_risk_score": 15, "residual_risk_score": 10, "treatment": "mitigate", "treatment_plan": "WAF, SAST/DAST scanning, access reviews, encryption at rest", "control_effectiveness": "partially_effective", "risk_owner": "Carol Davies", "identified_date": "2024-03-15", "last_reviewed": "2025-10-01", "review_date": "2026-03-15"}
-  },
-  {
-    "name": "Data Breach — Data Warehouse PII", "type": "risk", "description": "Unauthorized access to customer PII in analytics platform", "status": "active", "owner": "Carol Davies",
-    "metadata": {"risk_category": "security", "threat_source": "insider", "risk_framework": "NIST", "severity": "high", "likelihood": "unlikely", "impact": "major", "inherent_risk_score": 8, "residual_risk_score": 4, "treatment": "mitigate", "treatment_plan": "Column-level masking, role-based access, query audit logging", "control_effectiveness": "effective", "risk_owner": "Carol Davies", "identified_date": "2024-03-15", "last_reviewed": "2025-12-01", "review_date": "2026-06-01"}
-  },
-  {
-    "name": "Supply Chain Attack — CI/CD Pipeline", "type": "risk", "description": "Compromised dependency injected via build pipeline", "status": "active", "owner": "Carol Davies",
-    "metadata": {"risk_category": "security", "threat_source": "external attacker", "risk_framework": "NIST", "severity": "high", "likelihood": "likely", "impact": "major", "inherent_risk_score": 16, "residual_risk_score": 9, "treatment": "mitigate", "treatment_plan": "Dependency scanning, SBOM generation, signed builds, pinned versions", "control_effectiveness": "partially_effective", "risk_owner": "Frank Osei", "identified_date": "2024-09-01", "last_reviewed": "2026-01-10", "review_date": "2026-07-01"}
-  },
-  {
-    "name": "Key Person Dependency — Recommendation Engine", "type": "risk", "description": "Loss of ML model knowledge if key staff leave", "status": "active", "owner": "Bob Martinez",
-    "metadata": {"risk_category": "operational", "threat_source": "employee attrition", "severity": "medium", "likelihood": "possible", "impact": "moderate", "inherent_risk_score": 9, "residual_risk_score": 6, "treatment": "mitigate", "treatment_plan": "Documentation, cross-training, model registry with versioning", "control_effectiveness": "partially_effective", "risk_owner": "Bob Martinez", "identified_date": "2025-01-10", "last_reviewed": "2025-07-01", "review_date": "2026-01-10"}
-  },
-  {
-    "name": "Key Person Dependency — Platform Architecture", "type": "risk", "description": "Loss of architecture knowledge if key staff leave", "status": "active", "owner": "Bob Martinez",
-    "metadata": {"risk_category": "operational", "threat_source": "employee attrition", "severity": "medium", "likelihood": "possible", "impact": "moderate", "inherent_risk_score": 9, "residual_risk_score": 4, "treatment": "accept", "treatment_plan": "Architecture Decision Records, team rotations, shared documentation", "control_effectiveness": "effective", "risk_owner": "Bob Martinez", "identified_date": "2025-01-10", "last_reviewed": "2025-11-01", "review_date": "2026-05-01", "accepted_by": "Alice Chen", "accepted_date": "2025-11-15", "exception_approved": "2025-11-15", "exception_due": "2026-11-15", "exception_approver": "Alice Chen"}
-  },
-  {
-    "name": "GDPR Non-Compliance — Customer PII", "type": "risk", "description": "Failure to meet GDPR obligations for customer data", "status": "active", "owner": "Eve Novak",
-    "metadata": {"risk_category": "compliance", "threat_source": "regulatory change / process gaps", "risk_framework": "NIST", "severity": "high", "likelihood": "unlikely", "impact": "major", "inherent_risk_score": 8, "residual_risk_score": 4, "treatment": "mitigate", "treatment_plan": "DPO oversight, DSAR process, retention automation, annual GDPR training", "control_effectiveness": "effective", "risk_owner": "Eve Novak", "identified_date": "2024-01-01", "last_reviewed": "2026-01-15", "review_date": "2026-07-15"}
-  },
-  {
-    "name": "GDPR Non-Compliance — DSAR Process", "type": "risk", "description": "Failure to fulfill data subject access requests within deadline", "status": "active", "owner": "Eve Novak",
-    "metadata": {"risk_category": "compliance", "threat_source": "process inefficiency", "risk_framework": "NIST", "severity": "medium", "likelihood": "possible", "impact": "moderate", "inherent_risk_score": 9, "residual_risk_score": 4, "treatment": "accept", "treatment_plan": "Semi-automated DSAR tooling, SLA tracking, escalation path", "control_effectiveness": "effective", "risk_owner": "Eve Novak", "identified_date": "2024-01-01", "last_reviewed": "2026-02-01", "review_date": "2026-08-01", "accepted_by": "General Counsel", "accepted_date": "2026-02-01", "exception_approved": "2026-02-01", "exception_due": "2027-02-01", "exception_approver": "General Counsel"}
-  },
-  {
-    "name": "Service Outage — Production K8s Cluster", "type": "risk", "description": "Extended downtime of production workloads", "status": "active", "owner": "Frank Osei",
-    "metadata": {"risk_category": "operational", "threat_source": "infrastructure failure", "severity": "critical", "likelihood": "unlikely", "impact": "catastrophic", "inherent_risk_score": 10, "residual_risk_score": 5, "treatment": "mitigate", "treatment_plan": "Multi-AZ deployment, auto-scaling, chaos engineering, runbooks", "control_effectiveness": "effective", "risk_owner": "Frank Osei", "identified_date": "2024-06-01", "last_reviewed": "2026-01-15", "review_date": "2026-07-15"}
-  },
-  {
-    "name": "Service Outage — Customer Portal", "type": "risk", "description": "Extended downtime of customer-facing application", "status": "active", "owner": "Frank Osei",
-    "metadata": {"risk_category": "operational", "threat_source": "application failure", "severity": "high", "likelihood": "possible", "impact": "major", "inherent_risk_score": 12, "residual_risk_score": 6, "treatment": "mitigate", "treatment_plan": "Blue-green deploys, health checks, CDN failover, synthetic monitoring", "control_effectiveness": "partially_effective", "risk_owner": "Frank Osei", "identified_date": "2024-06-01", "last_reviewed": "2025-12-01", "review_date": "2026-06-01"}
-  },
-  {
-    "name": "Unauthorized Access — Identity Provider", "type": "risk", "description": "Compromise of SSO/MFA system granting broad access", "status": "active", "owner": "Carol Davies",
-    "metadata": {"risk_category": "security", "threat_source": "external attacker", "risk_framework": "NIST", "severity": "critical", "likelihood": "rare", "impact": "catastrophic", "inherent_risk_score": 5, "residual_risk_score": 3, "treatment": "mitigate", "treatment_plan": "Phishing-resistant MFA, admin session limits, break-glass procedures, Okta threat detection", "control_effectiveness": "effective", "risk_owner": "Carol Davies", "identified_date": "2024-03-15", "last_reviewed": "2026-02-01", "review_date": "2026-08-01"}
-  },
-  {
-    "name": "Insider Threat — Data Exfiltration", "type": "risk", "description": "Malicious or negligent insider exfiltrating sensitive data", "status": "active", "owner": "Carol Davies",
-    "metadata": {"risk_category": "security", "threat_source": "insider", "risk_framework": "NIST", "severity": "high", "likelihood": "almost_certain", "impact": "moderate", "inherent_risk_score": 15, "residual_risk_score": 9, "treatment": "mitigate", "treatment_plan": "DLP tools, USB restrictions, anomaly detection on data access patterns, least-privilege access", "control_effectiveness": "partially_effective", "risk_owner": "Carol Davies", "identified_date": "2025-03-01", "last_reviewed": "2026-01-15", "review_date": "2026-07-15"}
-  },
-  {
-    "name": "Third-Party API Downtime", "type": "risk", "description": "Extended outage of critical third-party APIs (Stripe, Okta, Snowflake)", "status": "active", "owner": "Frank Osei",
-    "metadata": {"risk_category": "operational", "threat_source": "vendor failure", "severity": "medium", "likelihood": "likely", "impact": "minor", "inherent_risk_score": 8, "residual_risk_score": 4, "treatment": "mitigate", "treatment_plan": "Circuit breakers, graceful degradation, multi-vendor strategy for critical paths", "control_effectiveness": "effective", "risk_owner": "Frank Osei", "identified_date": "2025-06-01", "last_reviewed": "2026-02-01", "review_date": "2026-08-01"}
-  },
-  {
-    "name": "Regulatory Fine — Data Retention Violation", "type": "risk", "description": "Fine due to retaining data beyond legally permitted periods", "status": "active", "owner": "Eve Novak",
-    "metadata": {"risk_category": "compliance", "threat_source": "regulatory enforcement", "risk_framework": "NIST", "severity": "medium", "likelihood": "rare", "impact": "major", "inherent_risk_score": 4, "residual_risk_score": 2, "treatment": "mitigate", "treatment_plan": "Automated retention enforcement, quarterly audits of data lifecycle, DPO review", "control_effectiveness": "effective", "risk_owner": "Eve Novak", "identified_date": "2025-01-15", "last_reviewed": "2025-09-01", "review_date": "2026-03-01"}
-  },
-  {
-    "name": "Shadow IT — Unapproved SaaS Usage", "type": "risk", "description": "Employees using unapproved SaaS tools that bypass security controls", "status": "draft", "owner": "Carol Davies",
-    "metadata": {"risk_category": "security", "threat_source": "employee behavior", "severity": "medium", "likelihood": "almost_certain", "impact": "minor", "inherent_risk_score": 10, "residual_risk_score": null, "treatment": "mitigate", "treatment_plan": "SaaS discovery tool, acceptable use enforcement, approved alternatives catalog", "control_effectiveness": "not_assessed", "risk_owner": "Carol Davies", "identified_date": "2026-03-01", "review_date": "2026-06-01"}
-  },
-
-  {
-    "name": "Okta", "type": "vendor", "description": "Identity and access management provider (SSO/MFA)", "status": "active", "owner": "Carol Davies",
-    "tags": ["critical-path", "SOC2"],
+    "name": "Executive Office",
+    "type": "organizational_unit",
+    "description": "Executive leadership division overseeing all company operations",
+    "status": "active",
+    "owner": "Sarah Thompson",
+    "metadata": {
+      "unit_type": "division",
+      "location": "HQ — San Francisco",
+      "headcount": 6,
+      "cost_center": "CC-0100",
+      "ou_lead": "Sarah Thompson",
+      "last_reviewed": "2026-01-15",
+      "next_review_due": "2026-07-15"
+    }
+  },
+  {
+    "name": "Finance & Accounting",
+    "type": "organizational_unit",
+    "description": "Financial planning, accounting, and treasury",
+    "status": "active",
+    "owner": "Michael Foster",
+    "metadata": {
+      "unit_type": "department",
+      "parent_unit": "Executive Office",
+      "location": "HQ — San Francisco",
+      "headcount": 5,
+      "cost_center": "CC-2000",
+      "ou_lead": "Michael Foster",
+      "last_reviewed": "2026-01-10",
+      "next_review_due": "2026-07-10"
+    }
+  },
+  {
+    "name": "Human Resources",
+    "type": "organizational_unit",
+    "description": "People operations, talent acquisition, and employee relations",
+    "status": "active",
+    "owner": "Maria Santos",
+    "metadata": {
+      "unit_type": "department",
+      "parent_unit": "Executive Office",
+      "location": "HQ — San Francisco",
+      "headcount": 6,
+      "cost_center": "CC-3000",
+      "ou_lead": "Maria Santos",
+      "last_reviewed": "2025-12-01",
+      "next_review_due": "2026-06-01"
+    }
+  },
+  {
+    "name": "Talent Acquisition",
+    "type": "organizational_unit",
+    "description": "Recruiting and hiring operations",
+    "status": "active",
+    "owner": "Jessica Park",
+    "metadata": {
+      "unit_type": "team",
+      "parent_unit": "Human Resources",
+      "location": "HQ — San Francisco",
+      "headcount": 3,
+      "cost_center": "CC-3100",
+      "ou_lead": "Jessica Park",
+      "last_reviewed": "2025-12-01",
+      "next_review_due": "2026-06-01"
+    }
+  },
+  {
+    "name": "People Operations",
+    "type": "organizational_unit",
+    "description": "Employee lifecycle, benefits, and HR business partnering",
+    "status": "active",
+    "owner": "Sam Okafor",
+    "metadata": {
+      "unit_type": "team",
+      "parent_unit": "Human Resources",
+      "location": "HQ — San Francisco",
+      "headcount": 3,
+      "cost_center": "CC-3200",
+      "ou_lead": "Sam Okafor",
+      "last_reviewed": "2025-12-01",
+      "next_review_due": "2026-06-01"
+    }
+  },
+  {
+    "name": "Sales",
+    "type": "organizational_unit",
+    "description": "Revenue generation through enterprise and SMB channels",
+    "status": "active",
+    "owner": "James Wilson",
+    "metadata": {
+      "unit_type": "division",
+      "parent_unit": "Executive Office",
+      "location": "HQ — San Francisco",
+      "headcount": 12,
+      "cost_center": "CC-4000",
+      "ou_lead": "James Wilson",
+      "last_reviewed": "2026-02-01",
+      "next_review_due": "2026-08-01"
+    }
+  },
+  {
+    "name": "Enterprise Sales",
+    "type": "organizational_unit",
+    "description": "Enterprise account management and large deal execution",
+    "status": "active",
+    "owner": "James Wilson",
+    "metadata": {
+      "unit_type": "team",
+      "parent_unit": "Sales",
+      "location": "HQ — San Francisco",
+      "headcount": 6,
+      "cost_center": "CC-4100",
+      "ou_lead": "James Wilson",
+      "last_reviewed": "2026-02-01",
+      "next_review_due": "2026-08-01"
+    }
+  },
+  {
+    "name": "SMB Sales",
+    "type": "organizational_unit",
+    "description": "Small and mid-sized business sales",
+    "status": "active",
+    "owner": "Tyler Stone",
+    "metadata": {
+      "unit_type": "team",
+      "parent_unit": "Sales",
+      "location": "HQ — San Francisco",
+      "headcount": 6,
+      "cost_center": "CC-4200",
+      "ou_lead": "Tyler Stone",
+      "last_reviewed": "2026-02-01",
+      "next_review_due": "2026-08-01"
+    }
+  },
+  {
+    "name": "Marketing",
+    "type": "organizational_unit",
+    "description": "Brand, demand generation, and marketing operations",
+    "status": "active",
+    "owner": "Priya Sharma",
+    "metadata": {
+      "unit_type": "department",
+      "parent_unit": "Executive Office",
+      "location": "HQ — San Francisco",
+      "headcount": 8,
+      "cost_center": "CC-5000",
+      "ou_lead": "Priya Sharma",
+      "last_reviewed": "2025-11-15",
+      "next_review_due": "2026-05-15"
+    }
+  },
+  {
+    "name": "Customer Success",
+    "type": "organizational_unit",
+    "description": "Customer retention, onboarding, and technical account management",
+    "status": "active",
+    "owner": "Kevin O'Brien",
+    "metadata": {
+      "unit_type": "department",
+      "parent_unit": "Executive Office",
+      "location": "HQ — San Francisco",
+      "headcount": 10,
+      "cost_center": "CC-6000",
+      "ou_lead": "Kevin O'Brien",
+      "last_reviewed": "2026-01-15",
+      "next_review_due": "2026-07-15"
+    }
+  },
+  {
+    "name": "Product",
+    "type": "organizational_unit",
+    "description": "Product management and user experience design",
+    "status": "active",
+    "owner": "Lisa Chang",
+    "metadata": {
+      "unit_type": "department",
+      "parent_unit": "Executive Office",
+      "location": "HQ — San Francisco",
+      "headcount": 8,
+      "cost_center": "CC-7000",
+      "ou_lead": "Lisa Chang",
+      "last_reviewed": "2026-02-15",
+      "next_review_due": "2026-08-15"
+    }
+  },
+  {
+    "name": "Engineering",
+    "type": "organizational_unit",
+    "description": "Software engineering division",
+    "status": "active",
+    "owner": "Bob Martinez",
+    "metadata": {
+      "unit_type": "division",
+      "parent_unit": "Executive Office",
+      "location": "HQ — San Francisco",
+      "headcount": 35,
+      "cost_center": "CC-1100",
+      "ou_lead": "Bob Martinez",
+      "last_reviewed": "2025-09-01",
+      "next_review_due": "2026-03-01"
+    }
+  },
+  {
+    "name": "Platform Engineering",
+    "type": "organizational_unit",
+    "description": "Infrastructure, CI/CD, and platform tooling",
+    "status": "active",
+    "owner": "Frank Osei",
+    "metadata": {
+      "unit_type": "team",
+      "parent_unit": "Engineering",
+      "location": "HQ — San Francisco",
+      "headcount": 6,
+      "cost_center": "CC-1110",
+      "ou_lead": "Frank Osei",
+      "last_reviewed": "2025-09-01",
+      "next_review_due": "2026-03-01"
+    }
+  },
+  {
+    "name": "Frontend Engineering",
+    "type": "organizational_unit",
+    "description": "Web and mobile frontend development",
+    "status": "active",
+    "owner": "Alex Rivera",
+    "metadata": {
+      "unit_type": "team",
+      "parent_unit": "Engineering",
+      "location": "HQ — San Francisco",
+      "headcount": 7,
+      "cost_center": "CC-1120",
+      "ou_lead": "Alex Rivera",
+      "last_reviewed": "2025-09-01",
+      "next_review_due": "2026-03-01"
+    }
+  },
+  {
+    "name": "Backend Engineering",
+    "type": "organizational_unit",
+    "description": "API, services, and backend systems development",
+    "status": "active",
+    "owner": "Sarah Kim",
+    "metadata": {
+      "unit_type": "team",
+      "parent_unit": "Engineering",
+      "location": "HQ — San Francisco",
+      "headcount": 8,
+      "cost_center": "CC-1130",
+      "ou_lead": "Sarah Kim",
+      "last_reviewed": "2025-09-01",
+      "next_review_due": "2026-03-01"
+    }
+  },
+  {
+    "name": "Data Engineering",
+    "type": "organizational_unit",
+    "description": "Data pipelines, warehousing, and ML infrastructure",
+    "status": "active",
+    "owner": "Hassan Ali",
+    "metadata": {
+      "unit_type": "team",
+      "parent_unit": "Engineering",
+      "location": "HQ — San Francisco",
+      "headcount": 5,
+      "cost_center": "CC-1140",
+      "ou_lead": "Hassan Ali",
+      "last_reviewed": "2025-09-01",
+      "next_review_due": "2026-03-01"
+    }
+  },
+  {
+    "name": "QA Engineering",
+    "type": "organizational_unit",
+    "description": "Quality assurance and test automation",
+    "status": "active",
+    "owner": "Jordan Lee",
+    "metadata": {
+      "unit_type": "team",
+      "parent_unit": "Engineering",
+      "location": "HQ — San Francisco",
+      "headcount": 4,
+      "cost_center": "CC-1150",
+      "ou_lead": "Jordan Lee",
+      "last_reviewed": "2025-09-01",
+      "next_review_due": "2026-03-01"
+    }
+  },
+  {
+    "name": "IT Operations",
+    "type": "organizational_unit",
+    "description": "IT infrastructure, service desk, and endpoint management",
+    "status": "active",
+    "owner": "Nina Patel",
+    "metadata": {
+      "unit_type": "department",
+      "parent_unit": "Executive Office",
+      "location": "HQ — San Francisco",
+      "headcount": 8,
+      "cost_center": "CC-1200",
+      "ou_lead": "Nina Patel",
+      "last_reviewed": "2026-01-01",
+      "next_review_due": "2026-07-01"
+    }
+  },
+  {
+    "name": "Infrastructure",
+    "type": "organizational_unit",
+    "description": "Network, server, and cloud infrastructure management",
+    "status": "active",
+    "owner": "Raj Krishnan",
+    "metadata": {
+      "unit_type": "team",
+      "parent_unit": "IT Operations",
+      "location": "HQ — San Francisco",
+      "headcount": 4,
+      "cost_center": "CC-1210",
+      "ou_lead": "Raj Krishnan",
+      "last_reviewed": "2026-01-01",
+      "next_review_due": "2026-07-01"
+    }
+  },
+  {
+    "name": "IT Service Desk",
+    "type": "organizational_unit",
+    "description": "Employee IT support and service request fulfillment",
+    "status": "active",
+    "owner": "Emily Watson",
+    "metadata": {
+      "unit_type": "team",
+      "parent_unit": "IT Operations",
+      "location": "HQ — San Francisco",
+      "headcount": 4,
+      "cost_center": "CC-1220",
+      "ou_lead": "Emily Watson",
+      "last_reviewed": "2026-01-01",
+      "next_review_due": "2026-07-01"
+    }
+  },
+  {
+    "name": "Information Security",
+    "type": "organizational_unit",
+    "description": "Cybersecurity, GRC, and compliance operations",
+    "status": "active",
+    "owner": "David Park",
+    "metadata": {
+      "unit_type": "department",
+      "parent_unit": "Executive Office",
+      "location": "HQ — San Francisco",
+      "headcount": 8,
+      "cost_center": "CC-1300",
+      "ou_lead": "David Park",
+      "compliance_scope": "SOC 2, PCI DSS, ISO 27001, GDPR",
+      "last_reviewed": "2026-02-01",
+      "next_review_due": "2026-08-01"
+    }
+  },
+  {
+    "name": "Security Operations",
+    "type": "organizational_unit",
+    "description": "SOC, threat detection, vulnerability management, and incident response",
+    "status": "active",
+    "owner": "Carol Davies",
+    "metadata": {
+      "unit_type": "team",
+      "parent_unit": "Information Security",
+      "location": "HQ — San Francisco",
+      "headcount": 4,
+      "cost_center": "CC-1310",
+      "ou_lead": "Carol Davies",
+      "compliance_scope": "SOC 2, PCI DSS",
+      "last_reviewed": "2026-02-01",
+      "next_review_due": "2026-08-01"
+    }
+  },
+  {
+    "name": "GRC & Compliance",
+    "type": "organizational_unit",
+    "description": "Governance, risk, and compliance management",
+    "status": "active",
+    "owner": "Dan Kim",
+    "metadata": {
+      "unit_type": "team",
+      "parent_unit": "Information Security",
+      "location": "HQ — San Francisco",
+      "headcount": 4,
+      "cost_center": "CC-1320",
+      "ou_lead": "Dan Kim",
+      "compliance_scope": "SOC 2, PCI DSS, ISO 27001, GDPR",
+      "last_reviewed": "2026-02-01",
+      "next_review_due": "2026-08-01"
+    }
+  },
+  {
+    "name": "Legal",
+    "type": "organizational_unit",
+    "description": "Legal affairs, contracts, and regulatory counsel",
+    "status": "active",
+    "owner": "Rachel Goldstein",
+    "metadata": {
+      "unit_type": "department",
+      "parent_unit": "Executive Office",
+      "location": "HQ — San Francisco",
+      "headcount": 4,
+      "cost_center": "CC-8000",
+      "ou_lead": "Rachel Goldstein",
+      "last_reviewed": "2026-01-10",
+      "next_review_due": "2026-07-10"
+    }
+  },
+  {
+    "name": "Sarah Thompson",
+    "type": "person",
+    "description": "Chief Executive Officer",
+    "status": "active",
+    "owner": "Board of Directors",
+    "metadata": {
+      "title": "Chief Executive Officer",
+      "department": "Executive Office",
+      "email": "sarah.thompson@example.com",
+      "employment_type": "full_time",
+      "start_date": "2018-01-15",
+      "last_reviewed": "2025-12-01",
+      "next_review_due": "2026-06-01"
+    }
+  },
+  {
+    "name": "Alice Chen",
+    "type": "person",
+    "description": "Chief Technology Officer",
+    "status": "active",
+    "owner": "Sarah Thompson",
+    "metadata": {
+      "manager": "Sarah Thompson",
+      "title": "Chief Technology Officer",
+      "department": "Executive Office",
+      "email": "alice.chen@example.com",
+      "employment_type": "full_time",
+      "start_date": "2019-03-15",
+      "last_reviewed": "2025-06-01",
+      "next_review_due": "2026-03-01"
+    }
+  },
+  {
+    "name": "Michael Foster",
+    "type": "person",
+    "description": "Chief Financial Officer",
+    "status": "active",
+    "owner": "Sarah Thompson",
+    "metadata": {
+      "manager": "Sarah Thompson",
+      "title": "Chief Financial Officer",
+      "department": "Finance & Accounting",
+      "email": "michael.foster@example.com",
+      "employment_type": "full_time",
+      "start_date": "2019-06-01",
+      "last_reviewed": "2025-12-15",
+      "next_review_due": "2026-06-15"
+    }
+  },
+  {
+    "name": "Jennifer Walsh",
+    "type": "person",
+    "description": "Chief Operating Officer",
+    "status": "active",
+    "owner": "Sarah Thompson",
+    "metadata": {
+      "manager": "Sarah Thompson",
+      "title": "Chief Operating Officer",
+      "department": "Executive Office",
+      "email": "jennifer.walsh@example.com",
+      "employment_type": "full_time",
+      "start_date": "2019-09-01",
+      "last_reviewed": "2025-11-15",
+      "next_review_due": "2026-05-15"
+    }
+  },
+  {
+    "name": "David Park",
+    "type": "person",
+    "description": "Chief Information Security Officer",
+    "status": "active",
+    "owner": "Sarah Thompson",
+    "metadata": {
+      "manager": "Sarah Thompson",
+      "title": "Chief Information Security Officer",
+      "department": "Information Security",
+      "email": "david.park@example.com",
+      "employment_type": "full_time",
+      "start_date": "2020-02-01",
+      "clearance_level": "secret",
+      "last_reviewed": "2025-12-01",
+      "next_review_due": "2026-06-01"
+    }
+  },
+  {
+    "name": "Rachel Goldstein",
+    "type": "person",
+    "description": "General Counsel / Chief Legal Officer",
+    "status": "active",
+    "owner": "Sarah Thompson",
+    "metadata": {
+      "manager": "Sarah Thompson",
+      "title": "General Counsel / Chief Legal Officer",
+      "department": "Legal",
+      "email": "rachel.goldstein@example.com",
+      "employment_type": "full_time",
+      "start_date": "2019-11-01",
+      "last_reviewed": "2026-01-15",
+      "next_review_due": "2026-07-15"
+    }
+  },
+  {
+    "name": "Bob Martinez",
+    "type": "person",
+    "description": "VP Engineering",
+    "status": "active",
+    "owner": "Alice Chen",
+    "metadata": {
+      "manager": "Alice Chen",
+      "title": "VP Engineering",
+      "department": "Engineering",
+      "email": "bob.martinez@example.com",
+      "employment_type": "full_time",
+      "start_date": "2020-01-10",
+      "last_reviewed": "2025-10-15",
+      "next_review_due": "2026-04-15"
+    }
+  },
+  {
+    "name": "Lisa Chang",
+    "type": "person",
+    "description": "VP Product",
+    "status": "active",
+    "owner": "Alice Chen",
+    "metadata": {
+      "manager": "Alice Chen",
+      "title": "VP Product",
+      "department": "Product",
+      "email": "lisa.chang@example.com",
+      "employment_type": "full_time",
+      "start_date": "2020-04-15",
+      "last_reviewed": "2025-10-01",
+      "next_review_due": "2026-04-01"
+    }
+  },
+  {
+    "name": "James Wilson",
+    "type": "person",
+    "description": "VP Sales",
+    "status": "active",
+    "owner": "Jennifer Walsh",
+    "metadata": {
+      "manager": "Jennifer Walsh",
+      "title": "VP Sales",
+      "department": "Sales",
+      "email": "james.wilson@example.com",
+      "employment_type": "full_time",
+      "start_date": "2020-06-01",
+      "last_reviewed": "2025-12-01",
+      "next_review_due": "2026-06-01"
+    }
+  },
+  {
+    "name": "Maria Santos",
+    "type": "person",
+    "description": "VP Human Resources",
+    "status": "active",
+    "owner": "Jennifer Walsh",
+    "metadata": {
+      "manager": "Jennifer Walsh",
+      "title": "VP Human Resources",
+      "department": "Human Resources",
+      "email": "maria.santos@example.com",
+      "employment_type": "full_time",
+      "start_date": "2020-03-01",
+      "last_reviewed": "2025-11-01",
+      "next_review_due": "2026-05-01"
+    }
+  },
+  {
+    "name": "Kevin O'Brien",
+    "type": "person",
+    "description": "VP Customer Success",
+    "status": "active",
+    "owner": "Jennifer Walsh",
+    "metadata": {
+      "manager": "Jennifer Walsh",
+      "title": "VP Customer Success",
+      "department": "Customer Success",
+      "email": "kevin.obrien@example.com",
+      "employment_type": "full_time",
+      "start_date": "2021-01-15",
+      "last_reviewed": "2025-12-15",
+      "next_review_due": "2026-06-15"
+    }
+  },
+  {
+    "name": "Priya Sharma",
+    "type": "person",
+    "description": "Director of Marketing",
+    "status": "active",
+    "owner": "Jennifer Walsh",
+    "metadata": {
+      "manager": "Jennifer Walsh",
+      "title": "Director of Marketing",
+      "department": "Marketing",
+      "email": "priya.sharma@example.com",
+      "employment_type": "full_time",
+      "start_date": "2021-03-01",
+      "last_reviewed": "2025-11-15",
+      "next_review_due": "2026-05-15"
+    }
+  },
+  {
+    "name": "Tom Anderson",
+    "type": "person",
+    "description": "Director of Finance",
+    "status": "active",
+    "owner": "Michael Foster",
+    "metadata": {
+      "manager": "Michael Foster",
+      "title": "Director of Finance",
+      "department": "Finance & Accounting",
+      "email": "tom.anderson@example.com",
+      "employment_type": "full_time",
+      "start_date": "2021-05-01",
+      "last_reviewed": "2025-12-01",
+      "next_review_due": "2026-06-01"
+    }
+  },
+  {
+    "name": "Carol Davies",
+    "type": "person",
+    "description": "Director of Security Operations",
+    "status": "active",
+    "owner": "David Park",
+    "metadata": {
+      "manager": "David Park",
+      "title": "Director of Security Operations",
+      "department": "Information Security",
+      "email": "carol.davies@example.com",
+      "employment_type": "full_time",
+      "start_date": "2020-06-01",
+      "clearance_level": "secret",
+      "last_reviewed": "2025-12-01",
+      "next_review_due": "2026-06-01"
+    }
+  },
+  {
+    "name": "Dan Kim",
+    "type": "person",
+    "description": "Compliance Manager",
+    "status": "active",
+    "owner": "Rachel Goldstein",
+    "metadata": {
+      "manager": "Rachel Goldstein",
+      "title": "Compliance Manager",
+      "department": "GRC & Compliance",
+      "email": "dan.kim@example.com",
+      "employment_type": "full_time",
+      "start_date": "2021-02-15",
+      "clearance_level": "confidential",
+      "last_reviewed": "2026-01-15",
+      "next_review_due": "2026-07-15"
+    }
+  },
+  {
+    "name": "Eve Novak",
+    "type": "person",
+    "description": "Data Protection Officer",
+    "status": "active",
+    "owner": "Rachel Goldstein",
+    "metadata": {
+      "manager": "Rachel Goldstein",
+      "title": "Data Protection Officer",
+      "department": "GRC & Compliance",
+      "email": "eve.novak@example.com",
+      "employment_type": "full_time",
+      "start_date": "2021-08-01",
+      "clearance_level": "confidential",
+      "last_reviewed": "2025-11-01",
+      "next_review_due": "2026-04-01"
+    }
+  },
+  {
+    "name": "Frank Osei",
+    "type": "person",
+    "description": "Director of SRE & DevOps",
+    "status": "active",
+    "owner": "Bob Martinez",
+    "metadata": {
+      "manager": "Bob Martinez",
+      "title": "Director of SRE & DevOps",
+      "department": "Platform Engineering",
+      "email": "frank.osei@example.com",
+      "employment_type": "full_time",
+      "start_date": "2020-09-20",
+      "last_reviewed": "2025-08-01",
+      "next_review_due": "2026-02-01"
+    }
+  },
+  {
+    "name": "Nina Patel",
+    "type": "person",
+    "description": "Director of IT Operations",
+    "status": "active",
+    "owner": "Alice Chen",
+    "metadata": {
+      "manager": "Alice Chen",
+      "title": "Director of IT Operations",
+      "department": "IT Operations",
+      "email": "nina.patel@example.com",
+      "employment_type": "full_time",
+      "start_date": "2021-04-01",
+      "last_reviewed": "2025-10-15",
+      "next_review_due": "2026-04-15"
+    }
+  },
+  {
+    "name": "Hassan Ali",
+    "type": "person",
+    "description": "Director of Data Engineering",
+    "status": "active",
+    "owner": "Bob Martinez",
+    "metadata": {
+      "manager": "Bob Martinez",
+      "title": "Director of Data Engineering",
+      "department": "Data Engineering",
+      "email": "hassan.ali@example.com",
+      "employment_type": "full_time",
+      "start_date": "2021-06-01",
+      "last_reviewed": "2025-09-15",
+      "next_review_due": "2026-03-15"
+    }
+  },
+  {
+    "name": "Wei Zhang",
+    "type": "person",
+    "description": "Senior Platform Engineer",
+    "status": "active",
+    "owner": "Frank Osei",
+    "metadata": {
+      "manager": "Frank Osei",
+      "title": "Senior Platform Engineer",
+      "department": "Platform Engineering",
+      "email": "wei.zhang@example.com",
+      "employment_type": "full_time",
+      "start_date": "2021-09-01",
+      "last_reviewed": "2025-09-01",
+      "next_review_due": "2026-03-01"
+    }
+  },
+  {
+    "name": "Alex Rivera",
+    "type": "person",
+    "description": "Frontend Engineering Lead",
+    "status": "active",
+    "owner": "Bob Martinez",
+    "metadata": {
+      "manager": "Bob Martinez",
+      "title": "Frontend Engineering Lead",
+      "department": "Frontend Engineering",
+      "email": "alex.rivera@example.com",
+      "employment_type": "full_time",
+      "start_date": "2021-07-15",
+      "last_reviewed": "2025-10-01",
+      "next_review_due": "2026-04-01"
+    }
+  },
+  {
+    "name": "Sarah Kim",
+    "type": "person",
+    "description": "Backend Engineering Lead",
+    "status": "active",
+    "owner": "Bob Martinez",
+    "metadata": {
+      "manager": "Bob Martinez",
+      "title": "Backend Engineering Lead",
+      "department": "Backend Engineering",
+      "email": "sarah.kim@example.com",
+      "employment_type": "full_time",
+      "start_date": "2021-08-01",
+      "last_reviewed": "2025-10-01",
+      "next_review_due": "2026-04-01"
+    }
+  },
+  {
+    "name": "Jordan Lee",
+    "type": "person",
+    "description": "QA Engineering Lead",
+    "status": "active",
+    "owner": "Bob Martinez",
+    "metadata": {
+      "manager": "Bob Martinez",
+      "title": "QA Engineering Lead",
+      "department": "QA Engineering",
+      "email": "jordan.lee@example.com",
+      "employment_type": "full_time",
+      "start_date": "2022-01-10",
+      "last_reviewed": "2025-10-01",
+      "next_review_due": "2026-04-01"
+    }
+  },
+  {
+    "name": "Aisha Johnson",
+    "type": "person",
+    "description": "Senior Data Engineer",
+    "status": "active",
+    "owner": "Hassan Ali",
+    "metadata": {
+      "manager": "Hassan Ali",
+      "title": "Senior Data Engineer",
+      "department": "Data Engineering",
+      "email": "aisha.johnson@example.com",
+      "employment_type": "full_time",
+      "start_date": "2022-03-01",
+      "last_reviewed": "2025-09-15",
+      "next_review_due": "2026-03-15"
+    }
+  },
+  {
+    "name": "Marcus Chen",
+    "type": "person",
+    "description": "ML Engineer",
+    "status": "active",
+    "owner": "Hassan Ali",
+    "metadata": {
+      "manager": "Hassan Ali",
+      "title": "ML Engineer",
+      "department": "Data Engineering",
+      "email": "marcus.chen@example.com",
+      "employment_type": "full_time",
+      "start_date": "2022-06-01",
+      "last_reviewed": "2025-09-15",
+      "next_review_due": "2026-03-15"
+    }
+  },
+  {
+    "name": "Yuki Tanaka",
+    "type": "person",
+    "description": "Site Reliability Engineer",
+    "status": "active",
+    "owner": "Frank Osei",
+    "metadata": {
+      "manager": "Frank Osei",
+      "title": "Site Reliability Engineer",
+      "department": "Platform Engineering",
+      "email": "yuki.tanaka@example.com",
+      "employment_type": "full_time",
+      "start_date": "2022-08-15",
+      "last_reviewed": "2025-09-01",
+      "next_review_due": "2026-03-01"
+    }
+  },
+  {
+    "name": "Grace Liu",
+    "type": "person",
+    "description": "Security Analyst",
+    "status": "active",
+    "owner": "Carol Davies",
+    "metadata": {
+      "manager": "Carol Davies",
+      "title": "Security Analyst",
+      "department": "Security Operations",
+      "email": "grace.liu@example.com",
+      "employment_type": "full_time",
+      "start_date": "2023-01-15",
+      "clearance_level": "confidential",
+      "last_reviewed": "2026-02-15",
+      "next_review_due": "2026-08-15"
+    }
+  },
+  {
+    "name": "Robert Nash",
+    "type": "person",
+    "description": "SOC Analyst",
+    "status": "active",
+    "owner": "Carol Davies",
+    "metadata": {
+      "manager": "Carol Davies",
+      "title": "SOC Analyst",
+      "department": "Security Operations",
+      "email": "robert.nash@example.com",
+      "employment_type": "full_time",
+      "start_date": "2023-04-01",
+      "clearance_level": "confidential",
+      "last_reviewed": "2026-02-15",
+      "next_review_due": "2026-08-15"
+    }
+  },
+  {
+    "name": "Emily Watson",
+    "type": "person",
+    "description": "IT Service Desk Lead",
+    "status": "active",
+    "owner": "Nina Patel",
+    "metadata": {
+      "manager": "Nina Patel",
+      "title": "IT Service Desk Lead",
+      "department": "IT Operations",
+      "email": "emily.watson@example.com",
+      "employment_type": "full_time",
+      "start_date": "2022-02-01",
+      "last_reviewed": "2025-10-15",
+      "next_review_due": "2026-04-15"
+    }
+  },
+  {
+    "name": "Raj Krishnan",
+    "type": "person",
+    "description": "Infrastructure Engineer",
+    "status": "active",
+    "owner": "Nina Patel",
+    "metadata": {
+      "manager": "Nina Patel",
+      "title": "Infrastructure Engineer",
+      "department": "IT Operations",
+      "email": "raj.krishnan@example.com",
+      "employment_type": "full_time",
+      "start_date": "2022-05-01",
+      "last_reviewed": "2025-10-15",
+      "next_review_due": "2026-04-15"
+    }
+  },
+  {
+    "name": "Sofia Rossi",
+    "type": "person",
+    "description": "Senior Product Manager",
+    "status": "active",
+    "owner": "Lisa Chang",
+    "metadata": {
+      "manager": "Lisa Chang",
+      "title": "Senior Product Manager",
+      "department": "Product",
+      "email": "sofia.rossi@example.com",
+      "employment_type": "full_time",
+      "start_date": "2022-01-15",
+      "last_reviewed": "2025-10-01",
+      "next_review_due": "2026-04-01"
+    }
+  },
+  {
+    "name": "Jake Morales",
+    "type": "person",
+    "description": "UX Designer",
+    "status": "active",
+    "owner": "Lisa Chang",
+    "metadata": {
+      "manager": "Lisa Chang",
+      "title": "UX Designer",
+      "department": "Product",
+      "email": "jake.morales@example.com",
+      "employment_type": "full_time",
+      "start_date": "2022-09-01",
+      "last_reviewed": "2025-10-01",
+      "next_review_due": "2026-04-01"
+    }
+  },
+  {
+    "name": "Amanda Brooks",
+    "type": "person",
+    "description": "Enterprise Account Executive",
+    "status": "active",
+    "owner": "James Wilson",
+    "metadata": {
+      "manager": "James Wilson",
+      "title": "Enterprise Account Executive",
+      "department": "Enterprise Sales",
+      "email": "amanda.brooks@example.com",
+      "employment_type": "full_time",
+      "start_date": "2022-04-01",
+      "last_reviewed": "2025-12-01",
+      "next_review_due": "2026-06-01"
+    }
+  },
+  {
+    "name": "Tyler Stone",
+    "type": "person",
+    "description": "SMB Account Manager",
+    "status": "active",
+    "owner": "James Wilson",
+    "metadata": {
+      "manager": "James Wilson",
+      "title": "SMB Account Manager",
+      "department": "SMB Sales",
+      "email": "tyler.stone@example.com",
+      "employment_type": "full_time",
+      "start_date": "2022-07-01",
+      "last_reviewed": "2025-12-01",
+      "next_review_due": "2026-06-01"
+    }
+  },
+  {
+    "name": "Olivia Parker",
+    "type": "person",
+    "description": "Customer Success Manager",
+    "status": "active",
+    "owner": "Kevin O'Brien",
+    "metadata": {
+      "manager": "Kevin O'Brien",
+      "title": "Customer Success Manager",
+      "department": "Customer Success",
+      "email": "olivia.parker@example.com",
+      "employment_type": "full_time",
+      "start_date": "2022-10-01",
+      "last_reviewed": "2025-12-15",
+      "next_review_due": "2026-06-15"
+    }
+  },
+  {
+    "name": "Diana Torres",
+    "type": "person",
+    "description": "Technical Account Manager",
+    "status": "active",
+    "owner": "Kevin O'Brien",
+    "metadata": {
+      "manager": "Kevin O'Brien",
+      "title": "Technical Account Manager",
+      "department": "Customer Success",
+      "email": "diana.torres@example.com",
+      "employment_type": "full_time",
+      "start_date": "2023-02-01",
+      "last_reviewed": "2025-12-15",
+      "next_review_due": "2026-06-15"
+    }
+  },
+  {
+    "name": "Brian Murphy",
+    "type": "person",
+    "description": "Marketing Operations Manager",
+    "status": "active",
+    "owner": "Priya Sharma",
+    "metadata": {
+      "manager": "Priya Sharma",
+      "title": "Marketing Operations Manager",
+      "department": "Marketing",
+      "email": "brian.murphy@example.com",
+      "employment_type": "full_time",
+      "start_date": "2023-01-15",
+      "last_reviewed": "2025-11-15",
+      "next_review_due": "2026-05-15"
+    }
+  },
+  {
+    "name": "Catherine Lee",
+    "type": "person",
+    "description": "Financial Analyst",
+    "status": "active",
+    "owner": "Tom Anderson",
+    "metadata": {
+      "manager": "Tom Anderson",
+      "title": "Financial Analyst",
+      "department": "Finance & Accounting",
+      "email": "catherine.lee@example.com",
+      "employment_type": "full_time",
+      "start_date": "2023-03-01",
+      "last_reviewed": "2025-12-01",
+      "next_review_due": "2026-06-01"
+    }
+  },
+  {
+    "name": "Sam Okafor",
+    "type": "person",
+    "description": "HR Business Partner",
+    "status": "active",
+    "owner": "Maria Santos",
+    "metadata": {
+      "manager": "Maria Santos",
+      "title": "HR Business Partner",
+      "department": "Human Resources",
+      "email": "sam.okafor@example.com",
+      "employment_type": "full_time",
+      "start_date": "2022-11-01",
+      "last_reviewed": "2025-11-01",
+      "next_review_due": "2026-05-01"
+    }
+  },
+  {
+    "name": "Jessica Park",
+    "type": "person",
+    "description": "Talent Acquisition Lead",
+    "status": "active",
+    "owner": "Maria Santos",
+    "metadata": {
+      "manager": "Maria Santos",
+      "title": "Talent Acquisition Lead",
+      "department": "Human Resources",
+      "email": "jessica.park@example.com",
+      "employment_type": "full_time",
+      "start_date": "2023-05-01",
+      "last_reviewed": "2025-11-01",
+      "next_review_due": "2026-05-01"
+    }
+  },
+  {
+    "name": "Nathan Grey",
+    "type": "person",
+    "description": "Paralegal",
+    "status": "active",
+    "owner": "Rachel Goldstein",
+    "metadata": {
+      "manager": "Rachel Goldstein",
+      "title": "Paralegal",
+      "department": "Legal",
+      "email": "nathan.grey@example.com",
+      "employment_type": "full_time",
+      "start_date": "2023-06-01",
+      "last_reviewed": "2026-01-15",
+      "next_review_due": "2026-07-15"
+    }
+  },
+  {
+    "name": "Derek Hoffman",
+    "type": "person",
+    "description": "Junior Backend Engineer",
+    "status": "active",
+    "owner": "Sarah Kim",
+    "metadata": {
+      "manager": "Sarah Kim",
+      "title": "Junior Backend Engineer",
+      "department": "Backend Engineering",
+      "email": "derek.hoffman@example.com",
+      "employment_type": "full_time",
+      "start_date": "2024-01-15",
+      "last_reviewed": "2025-10-01",
+      "next_review_due": "2026-04-01"
+    }
+  },
+  {
+    "name": "Liam Cooper",
+    "type": "person",
+    "description": "DevOps Engineer",
+    "status": "active",
+    "owner": "Frank Osei",
+    "metadata": {
+      "manager": "Frank Osei",
+      "title": "DevOps Engineer",
+      "department": "Platform Engineering",
+      "email": "liam.cooper@example.com",
+      "employment_type": "full_time",
+      "start_date": "2023-09-01",
+      "last_reviewed": "2025-09-01",
+      "next_review_due": "2026-03-01"
+    }
+  },
+  {
+    "name": "Hannah Mitchell",
+    "type": "person",
+    "description": "Compliance Analyst",
+    "status": "active",
+    "owner": "Dan Kim",
+    "metadata": {
+      "manager": "Dan Kim",
+      "title": "Compliance Analyst",
+      "department": "GRC & Compliance",
+      "email": "hannah.mitchell@example.com",
+      "employment_type": "full_time",
+      "start_date": "2024-03-01",
+      "clearance_level": "confidential",
+      "last_reviewed": "2026-01-15",
+      "next_review_due": "2026-07-15"
+    }
+  },
+  {
+    "name": "Acceptable Use Policy",
+    "type": "policy",
+    "description": "Defines acceptable use of company systems and data",
+    "status": "active",
+    "owner": "Carol Davies",
+    "metadata": {
+      "version": "3.0",
+      "effective_date": "2025-01-15",
+      "review_cadence": "annual",
+      "review_date": "2026-01-15",
+      "approver": "David Park",
+      "scope": "All employees and contractors",
+      "classification": "internal"
+    }
+  },
+  {
+    "name": "Data Retention Policy",
+    "type": "policy",
+    "description": "Governs how long data is retained and when it is purged",
+    "status": "active",
+    "owner": "Eve Novak",
+    "metadata": {
+      "version": "2.1",
+      "effective_date": "2025-03-01",
+      "review_cadence": "annual",
+      "review_date": "2026-03-01",
+      "approver": "Rachel Goldstein",
+      "scope": "All data stores and processing systems",
+      "classification": "internal"
+    }
+  },
+  {
+    "name": "Incident Response Policy",
+    "type": "policy",
+    "description": "Procedures for responding to security incidents",
+    "status": "active",
+    "owner": "Carol Davies",
+    "metadata": {
+      "version": "4.2",
+      "effective_date": "2025-06-01",
+      "review_cadence": "annual",
+      "review_date": "2026-06-01",
+      "approver": "David Park",
+      "scope": "Security team and on-call engineers",
+      "classification": "confidential"
+    }
+  },
+  {
+    "name": "Access Control Policy",
+    "type": "policy",
+    "description": "Rules for granting and revoking system access",
+    "status": "active",
+    "owner": "Carol Davies",
+    "metadata": {
+      "version": "2.0",
+      "effective_date": "2025-04-01",
+      "review_cadence": "annual",
+      "review_date": "2026-04-01",
+      "approver": "David Park",
+      "scope": "All systems and applications",
+      "classification": "internal"
+    }
+  },
+  {
+    "name": "Change Management Policy",
+    "type": "policy",
+    "description": "Process for approving and deploying changes",
+    "status": "active",
+    "owner": "Frank Osei",
+    "metadata": {
+      "version": "1.5",
+      "effective_date": "2025-02-01",
+      "review_cadence": "annual",
+      "review_date": "2026-02-01",
+      "approver": "Bob Martinez",
+      "scope": "Production systems and infrastructure",
+      "classification": "internal"
+    }
+  },
+  {
+    "name": "Remote Access Policy",
+    "type": "policy",
+    "description": "Governs VPN and remote access to corporate networks",
+    "status": "draft",
+    "owner": "Carol Davies",
+    "metadata": {
+      "version": "0.1",
+      "effective_date": "",
+      "review_cadence": "annual",
+      "review_date": "",
+      "approver": "",
+      "scope": "All remote employees and contractors",
+      "classification": "internal"
+    }
+  },
+  {
+    "name": "Data Classification Policy",
+    "type": "policy",
+    "description": "Defines data classification levels and handling requirements",
+    "status": "archived",
+    "owner": "Eve Novak",
+    "metadata": {
+      "version": "1.0",
+      "effective_date": "2023-01-01",
+      "review_cadence": "annual",
+      "review_date": "2024-01-01",
+      "approver": "Rachel Goldstein",
+      "scope": "All data assets",
+      "classification": "internal"
+    }
+  },
+  {
+    "name": "Information Security Policy",
+    "type": "policy",
+    "description": "Top-level policy establishing the information security program, objectives, and governance structure",
+    "status": "active",
+    "owner": "David Park",
+    "metadata": {
+      "version": "2.0",
+      "effective_date": "2025-09-01",
+      "review_cadence": "annual",
+      "review_date": "2026-09-01",
+      "approver": "Sarah Thompson",
+      "scope": "All employees, contractors, and systems",
+      "classification": "internal"
+    }
+  },
+  {
+    "name": "Vendor Management Policy",
+    "type": "policy",
+    "description": "Defines requirements for third-party vendor assessment, onboarding, and ongoing monitoring",
+    "status": "active",
+    "owner": "Dan Kim",
+    "metadata": {
+      "version": "1.0",
+      "effective_date": "2025-07-01",
+      "review_cadence": "annual",
+      "review_date": "2026-07-01",
+      "approver": "Rachel Goldstein",
+      "scope": "All third-party vendors with access to company data or systems",
+      "classification": "internal"
+    }
+  },
+  {
+    "name": "Business Continuity Policy",
+    "type": "policy",
+    "description": "Establishes business continuity and disaster recovery planning requirements",
+    "status": "active",
+    "owner": "Jennifer Walsh",
+    "metadata": {
+      "version": "1.2",
+      "effective_date": "2025-10-01",
+      "review_cadence": "annual",
+      "review_date": "2026-10-01",
+      "approver": "Sarah Thompson",
+      "scope": "All critical business functions and systems",
+      "classification": "confidential"
+    }
+  },
+  {
+    "name": "Employee Handbook",
+    "type": "policy",
+    "description": "Comprehensive guide to company policies, benefits, and workplace expectations",
+    "status": "active",
+    "owner": "Maria Santos",
+    "metadata": {
+      "version": "5.0",
+      "effective_date": "2026-01-01",
+      "review_cadence": "annual",
+      "review_date": "2027-01-01",
+      "approver": "Jennifer Walsh",
+      "scope": "All employees",
+      "classification": "internal"
+    }
+  },
+  {
+    "name": "Code of Conduct",
+    "type": "policy",
+    "description": "Ethical standards and behavioral expectations for all personnel",
+    "status": "active",
+    "owner": "Rachel Goldstein",
+    "metadata": {
+      "version": "3.1",
+      "effective_date": "2025-06-15",
+      "review_cadence": "annual",
+      "review_date": "2026-06-15",
+      "approver": "Sarah Thompson",
+      "scope": "All employees, contractors, and board members",
+      "classification": "public"
+    }
+  },
+  {
+    "name": "Privacy Policy",
+    "type": "policy",
+    "description": "External-facing privacy notice and internal data handling procedures",
+    "status": "active",
+    "owner": "Eve Novak",
+    "metadata": {
+      "version": "4.0",
+      "effective_date": "2025-05-25",
+      "review_cadence": "annual",
+      "review_date": "2026-05-25",
+      "approver": "Rachel Goldstein",
+      "scope": "All personal data processing activities",
+      "classification": "public"
+    }
+  },
+  {
+    "name": "GRCen Platform",
+    "type": "product",
+    "description": "Internal GRC management tool",
+    "status": "active",
+    "owner": "Bob Martinez",
+    "metadata": {
+      "version": "0.1.0",
+      "lifecycle_stage": "development",
+      "type": "internal",
+      "developer": "Internal Engineering",
+      "last_reviewed": "2026-02-15",
+      "next_review_due": "2026-08-15"
+    }
+  },
+  {
+    "name": "Customer Portal",
+    "type": "product",
+    "description": "Customer-facing web application",
+    "status": "active",
+    "owner": "Bob Martinez",
+    "metadata": {
+      "version": "5.12.3",
+      "lifecycle_stage": "ga",
+      "type": "paid",
+      "developer": "Internal Engineering",
+      "url": "https://portal.example.com",
+      "last_reviewed": "2025-09-01",
+      "next_review_due": "2026-03-15"
+    }
+  },
+  {
+    "name": "Mobile App",
+    "type": "product",
+    "description": "iOS and Android customer app",
+    "status": "active",
+    "owner": "Bob Martinez",
+    "metadata": {
+      "version": "3.8.1",
+      "lifecycle_stage": "ga",
+      "type": "free",
+      "developer": "Internal Engineering",
+      "last_reviewed": "2026-01-01",
+      "next_review_due": "2026-04-01"
+    }
+  },
+  {
+    "name": "Legacy Billing Portal",
+    "type": "product",
+    "description": "Old billing interface replaced by Customer Portal",
+    "status": "inactive",
+    "owner": "Bob Martinez",
+    "metadata": {
+      "version": "2.0.0",
+      "lifecycle_stage": "eol",
+      "type": "internal",
+      "developer": "Internal Engineering",
+      "last_reviewed": "2024-06-01",
+      "next_review_due": "2025-06-01"
+    }
+  },
+  {
+    "name": "Internal Analytics Dashboard",
+    "type": "product",
+    "description": "Internal data visualization and business intelligence tool",
+    "status": "active",
+    "owner": "Hassan Ali",
+    "metadata": {
+      "version": "1.3.0",
+      "lifecycle_stage": "ga",
+      "type": "internal",
+      "developer": "Data Engineering",
+      "url": "https://analytics.internal.example.com",
+      "last_reviewed": "2026-02-01",
+      "next_review_due": "2026-08-01"
+    }
+  },
+  {
+    "name": "API Gateway",
+    "type": "product",
+    "description": "Central API management platform for internal and external consumers",
+    "status": "active",
+    "owner": "Frank Osei",
+    "metadata": {
+      "version": "2.1.0",
+      "lifecycle_stage": "ga",
+      "type": "internal",
+      "developer": "Platform Engineering",
+      "url": "https://api.example.com",
+      "last_reviewed": "2026-01-15",
+      "next_review_due": "2026-07-15"
+    }
+  },
+  {
+    "name": "Production Kubernetes Cluster",
+    "type": "system",
+    "description": "Primary production workload orchestration",
+    "status": "active",
+    "owner": "Frank Osei",
+    "metadata": {
+      "environment": "production",
+      "hosting": "cloud",
+      "provider": "AWS",
+      "region": "us-east-1, eu-west-1",
+      "criticality": "critical",
+      "data_classification": "confidential",
+      "last_reviewed": "2025-09-15",
+      "next_review_due": "2026-03-15"
+    }
+  },
+  {
+    "name": "CI/CD Pipeline",
+    "type": "system",
+    "description": "Jenkins and ArgoCD deployment pipeline",
+    "status": "active",
+    "owner": "Frank Osei",
+    "metadata": {
+      "environment": "production",
+      "hosting": "cloud",
+      "provider": "AWS",
+      "region": "us-east-1",
+      "criticality": "high",
+      "data_classification": "internal",
+      "last_reviewed": "2026-01-01",
+      "next_review_due": "2026-07-01"
+    }
+  },
+  {
+    "name": "Identity Provider",
+    "type": "system",
+    "description": "Okta SSO and MFA",
+    "status": "active",
+    "owner": "Carol Davies",
+    "metadata": {
+      "environment": "production",
+      "hosting": "saas",
+      "provider": "Okta",
+      "criticality": "critical",
+      "data_classification": "confidential",
+      "url": "https://example.okta.com",
+      "last_reviewed": "2025-12-01",
+      "next_review_due": "2026-04-01"
+    }
+  },
+  {
+    "name": "Data Warehouse",
+    "type": "system",
+    "description": "Snowflake analytics platform",
+    "status": "active",
+    "owner": "Hassan Ali",
+    "metadata": {
+      "environment": "production",
+      "hosting": "saas",
+      "provider": "Snowflake",
+      "region": "us-east-1",
+      "criticality": "high",
+      "data_classification": "confidential",
+      "last_reviewed": "2026-02-01",
+      "next_review_due": "2026-08-01"
+    }
+  },
+  {
+    "name": "Monitoring Stack",
+    "type": "system",
+    "description": "Prometheus, Grafana, PagerDuty integration",
+    "status": "active",
+    "owner": "Frank Osei",
+    "metadata": {
+      "environment": "production",
+      "hosting": "cloud",
+      "provider": "AWS",
+      "region": "us-east-1",
+      "criticality": "high",
+      "data_classification": "internal",
+      "last_reviewed": "2026-01-15",
+      "next_review_due": "2026-07-15"
+    }
+  },
+  {
+    "name": "Secrets Manager",
+    "type": "system",
+    "description": "HashiCorp Vault for secrets and certificates",
+    "status": "active",
+    "owner": "Carol Davies",
+    "metadata": {
+      "environment": "production",
+      "hosting": "cloud",
+      "provider": "AWS",
+      "region": "us-east-1",
+      "criticality": "critical",
+      "data_classification": "restricted",
+      "last_reviewed": "2025-10-01",
+      "next_review_due": "2026-04-01"
+    }
+  },
+  {
+    "name": "Staging Environment",
+    "type": "system",
+    "description": "Pre-production staging cluster",
+    "status": "active",
+    "owner": "Frank Osei",
+    "metadata": {
+      "environment": "staging",
+      "hosting": "cloud",
+      "provider": "AWS",
+      "region": "us-east-1",
+      "criticality": "medium",
+      "data_classification": "internal",
+      "last_reviewed": "2026-01-01",
+      "next_review_due": "2026-07-01"
+    }
+  },
+  {
+    "name": "Salesforce CRM",
+    "type": "system",
+    "description": "Sales CRM platform for pipeline management, forecasting, and customer engagement",
+    "status": "active",
+    "owner": "James Wilson",
+    "metadata": {
+      "environment": "production",
+      "hosting": "saas",
+      "provider": "Salesforce",
+      "region": "us-east-1",
+      "criticality": "high",
+      "data_classification": "confidential",
+      "last_reviewed": "2026-01-15",
+      "next_review_due": "2026-07-15"
+    }
+  },
+  {
+    "name": "Workday HRIS",
+    "type": "system",
+    "description": "HR information system for employee records, payroll, and benefits administration",
+    "status": "active",
+    "owner": "Maria Santos",
+    "metadata": {
+      "environment": "production",
+      "hosting": "saas",
+      "provider": "Workday",
+      "region": "us-east-1",
+      "criticality": "high",
+      "data_classification": "confidential",
+      "last_reviewed": "2026-02-01",
+      "next_review_due": "2026-08-01"
+    }
+  },
+  {
+    "name": "NetSuite ERP",
+    "type": "system",
+    "description": "Enterprise resource planning system for financials, procurement, and reporting",
+    "status": "active",
+    "owner": "Michael Foster",
+    "metadata": {
+      "environment": "production",
+      "hosting": "saas",
+      "provider": "Oracle/NetSuite",
+      "region": "us-east-1",
+      "criticality": "high",
+      "data_classification": "confidential",
+      "last_reviewed": "2026-01-01",
+      "next_review_due": "2026-07-01"
+    }
+  },
+  {
+    "name": "Slack",
+    "type": "system",
+    "description": "Team communication and collaboration platform",
+    "status": "active",
+    "owner": "Nina Patel",
+    "metadata": {
+      "environment": "production",
+      "hosting": "saas",
+      "provider": "Salesforce/Slack",
+      "region": "global",
+      "criticality": "high",
+      "data_classification": "internal",
+      "last_reviewed": "2026-02-15",
+      "next_review_due": "2026-08-15"
+    }
+  },
+  {
+    "name": "Jira",
+    "type": "system",
+    "description": "Project management and issue tracking for engineering and product teams",
+    "status": "active",
+    "owner": "Bob Martinez",
+    "metadata": {
+      "environment": "production",
+      "hosting": "saas",
+      "provider": "Atlassian",
+      "region": "global",
+      "criticality": "high",
+      "data_classification": "internal",
+      "last_reviewed": "2026-01-15",
+      "next_review_due": "2026-07-15"
+    }
+  },
+  {
+    "name": "Confluence",
+    "type": "system",
+    "description": "Knowledge management wiki for documentation and collaboration",
+    "status": "active",
+    "owner": "Bob Martinez",
+    "metadata": {
+      "environment": "production",
+      "hosting": "saas",
+      "provider": "Atlassian",
+      "region": "global",
+      "criticality": "medium",
+      "data_classification": "internal",
+      "last_reviewed": "2026-01-15",
+      "next_review_due": "2026-07-15"
+    }
+  },
+  {
+    "name": "GitHub",
+    "type": "system",
+    "description": "Source code management, CI actions, and code review platform",
+    "status": "active",
+    "owner": "Bob Martinez",
+    "metadata": {
+      "environment": "production",
+      "hosting": "saas",
+      "provider": "GitHub/Microsoft",
+      "region": "global",
+      "criticality": "critical",
+      "data_classification": "confidential",
+      "last_reviewed": "2026-02-01",
+      "next_review_due": "2026-08-01"
+    }
+  },
+  {
+    "name": "Datadog",
+    "type": "system",
+    "description": "Observability platform for metrics, traces, and log management",
+    "status": "active",
+    "owner": "Frank Osei",
+    "metadata": {
+      "environment": "production",
+      "hosting": "saas",
+      "provider": "Datadog",
+      "region": "us-east-1",
+      "criticality": "high",
+      "data_classification": "internal",
+      "last_reviewed": "2026-03-01",
+      "next_review_due": "2026-09-01"
+    }
+  },
+  {
+    "name": "Developer Laptops",
+    "type": "device",
+    "description": "Company-issued MacBook Pros",
+    "status": "active",
+    "owner": "Nina Patel",
+    "metadata": {
+      "device_type": "laptop",
+      "manufacturer": "Apple",
+      "model": "MacBook Pro 16-inch M3",
+      "os": "macOS 15 Sequoia",
+      "location": "Distributed — remote employees",
+      "quantity": 35,
+      "use": "employee_device",
+      "last_reviewed": "2025-11-01",
+      "next_review_due": "2026-04-01"
+    }
+  },
+  {
+    "name": "Production Servers",
+    "type": "device",
+    "description": "AWS EC2 instances in us-east-1 and eu-west-1",
+    "status": "active",
+    "owner": "Frank Osei",
+    "metadata": {
+      "device_type": "server",
+      "manufacturer": "AWS",
+      "model": "m6i.2xlarge",
+      "os": "Amazon Linux 2023",
+      "location": "us-east-1, eu-west-1",
+      "quantity": 24,
+      "use": "production_server",
+      "last_reviewed": "2025-12-01",
+      "next_review_due": "2026-06-01"
+    }
+  },
+  {
+    "name": "Network Firewalls",
+    "type": "device",
+    "description": "Palo Alto firewalls at network perimeter",
+    "status": "active",
+    "owner": "Carol Davies",
+    "metadata": {
+      "device_type": "networking_device",
+      "manufacturer": "Palo Alto Networks",
+      "model": "PA-3260",
+      "os": "PAN-OS 11.1",
+      "location": "AWS VPC perimeter",
+      "quantity": 4,
+      "use": "production_server",
+      "last_reviewed": "2025-07-01",
+      "next_review_due": "2026-01-01"
+    }
+  },
+  {
+    "name": "VPN Appliances",
+    "type": "device",
+    "description": "WireGuard VPN concentrators",
+    "status": "active",
+    "owner": "Carol Davies",
+    "metadata": {
+      "device_type": "networking_device",
+      "manufacturer": "Custom",
+      "model": "WireGuard on EC2",
+      "os": "Ubuntu 24.04",
+      "location": "us-east-1",
+      "quantity": 2,
+      "use": "production_server",
+      "last_reviewed": "2026-01-15",
+      "next_review_due": "2026-07-15"
+    }
+  },
+  {
+    "name": "Lab Test Devices",
+    "type": "device",
+    "description": "Shared devices for QA and security testing",
+    "status": "active",
+    "owner": "Carol Davies",
+    "metadata": {
+      "device_type": "laptop",
+      "manufacturer": "Lenovo",
+      "model": "ThinkPad T14s",
+      "os": "Ubuntu 24.04",
+      "location": "HQ — San Francisco",
+      "quantity": 5,
+      "use": "lab_device",
+      "last_reviewed": "2026-02-01",
+      "next_review_due": "2026-08-01"
+    }
+  },
+  {
+    "name": "Customer PII",
+    "type": "data_category",
+    "description": "Names, emails, addresses, phone numbers",
+    "status": "active",
+    "owner": "Eve Novak",
+    "metadata": {
+      "classification": "confidential",
+      "pii": true,
+      "phi": false,
+      "regulated": true,
+      "regulations": "GDPR, CCPA",
+      "retention_period": "Duration of customer relationship + 3 years",
+      "storage_locations": "Customer Portal DB, Data Warehouse",
+      "last_reviewed": "2025-06-01",
+      "next_review_due": "2025-12-01"
+    }
+  },
+  {
+    "name": "Payment Card Data",
+    "type": "data_category",
+    "description": "Credit card numbers, CVVs, expiry dates",
+    "status": "active",
+    "owner": "Eve Novak",
+    "metadata": {
+      "classification": "restricted",
+      "pii": true,
+      "phi": false,
+      "regulated": true,
+      "regulations": "PCI DSS",
+      "retention_period": "Transaction completion + 90 days",
+      "storage_locations": "Payment processor (Stripe) — not stored locally",
+      "last_reviewed": "2025-12-15",
+      "next_review_due": "2026-06-15"
+    }
+  },
+  {
+    "name": "Employee Records",
+    "type": "data_category",
+    "description": "HR data including salary and performance reviews",
+    "status": "active",
+    "owner": "Eve Novak",
+    "metadata": {
+      "classification": "confidential",
+      "pii": true,
+      "phi": false,
+      "regulated": true,
+      "regulations": "GDPR, local labor laws",
+      "retention_period": "Employment + 7 years",
+      "storage_locations": "Workday HRIS, Data Warehouse",
+      "last_reviewed": "2025-10-01",
+      "next_review_due": "2026-04-01"
+    }
+  },
+  {
+    "name": "Application Logs",
+    "type": "data_category",
+    "description": "System and application log data",
+    "status": "active",
+    "owner": "Frank Osei",
+    "metadata": {
+      "classification": "internal",
+      "pii": false,
+      "phi": false,
+      "regulated": false,
+      "retention_period": "90 days",
+      "storage_locations": "Datadog, Monitoring Stack (Prometheus/Grafana)",
+      "last_reviewed": "2026-02-01",
+      "next_review_due": "2026-08-01"
+    }
+  },
+  {
+    "name": "Analytics Data",
+    "type": "data_category",
+    "description": "Anonymized product usage metrics",
+    "status": "active",
+    "owner": "Hassan Ali",
+    "metadata": {
+      "classification": "internal",
+      "pii": false,
+      "phi": false,
+      "regulated": false,
+      "retention_period": "Indefinite",
+      "storage_locations": "Data Warehouse",
+      "last_reviewed": "2026-01-01",
+      "next_review_due": "2026-07-01"
+    }
+  },
+  {
+    "name": "Sales Data",
+    "type": "data_category",
+    "description": "CRM records, sales pipeline, revenue forecasts, and deal history",
+    "status": "active",
+    "owner": "James Wilson",
+    "metadata": {
+      "classification": "confidential",
+      "pii": true,
+      "phi": false,
+      "regulated": false,
+      "retention_period": "Duration of customer relationship + 5 years",
+      "storage_locations": "Salesforce CRM, Data Warehouse",
+      "last_reviewed": "2026-02-01",
+      "next_review_due": "2026-08-01"
+    }
+  },
+  {
+    "name": "HR Data",
+    "type": "data_category",
+    "description": "Employee personal data, payroll, benefits, and performance records",
+    "status": "active",
+    "owner": "Maria Santos",
+    "metadata": {
+      "classification": "confidential",
+      "pii": true,
+      "phi": false,
+      "regulated": true,
+      "regulations": "GDPR, CCPA, local labor laws",
+      "retention_period": "Employment + 7 years",
+      "storage_locations": "Workday HRIS, NetSuite ERP",
+      "last_reviewed": "2026-01-15",
+      "next_review_due": "2026-07-15"
+    }
+  },
+  {
+    "name": "SOC 2 Type II Audit 2025",
+    "type": "audit",
+    "description": "Annual SOC 2 Type II examination",
+    "status": "active",
+    "owner": "Dan Kim",
+    "metadata": {
+      "audit_type": "external",
+      "framework": "SOC 2",
+      "auditor": "Deloitte",
+      "start_date": "2025-01-01",
+      "end_date": "2025-12-31",
+      "report_date": "2026-03-15",
+      "result": "pending"
+    }
+  },
+  {
+    "name": "PCI DSS Assessment 2025",
+    "type": "audit",
+    "description": "Annual PCI DSS compliance assessment",
+    "status": "active",
+    "owner": "Dan Kim",
+    "metadata": {
+      "audit_type": "assessment",
+      "framework": "PCI DSS v4.0",
+      "auditor": "Coalfire",
+      "start_date": "2025-06-01",
+      "end_date": "2025-08-31",
+      "report_date": "2025-10-01",
+      "result": "pass"
+    }
+  },
+  {
+    "name": "Internal Security Audit Q1 2026",
+    "type": "audit",
+    "description": "Quarterly internal security review",
+    "status": "active",
+    "owner": "Carol Davies",
+    "metadata": {
+      "audit_type": "internal",
+      "framework": "Internal security baseline",
+      "auditor": "Carol Davies",
+      "start_date": "2026-01-01",
+      "end_date": "2026-03-31",
+      "report_date": "2026-04-15",
+      "result": "pending"
+    }
+  },
+  {
+    "name": "Vendor Risk Assessment 2024",
+    "type": "audit",
+    "description": "Annual third-party vendor risk assessment",
+    "status": "archived",
+    "owner": "Dan Kim",
+    "metadata": {
+      "audit_type": "assessment",
+      "framework": "Vendor Risk",
+      "auditor": "Dan Kim",
+      "start_date": "2024-04-01",
+      "end_date": "2024-06-30",
+      "report_date": "2024-08-01",
+      "result": "pass_with_exceptions"
+    }
+  },
+  {
+    "name": "ISO 27001 Gap Assessment 2026",
+    "type": "audit",
+    "description": "Gap analysis against ISO 27001:2022 controls in preparation for certification",
+    "status": "active",
+    "owner": "Dan Kim",
+    "metadata": {
+      "audit_type": "assessment",
+      "framework": "ISO 27001:2022",
+      "auditor": "BSI Group",
+      "start_date": "2026-02-01",
+      "end_date": "2026-05-31",
+      "report_date": "2026-06-30",
+      "result": "pending"
+    }
+  },
+  {
+    "name": "Annual Access Review 2026",
+    "type": "audit",
+    "description": "Comprehensive annual review of all user access across production systems",
+    "status": "active",
+    "owner": "Carol Davies",
+    "metadata": {
+      "audit_type": "internal",
+      "framework": "SOC 2, ISO 27001",
+      "auditor": "Carol Davies",
+      "start_date": "2026-03-01",
+      "end_date": "2026-04-30",
+      "report_date": "2026-05-15",
+      "result": "pending"
+    }
+  },
+  {
+    "name": "SOC 2 CC6.1",
+    "type": "requirement",
+    "description": "Logical and physical access controls",
+    "status": "active",
+    "owner": "Dan Kim",
+    "metadata": {
+      "framework": "SOC 2",
+      "reference_id": "CC6.1",
+      "category": "Common Criteria",
+      "compliance_status": "compliant",
+      "due_date": "2026-06-30",
+      "last_assessed": "2025-12-15",
+      "evidence_url": "https://wiki.example.com/soc2/cc6.1"
+    }
+  },
+  {
+    "name": "SOC 2 CC7.2",
+    "type": "requirement",
+    "description": "System monitoring and anomaly detection",
+    "status": "active",
+    "owner": "Dan Kim",
+    "metadata": {
+      "framework": "SOC 2",
+      "reference_id": "CC7.2",
+      "category": "Common Criteria",
+      "compliance_status": "compliant",
+      "due_date": "2026-06-30",
+      "last_assessed": "2025-12-15",
+      "evidence_url": "https://wiki.example.com/soc2/cc7.2"
+    }
+  },
+  {
+    "name": "PCI DSS Req 3",
+    "type": "requirement",
+    "description": "Protect stored cardholder data",
+    "status": "active",
+    "owner": "Dan Kim",
+    "metadata": {
+      "framework": "PCI DSS v4.0",
+      "reference_id": "Requirement 3",
+      "category": "Protect Account Data",
+      "compliance_status": "compliant",
+      "due_date": "2026-08-31",
+      "last_assessed": "2025-08-15",
+      "evidence_url": "https://wiki.example.com/pci/req3"
+    }
+  },
+  {
+    "name": "PCI DSS Req 6",
+    "type": "requirement",
+    "description": "Develop and maintain secure systems",
+    "status": "active",
+    "owner": "Dan Kim",
+    "metadata": {
+      "framework": "PCI DSS v4.0",
+      "reference_id": "Requirement 6",
+      "category": "Maintain Secure Systems",
+      "compliance_status": "compliant",
+      "due_date": "2026-08-31",
+      "last_assessed": "2025-08-15",
+      "evidence_url": "https://wiki.example.com/pci/req6"
+    }
+  },
+  {
+    "name": "GDPR Art. 17",
+    "type": "requirement",
+    "description": "Right to erasure (right to be forgotten)",
+    "status": "active",
+    "owner": "Eve Novak",
+    "metadata": {
+      "framework": "GDPR",
+      "reference_id": "Article 17",
+      "category": "Data Subject Rights",
+      "compliance_status": "compliant",
+      "due_date": "2026-05-25",
+      "last_assessed": "2025-11-01",
+      "evidence_url": "https://wiki.example.com/gdpr/art17"
+    }
+  },
+  {
+    "name": "GDPR Art. 32",
+    "type": "requirement",
+    "description": "Security of processing",
+    "status": "active",
+    "owner": "Eve Novak",
+    "metadata": {
+      "framework": "GDPR",
+      "reference_id": "Article 32",
+      "category": "Security",
+      "compliance_status": "partially_compliant",
+      "due_date": "2026-04-15",
+      "last_assessed": "2025-11-01",
+      "evidence_url": "https://wiki.example.com/gdpr/art32"
+    }
+  },
+  {
+    "name": "ISO 27001 A.8.1",
+    "type": "requirement",
+    "description": "Inventory of assets",
+    "status": "active",
+    "owner": "Dan Kim",
+    "metadata": {
+      "framework": "ISO 27001:2022",
+      "reference_id": "A.8.1",
+      "category": "Asset Management",
+      "compliance_status": "partially_compliant",
+      "due_date": "2026-09-30",
+      "last_assessed": "2025-09-15",
+      "evidence_url": "https://wiki.example.com/iso27001/a81"
+    }
+  },
+  {
+    "name": "Quarterly Access Review",
+    "type": "process",
+    "description": "Review all system access quarterly",
+    "status": "active",
+    "owner": "Carol Davies",
+    "metadata": {
+      "frequency": "quarterly",
+      "last_executed": "2026-01-15",
+      "next_execution": "2026-04-15",
+      "automation_level": "semi_automated",
+      "sla": "Completed within 2 weeks of quarter start",
+      "type": "operational"
+    }
+  },
+  {
+    "name": "Vulnerability Scanning",
+    "type": "process",
+    "description": "Weekly automated vulnerability scans",
+    "status": "active",
+    "owner": "Carol Davies",
+    "metadata": {
+      "frequency": "weekly",
+      "last_executed": "2026-03-17",
+      "next_execution": "2026-03-24",
+      "automation_level": "fully_automated",
+      "sla": "Critical findings triaged within 24 hours",
+      "type": "operational"
+    }
+  },
+  {
+    "name": "Change Approval Board",
+    "type": "process",
+    "description": "Weekly CAB meeting for production changes",
+    "status": "active",
+    "owner": "Frank Osei",
+    "metadata": {
+      "frequency": "weekly",
+      "last_executed": "2026-03-18",
+      "next_execution": "2026-03-25",
+      "automation_level": "manual",
+      "sla": "Changes reviewed within 1 business day",
+      "type": "management"
+    }
+  },
+  {
+    "name": "Incident Triage",
+    "type": "process",
+    "description": "24/7 incident triage and escalation",
+    "status": "active",
+    "owner": "Carol Davies",
+    "metadata": {
+      "frequency": "continuous",
+      "automation_level": "semi_automated",
+      "sla": "P1: 15 min response, P2: 1 hour, P3: 4 hours",
+      "type": "operational"
+    }
+  },
+  {
+    "name": "Data Subject Access Requests",
+    "type": "process",
+    "description": "Handle GDPR DSARs within 30 days",
+    "status": "active",
+    "owner": "Eve Novak",
+    "metadata": {
+      "frequency": "ad_hoc",
+      "last_executed": "2026-02-28",
+      "automation_level": "semi_automated",
+      "sla": "30 calendar days from receipt",
+      "type": "operational"
+    }
+  },
+  {
+    "name": "Backup & Recovery Testing",
+    "type": "process",
+    "description": "Monthly backup restoration drills",
+    "status": "active",
+    "owner": "Frank Osei",
+    "metadata": {
+      "frequency": "monthly",
+      "last_executed": "2026-03-01",
+      "next_execution": "2026-04-01",
+      "automation_level": "semi_automated",
+      "sla": "Full restore completed within 4 hours",
+      "type": "operational"
+    }
+  },
+  {
+    "name": "Security Awareness Training",
+    "type": "process",
+    "description": "Annual security training for all employees",
+    "status": "active",
+    "owner": "Carol Davies",
+    "metadata": {
+      "frequency": "annually",
+      "last_executed": "2025-11-15",
+      "next_execution": "2026-11-15",
+      "automation_level": "semi_automated",
+      "sla": "All employees completed within 30 days of launch",
+      "type": "management"
+    }
+  },
+  {
+    "name": "Employee Onboarding",
+    "type": "process",
+    "description": "End-to-end onboarding process for new hires including IT provisioning, training, and compliance enrollment",
+    "status": "active",
+    "owner": "Maria Santos",
+    "metadata": {
+      "frequency": "ad_hoc",
+      "last_executed": "2026-03-10",
+      "automation_level": "semi_automated",
+      "sla": "Full onboarding completed within 5 business days of start date",
+      "type": "operational"
+    }
+  },
+  {
+    "name": "Employee Offboarding",
+    "type": "process",
+    "description": "Offboarding process including access revocation, asset collection, and exit procedures",
+    "status": "active",
+    "owner": "Maria Santos",
+    "metadata": {
+      "frequency": "ad_hoc",
+      "last_executed": "2026-02-28",
+      "automation_level": "semi_automated",
+      "sla": "Access revoked within 4 hours of termination; assets collected within 5 business days",
+      "type": "operational"
+    }
+  },
+  {
+    "name": "Vendor Onboarding",
+    "type": "process",
+    "description": "Third-party vendor assessment, contract review, and onboarding into vendor management program",
+    "status": "active",
+    "owner": "Dan Kim",
+    "metadata": {
+      "frequency": "ad_hoc",
+      "last_executed": "2026-02-15",
+      "automation_level": "manual",
+      "sla": "Vendor risk assessment completed within 15 business days of request",
+      "type": "management"
+    }
+  },
+  {
+    "name": "Budget Planning Cycle",
+    "type": "process",
+    "description": "Annual budgeting and quarterly reforecasting process",
+    "status": "active",
+    "owner": "Michael Foster",
+    "metadata": {
+      "frequency": "annually",
+      "last_executed": "2025-11-01",
+      "next_execution": "2026-11-01",
+      "automation_level": "semi_automated",
+      "sla": "Annual budget finalized by December 15; quarterly reforecasts within 2 weeks of quarter close",
+      "type": "management"
+    }
+  },
+  {
+    "name": "Sprint Planning",
+    "type": "process",
+    "description": "Bi-weekly sprint planning and backlog grooming for engineering teams",
+    "status": "active",
+    "owner": "Bob Martinez",
+    "metadata": {
+      "frequency": "biweekly",
+      "last_executed": "2026-03-17",
+      "next_execution": "2026-03-31",
+      "automation_level": "manual",
+      "sla": "Sprint goals defined and communicated before sprint start",
+      "type": "management"
+    }
+  },
+  {
+    "name": "Incident Response",
+    "type": "process",
+    "description": "24/7 security incident response including containment, eradication, recovery, and post-incident review",
+    "status": "active",
+    "owner": "Carol Davies",
+    "metadata": {
+      "frequency": "ad_hoc",
+      "last_executed": "2026-02-10",
+      "automation_level": "semi_automated",
+      "sla": "P1: 15 min acknowledgment, 1 hour containment; post-mortem within 5 business days",
+      "type": "operational"
+    }
+  },
+  {
+    "name": "Penetration Testing",
+    "type": "process",
+    "description": "Annual external penetration test of production systems and customer-facing applications",
+    "status": "active",
+    "owner": "Carol Davies",
+    "metadata": {
+      "frequency": "annually",
+      "last_executed": "2025-09-15",
+      "next_execution": "2026-09-15",
+      "automation_level": "manual",
+      "sla": "Findings report delivered within 2 weeks of test completion; critical findings remediated within 30 days",
+      "type": "operational"
+    }
+  },
+  {
+    "name": "Recommendation Engine",
+    "type": "intellectual_property",
+    "description": "ML model for personalized recommendations",
+    "status": "active",
+    "owner": "Hassan Ali",
+    "metadata": {
+      "ip_type": "trade_secret",
+      "confidentiality": "confidential",
+      "expiry_date": "2028-12-31"
+    }
+  },
+  {
+    "name": "Platform Architecture",
+    "type": "intellectual_property",
+    "description": "Proprietary microservices architecture design",
+    "status": "active",
+    "owner": "Bob Martinez",
+    "metadata": {
+      "ip_type": "trade_secret",
+      "confidentiality": "internal",
+      "expiry_date": "2028-12-31"
+    }
+  },
+  {
+    "name": "Data Pipeline Framework",
+    "type": "intellectual_property",
+    "description": "Proprietary ETL framework for analytics ingestion",
+    "status": "active",
+    "owner": "Hassan Ali",
+    "metadata": {
+      "ip_type": "proprietary_tech",
+      "confidentiality": "confidential",
+      "expiry_date": "2027-06-30"
+    }
+  },
+  {
+    "name": "Ransomware — Production K8s Cluster",
+    "type": "risk",
+    "description": "Encryption of production workloads by threat actor",
+    "status": "active",
+    "owner": "Carol Davies",
+    "metadata": {
+      "risk_category": "security",
+      "threat_source": "external attacker",
+      "risk_framework": "NIST",
+      "severity": "critical",
+      "likelihood": "possible",
+      "impact": "catastrophic",
+      "inherent_risk_score": 15,
+      "residual_risk_score": 8,
+      "treatment": "mitigate",
+      "treatment_plan": "Network segmentation, immutable backups, EDR on nodes",
+      "control_effectiveness": "effective",
+      "risk_owner": "Carol Davies",
+      "identified_date": "2024-06-01",
+      "last_reviewed": "2025-12-15",
+      "review_date": "2026-06-01"
+    }
+  },
+  {
+    "name": "Ransomware — Data Warehouse",
+    "type": "risk",
+    "description": "Encryption of analytics data by threat actor",
+    "status": "active",
+    "owner": "Carol Davies",
+    "metadata": {
+      "risk_category": "security",
+      "threat_source": "external attacker",
+      "risk_framework": "NIST",
+      "severity": "high",
+      "likelihood": "unlikely",
+      "impact": "major",
+      "inherent_risk_score": 8,
+      "residual_risk_score": 4,
+      "treatment": "mitigate",
+      "treatment_plan": "Snowflake Time Travel, cross-region replication, access controls",
+      "control_effectiveness": "effective",
+      "risk_owner": "Carol Davies",
+      "identified_date": "2024-06-01",
+      "last_reviewed": "2025-12-15",
+      "review_date": "2026-06-01"
+    }
+  },
+  {
+    "name": "Data Breach — Customer Portal PII",
+    "type": "risk",
+    "description": "Unauthorized access to customer PII via web application",
+    "status": "active",
+    "owner": "Carol Davies",
+    "metadata": {
+      "risk_category": "security",
+      "threat_source": "external attacker",
+      "risk_framework": "NIST",
+      "severity": "critical",
+      "likelihood": "possible",
+      "impact": "catastrophic",
+      "inherent_risk_score": 15,
+      "residual_risk_score": 10,
+      "treatment": "mitigate",
+      "treatment_plan": "WAF, SAST/DAST scanning, access reviews, encryption at rest",
+      "control_effectiveness": "partially_effective",
+      "risk_owner": "Carol Davies",
+      "identified_date": "2024-03-15",
+      "last_reviewed": "2025-10-01",
+      "review_date": "2026-03-15"
+    }
+  },
+  {
+    "name": "Data Breach — Data Warehouse PII",
+    "type": "risk",
+    "description": "Unauthorized access to customer PII in analytics platform",
+    "status": "active",
+    "owner": "Carol Davies",
+    "metadata": {
+      "risk_category": "security",
+      "threat_source": "insider",
+      "risk_framework": "NIST",
+      "severity": "high",
+      "likelihood": "unlikely",
+      "impact": "major",
+      "inherent_risk_score": 8,
+      "residual_risk_score": 4,
+      "treatment": "mitigate",
+      "treatment_plan": "Column-level masking, role-based access, query audit logging",
+      "control_effectiveness": "effective",
+      "risk_owner": "Carol Davies",
+      "identified_date": "2024-03-15",
+      "last_reviewed": "2025-12-01",
+      "review_date": "2026-06-01"
+    }
+  },
+  {
+    "name": "Supply Chain Attack — CI/CD Pipeline",
+    "type": "risk",
+    "description": "Compromised dependency injected via build pipeline",
+    "status": "active",
+    "owner": "Carol Davies",
+    "metadata": {
+      "risk_category": "security",
+      "threat_source": "external attacker",
+      "risk_framework": "NIST",
+      "severity": "high",
+      "likelihood": "likely",
+      "impact": "major",
+      "inherent_risk_score": 16,
+      "residual_risk_score": 9,
+      "treatment": "mitigate",
+      "treatment_plan": "Dependency scanning, SBOM generation, signed builds, pinned versions",
+      "control_effectiveness": "partially_effective",
+      "risk_owner": "Frank Osei",
+      "identified_date": "2024-09-01",
+      "last_reviewed": "2026-01-10",
+      "review_date": "2026-07-01"
+    }
+  },
+  {
+    "name": "Key Person Dependency — Recommendation Engine",
+    "type": "risk",
+    "description": "Loss of ML model knowledge if key staff leave",
+    "status": "active",
+    "owner": "Bob Martinez",
+    "metadata": {
+      "risk_category": "operational",
+      "threat_source": "employee attrition",
+      "severity": "medium",
+      "likelihood": "possible",
+      "impact": "moderate",
+      "inherent_risk_score": 9,
+      "residual_risk_score": 6,
+      "treatment": "mitigate",
+      "treatment_plan": "Documentation, cross-training, model registry with versioning",
+      "control_effectiveness": "partially_effective",
+      "risk_owner": "Hassan Ali",
+      "identified_date": "2025-01-10",
+      "last_reviewed": "2025-07-01",
+      "review_date": "2026-01-10"
+    }
+  },
+  {
+    "name": "Key Person Dependency — Platform Architecture",
+    "type": "risk",
+    "description": "Loss of architecture knowledge if key staff leave",
+    "status": "active",
+    "owner": "Bob Martinez",
+    "metadata": {
+      "risk_category": "operational",
+      "threat_source": "employee attrition",
+      "severity": "medium",
+      "likelihood": "possible",
+      "impact": "moderate",
+      "inherent_risk_score": 9,
+      "residual_risk_score": 4,
+      "treatment": "accept",
+      "treatment_plan": "Architecture Decision Records, team rotations, shared documentation",
+      "control_effectiveness": "effective",
+      "risk_owner": "Bob Martinez",
+      "identified_date": "2025-01-10",
+      "last_reviewed": "2025-11-01",
+      "review_date": "2026-05-01",
+      "accepted_by": "Alice Chen",
+      "accepted_date": "2025-11-15",
+      "exception_approved": "2025-11-15",
+      "exception_due": "2026-11-15",
+      "exception_approver": "Alice Chen"
+    }
+  },
+  {
+    "name": "GDPR Non-Compliance — Customer PII",
+    "type": "risk",
+    "description": "Failure to meet GDPR obligations for customer data",
+    "status": "active",
+    "owner": "Eve Novak",
+    "metadata": {
+      "risk_category": "compliance",
+      "threat_source": "regulatory change / process gaps",
+      "risk_framework": "NIST",
+      "severity": "high",
+      "likelihood": "unlikely",
+      "impact": "major",
+      "inherent_risk_score": 8,
+      "residual_risk_score": 4,
+      "treatment": "mitigate",
+      "treatment_plan": "DPO oversight, DSAR process, retention automation, annual GDPR training",
+      "control_effectiveness": "effective",
+      "risk_owner": "Eve Novak",
+      "identified_date": "2024-01-01",
+      "last_reviewed": "2026-01-15",
+      "review_date": "2026-07-15"
+    }
+  },
+  {
+    "name": "GDPR Non-Compliance — DSAR Process",
+    "type": "risk",
+    "description": "Failure to fulfill data subject access requests within deadline",
+    "status": "active",
+    "owner": "Eve Novak",
+    "metadata": {
+      "risk_category": "compliance",
+      "threat_source": "process inefficiency",
+      "risk_framework": "NIST",
+      "severity": "medium",
+      "likelihood": "possible",
+      "impact": "moderate",
+      "inherent_risk_score": 9,
+      "residual_risk_score": 4,
+      "treatment": "accept",
+      "treatment_plan": "Semi-automated DSAR tooling, SLA tracking, escalation path",
+      "control_effectiveness": "effective",
+      "risk_owner": "Eve Novak",
+      "identified_date": "2024-01-01",
+      "last_reviewed": "2026-02-01",
+      "review_date": "2026-08-01",
+      "accepted_by": "Rachel Goldstein",
+      "accepted_date": "2026-02-01",
+      "exception_approved": "2026-02-01",
+      "exception_due": "2027-02-01",
+      "exception_approver": "Rachel Goldstein"
+    }
+  },
+  {
+    "name": "Service Outage — Production K8s Cluster",
+    "type": "risk",
+    "description": "Extended downtime of production workloads",
+    "status": "active",
+    "owner": "Frank Osei",
+    "metadata": {
+      "risk_category": "operational",
+      "threat_source": "infrastructure failure",
+      "severity": "critical",
+      "likelihood": "unlikely",
+      "impact": "catastrophic",
+      "inherent_risk_score": 10,
+      "residual_risk_score": 5,
+      "treatment": "mitigate",
+      "treatment_plan": "Multi-AZ deployment, auto-scaling, chaos engineering, runbooks",
+      "control_effectiveness": "effective",
+      "risk_owner": "Frank Osei",
+      "identified_date": "2024-06-01",
+      "last_reviewed": "2026-01-15",
+      "review_date": "2026-07-15"
+    }
+  },
+  {
+    "name": "Service Outage — Customer Portal",
+    "type": "risk",
+    "description": "Extended downtime of customer-facing application",
+    "status": "active",
+    "owner": "Frank Osei",
+    "metadata": {
+      "risk_category": "operational",
+      "threat_source": "application failure",
+      "severity": "high",
+      "likelihood": "possible",
+      "impact": "major",
+      "inherent_risk_score": 12,
+      "residual_risk_score": 6,
+      "treatment": "mitigate",
+      "treatment_plan": "Blue-green deploys, health checks, CDN failover, synthetic monitoring",
+      "control_effectiveness": "partially_effective",
+      "risk_owner": "Frank Osei",
+      "identified_date": "2024-06-01",
+      "last_reviewed": "2025-12-01",
+      "review_date": "2026-06-01"
+    }
+  },
+  {
+    "name": "Unauthorized Access — Identity Provider",
+    "type": "risk",
+    "description": "Compromise of SSO/MFA system granting broad access",
+    "status": "active",
+    "owner": "Carol Davies",
+    "metadata": {
+      "risk_category": "security",
+      "threat_source": "external attacker",
+      "risk_framework": "NIST",
+      "severity": "critical",
+      "likelihood": "rare",
+      "impact": "catastrophic",
+      "inherent_risk_score": 5,
+      "residual_risk_score": 3,
+      "treatment": "mitigate",
+      "treatment_plan": "Phishing-resistant MFA, admin session limits, break-glass procedures, Okta threat detection",
+      "control_effectiveness": "effective",
+      "risk_owner": "Carol Davies",
+      "identified_date": "2024-03-15",
+      "last_reviewed": "2026-02-01",
+      "review_date": "2026-08-01"
+    }
+  },
+  {
+    "name": "Insider Threat — Data Exfiltration",
+    "type": "risk",
+    "description": "Malicious or negligent insider exfiltrating sensitive data",
+    "status": "active",
+    "owner": "Carol Davies",
+    "metadata": {
+      "risk_category": "security",
+      "threat_source": "insider",
+      "risk_framework": "NIST",
+      "severity": "high",
+      "likelihood": "almost_certain",
+      "impact": "moderate",
+      "inherent_risk_score": 15,
+      "residual_risk_score": 9,
+      "treatment": "mitigate",
+      "treatment_plan": "DLP tools, USB restrictions, anomaly detection on data access patterns, least-privilege access",
+      "control_effectiveness": "partially_effective",
+      "risk_owner": "Carol Davies",
+      "identified_date": "2025-03-01",
+      "last_reviewed": "2026-01-15",
+      "review_date": "2026-07-15"
+    }
+  },
+  {
+    "name": "Third-Party API Downtime",
+    "type": "risk",
+    "description": "Extended outage of critical third-party APIs (Stripe, Okta, Snowflake)",
+    "status": "active",
+    "owner": "Frank Osei",
+    "metadata": {
+      "risk_category": "operational",
+      "threat_source": "vendor failure",
+      "severity": "medium",
+      "likelihood": "likely",
+      "impact": "minor",
+      "inherent_risk_score": 8,
+      "residual_risk_score": 4,
+      "treatment": "mitigate",
+      "treatment_plan": "Circuit breakers, graceful degradation, multi-vendor strategy for critical paths",
+      "control_effectiveness": "effective",
+      "risk_owner": "Frank Osei",
+      "identified_date": "2025-06-01",
+      "last_reviewed": "2026-02-01",
+      "review_date": "2026-08-01"
+    }
+  },
+  {
+    "name": "Regulatory Fine — Data Retention Violation",
+    "type": "risk",
+    "description": "Fine due to retaining data beyond legally permitted periods",
+    "status": "active",
+    "owner": "Eve Novak",
+    "metadata": {
+      "risk_category": "compliance",
+      "threat_source": "regulatory enforcement",
+      "risk_framework": "NIST",
+      "severity": "medium",
+      "likelihood": "rare",
+      "impact": "major",
+      "inherent_risk_score": 4,
+      "residual_risk_score": 2,
+      "treatment": "mitigate",
+      "treatment_plan": "Automated retention enforcement, quarterly audits of data lifecycle, DPO review",
+      "control_effectiveness": "effective",
+      "risk_owner": "Eve Novak",
+      "identified_date": "2025-01-15",
+      "last_reviewed": "2025-09-01",
+      "review_date": "2026-03-01"
+    }
+  },
+  {
+    "name": "Shadow IT — Unapproved SaaS Usage",
+    "type": "risk",
+    "description": "Employees using unapproved SaaS tools that bypass security controls",
+    "status": "draft",
+    "owner": "Carol Davies",
+    "metadata": {
+      "risk_category": "security",
+      "threat_source": "employee behavior",
+      "severity": "medium",
+      "likelihood": "almost_certain",
+      "impact": "minor",
+      "inherent_risk_score": 10,
+      "residual_risk_score": null,
+      "treatment": "mitigate",
+      "treatment_plan": "SaaS discovery tool, acceptable use enforcement, approved alternatives catalog",
+      "control_effectiveness": "not_assessed",
+      "risk_owner": "Carol Davies",
+      "identified_date": "2026-03-01",
+      "review_date": "2026-06-01"
+    }
+  },
+  {
+    "name": "Okta",
+    "type": "vendor",
+    "description": "Identity and access management provider (SSO/MFA)",
+    "status": "active",
+    "owner": "Carol Davies",
+    "tags": [
+      "critical-path",
+      "SOC2"
+    ],
     "criticality": "critical",
-    "metadata": {"vendor_type": "saas", "contract_start": "2024-01-01", "contract_end": "2026-12-31", "contract_value": "120000", "tier": "enterprise", "security_contact": "security@okta.com", "data_access": "authentication_tokens", "subprocessors": "AWS, GCP", "last_assessment": "2025-09-15", "next_assessment_due": "2026-09-15", "assessment_result": "satisfactory", "sla_url": "https://www.okta.com/agreements/sla/"}
+    "metadata": {
+      "vendor_type": "saas",
+      "contract_start": "2024-01-01",
+      "contract_end": "2026-12-31",
+      "contract_value": "120000",
+      "tier": "critical",
+      "security_contact": "security@okta.com",
+      "data_access": true,
+      "subprocessors": true,
+      "last_assessment": "2025-09-15",
+      "next_assessment_due": "2026-09-15",
+      "assessment_result": "approved",
+      "sla_url": "https://www.okta.com/agreements/sla/"
+    }
   },
   {
-    "name": "Snowflake", "type": "vendor", "description": "Cloud data warehousing platform", "status": "active", "owner": "Bob Martinez",
-    "tags": ["SOC2", "analytics"],
+    "name": "Snowflake",
+    "type": "vendor",
+    "description": "Cloud data warehousing platform",
+    "status": "active",
+    "owner": "Hassan Ali",
+    "tags": [
+      "SOC2",
+      "analytics"
+    ],
     "criticality": "high",
-    "metadata": {"vendor_type": "saas", "contract_start": "2024-06-01", "contract_end": "2026-05-31", "contract_value": "85000", "tier": "enterprise", "security_contact": "security@snowflake.com", "data_access": "customer_pii_analytics", "subprocessors": "AWS", "last_assessment": "2025-11-01", "next_assessment_due": "2026-05-01", "assessment_result": "satisfactory", "sla_url": "https://www.snowflake.com/legal/sla/"}
+    "metadata": {
+      "vendor_type": "saas",
+      "contract_start": "2024-06-01",
+      "contract_end": "2026-05-31",
+      "contract_value": "85000",
+      "tier": "high",
+      "security_contact": "security@snowflake.com",
+      "data_access": true,
+      "subprocessors": true,
+      "last_assessment": "2025-11-01",
+      "next_assessment_due": "2026-05-01",
+      "assessment_result": "approved",
+      "sla_url": "https://www.snowflake.com/legal/sla/"
+    }
   },
   {
-    "name": "AWS", "type": "vendor", "description": "Primary cloud infrastructure provider", "status": "active", "owner": "Frank Osei",
-    "tags": ["critical-path", "infrastructure"],
+    "name": "AWS",
+    "type": "vendor",
+    "description": "Primary cloud infrastructure provider",
+    "status": "active",
+    "owner": "Frank Osei",
+    "tags": [
+      "critical-path",
+      "infrastructure"
+    ],
     "criticality": "critical",
-    "metadata": {"vendor_type": "iaas", "contract_start": "2023-01-01", "contract_end": "2026-12-31", "contract_value": "450000", "tier": "enterprise_support", "security_contact": "aws-security@amazon.com", "data_access": "all_production_data", "subprocessors": "", "last_assessment": "2025-06-01", "next_assessment_due": "2026-06-01", "assessment_result": "satisfactory", "sla_url": "https://aws.amazon.com/compute/sla/"}
+    "metadata": {
+      "vendor_type": "iaas",
+      "contract_start": "2023-01-01",
+      "contract_end": "2026-12-31",
+      "contract_value": "450000",
+      "tier": "critical",
+      "security_contact": "aws-security@amazon.com",
+      "data_access": true,
+      "subprocessors": false,
+      "last_assessment": "2025-06-01",
+      "next_assessment_due": "2026-06-01",
+      "assessment_result": "approved",
+      "sla_url": "https://aws.amazon.com/compute/sla/"
+    }
   },
   {
-    "name": "Stripe", "type": "vendor", "description": "Payment processing provider", "status": "active", "owner": "Bob Martinez",
-    "tags": ["PCI", "critical-path"],
+    "name": "Stripe",
+    "type": "vendor",
+    "description": "Payment processing provider",
+    "status": "active",
+    "owner": "Michael Foster",
+    "tags": [
+      "PCI",
+      "critical-path"
+    ],
     "criticality": "critical",
-    "metadata": {"vendor_type": "saas", "contract_start": "2023-06-01", "contract_end": "2026-05-31", "contract_value": "transaction_based", "tier": "enterprise", "security_contact": "security@stripe.com", "data_access": "payment_card_data", "subprocessors": "AWS, GCP", "last_assessment": "2025-08-01", "next_assessment_due": "2026-08-01", "assessment_result": "satisfactory", "sla_url": "https://stripe.com/legal/sla"}
+    "metadata": {
+      "vendor_type": "saas",
+      "contract_start": "2023-06-01",
+      "contract_end": "2026-05-31",
+      "contract_value": "transaction_based",
+      "tier": "critical",
+      "security_contact": "security@stripe.com",
+      "data_access": true,
+      "subprocessors": true,
+      "last_assessment": "2025-08-01",
+      "next_assessment_due": "2026-08-01",
+      "assessment_result": "approved",
+      "sla_url": "https://stripe.com/legal/sla"
+    }
   },
   {
-    "name": "CrowdStrike", "type": "vendor", "description": "Endpoint detection and response platform", "status": "active", "owner": "Carol Davies",
-    "tags": ["SOC2", "security"],
+    "name": "CrowdStrike",
+    "type": "vendor",
+    "description": "Endpoint detection and response platform",
+    "status": "active",
+    "owner": "Carol Davies",
+    "tags": [
+      "SOC2",
+      "security"
+    ],
     "criticality": "high",
-    "metadata": {"vendor_type": "saas", "contract_start": "2025-01-01", "contract_end": "2027-12-31", "contract_value": "65000", "tier": "falcon_complete", "security_contact": "trust@crowdstrike.com", "data_access": "endpoint_telemetry", "subprocessors": "AWS", "last_assessment": "2025-03-01", "next_assessment_due": "2026-03-01", "assessment_result": "satisfactory", "sla_url": "https://www.crowdstrike.com/legal/sla/"}
+    "metadata": {
+      "vendor_type": "saas",
+      "contract_start": "2025-01-01",
+      "contract_end": "2027-12-31",
+      "contract_value": "65000",
+      "tier": "high",
+      "security_contact": "trust@crowdstrike.com",
+      "data_access": true,
+      "subprocessors": true,
+      "last_assessment": "2025-03-01",
+      "next_assessment_due": "2026-03-01",
+      "assessment_result": "approved",
+      "sla_url": "https://www.crowdstrike.com/legal/sla/"
+    }
   },
-
   {
-    "name": "MFA Enforcement", "type": "control", "description": "Multi-factor authentication required for all users", "status": "active", "owner": "Carol Davies",
-    "tags": ["SOC2", "PCI", "GDPR"],
-    "criticality": "critical",
-    "metadata": {"control_type": "preventive", "implementation": "implemented", "automation_level": "fully_automated", "frequency": "continuous", "effectiveness": "effective", "last_tested": "2026-02-15", "next_test_due": "2026-05-15", "evidence_url": "https://wiki.example.com/controls/mfa", "framework_ref": "SOC2-CC6.1, PCI-8.3"}
-  },
-  {
-    "name": "Quarterly Access Review Control", "type": "control", "description": "Periodic review of user access rights across all systems", "status": "active", "owner": "Carol Davies",
-    "tags": ["SOC2", "ISO27001"],
+    "name": "Salesforce",
+    "type": "vendor",
+    "description": "CRM and sales automation platform provider",
+    "status": "active",
+    "owner": "James Wilson",
+    "tags": [
+      "SOC2",
+      "sales"
+    ],
     "criticality": "high",
-    "metadata": {"control_type": "detective", "implementation": "implemented", "automation_level": "semi_automated", "frequency": "quarterly", "effectiveness": "effective", "last_tested": "2026-01-20", "next_test_due": "2026-04-20", "evidence_url": "https://wiki.example.com/controls/access-review", "framework_ref": "SOC2-CC6.1, ISO27001-A.9.2.5"}
+    "metadata": {
+      "vendor_type": "saas",
+      "contract_start": "2024-03-01",
+      "contract_end": "2027-02-28",
+      "contract_value": "180000",
+      "tier": "high",
+      "security_contact": "security@salesforce.com",
+      "data_access": true,
+      "subprocessors": true,
+      "last_assessment": "2025-10-01",
+      "next_assessment_due": "2026-10-01",
+      "assessment_result": "approved",
+      "sla_url": "https://www.salesforce.com/company/legal/agreements/"
+    }
   },
   {
-    "name": "Encryption at Rest", "type": "control", "description": "AES-256 encryption for all data at rest", "status": "active", "owner": "Frank Osei",
-    "tags": ["PCI", "GDPR", "SOC2"],
-    "criticality": "critical",
-    "metadata": {"control_type": "preventive", "implementation": "implemented", "automation_level": "fully_automated", "frequency": "continuous", "effectiveness": "effective", "last_tested": "2026-01-10", "next_test_due": "2026-04-10", "evidence_url": "https://wiki.example.com/controls/encryption-at-rest", "framework_ref": "PCI-3.4, GDPR-Art32"}
-  },
-  {
-    "name": "WAF — Customer Portal", "type": "control", "description": "Web application firewall protecting customer-facing endpoints", "status": "active", "owner": "Carol Davies",
-    "tags": ["PCI", "security"],
+    "name": "Workday",
+    "type": "vendor",
+    "description": "Human capital management and HRIS platform provider",
+    "status": "active",
+    "owner": "Maria Santos",
+    "tags": [
+      "SOC2",
+      "HR"
+    ],
     "criticality": "high",
-    "metadata": {"control_type": "preventive", "implementation": "implemented", "automation_level": "fully_automated", "frequency": "continuous", "effectiveness": "effective", "last_tested": "2026-03-01", "next_test_due": "2026-06-01", "evidence_url": "https://wiki.example.com/controls/waf", "framework_ref": "PCI-6.6"}
+    "metadata": {
+      "vendor_type": "saas",
+      "contract_start": "2024-01-01",
+      "contract_end": "2026-12-31",
+      "contract_value": "95000",
+      "tier": "medium",
+      "security_contact": "security@workday.com",
+      "data_access": true,
+      "subprocessors": true,
+      "last_assessment": "2025-07-01",
+      "next_assessment_due": "2026-07-01",
+      "assessment_result": "approved",
+      "sla_url": "https://www.workday.com/en-us/legal.html"
+    }
   },
   {
-    "name": "SAST/DAST Scanning", "type": "control", "description": "Static and dynamic application security testing in CI/CD", "status": "active", "owner": "Carol Davies",
-    "tags": ["SOC2", "PCI"],
+    "name": "Oracle/NetSuite",
+    "type": "vendor",
+    "description": "Enterprise resource planning and financial management platform",
+    "status": "active",
+    "owner": "Michael Foster",
+    "tags": [
+      "SOC2",
+      "finance"
+    ],
     "criticality": "high",
-    "metadata": {"control_type": "detective", "implementation": "implemented", "automation_level": "fully_automated", "frequency": "per_deployment", "effectiveness": "partially_effective", "last_tested": "2026-03-18", "next_test_due": "2026-06-18", "evidence_url": "https://wiki.example.com/controls/sast-dast", "framework_ref": "PCI-6.5, SOC2-CC8.1"}
+    "metadata": {
+      "vendor_type": "saas",
+      "contract_start": "2024-06-01",
+      "contract_end": "2027-05-31",
+      "contract_value": "140000",
+      "tier": "high",
+      "security_contact": "security@oracle.com",
+      "data_access": true,
+      "subprocessors": true,
+      "last_assessment": "2025-09-01",
+      "next_assessment_due": "2026-09-01",
+      "assessment_result": "approved",
+      "sla_url": "https://www.oracle.com/legal/sla/"
+    }
   },
   {
-    "name": "Network Segmentation", "type": "control", "description": "Micro-segmentation between production, staging, and corporate networks", "status": "active", "owner": "Frank Osei",
-    "tags": ["PCI", "SOC2"],
+    "name": "Atlassian",
+    "type": "vendor",
+    "description": "Project management and knowledge base provider (Jira, Confluence)",
+    "status": "active",
+    "owner": "Bob Martinez",
+    "tags": [
+      "SOC2",
+      "engineering"
+    ],
+    "criticality": "high",
+    "metadata": {
+      "vendor_type": "saas",
+      "contract_start": "2023-09-01",
+      "contract_end": "2026-08-31",
+      "contract_value": "48000",
+      "tier": "medium",
+      "security_contact": "security@atlassian.com",
+      "data_access": true,
+      "subprocessors": true,
+      "last_assessment": "2025-12-01",
+      "next_assessment_due": "2026-06-01",
+      "assessment_result": "approved",
+      "sla_url": "https://www.atlassian.com/legal/sla"
+    }
+  },
+  {
+    "name": "GitHub/Microsoft",
+    "type": "vendor",
+    "description": "Source code hosting and CI/CD platform provider",
+    "status": "active",
+    "owner": "Bob Martinez",
+    "tags": [
+      "SOC2",
+      "engineering",
+      "critical-path"
+    ],
     "criticality": "critical",
-    "metadata": {"control_type": "preventive", "implementation": "implemented", "automation_level": "semi_automated", "frequency": "continuous", "effectiveness": "effective", "last_tested": "2025-12-01", "next_test_due": "2026-06-01", "evidence_url": "https://wiki.example.com/controls/network-segmentation", "framework_ref": "PCI-1.3, SOC2-CC6.6"}
+    "metadata": {
+      "vendor_type": "saas",
+      "contract_start": "2023-01-01",
+      "contract_end": "2026-12-31",
+      "contract_value": "36000",
+      "tier": "critical",
+      "security_contact": "security@github.com",
+      "data_access": true,
+      "subprocessors": true,
+      "last_assessment": "2025-11-15",
+      "next_assessment_due": "2026-05-15",
+      "assessment_result": "approved",
+      "sla_url": "https://github.com/customer-terms"
+    }
   },
   {
-    "name": "Backup Verification", "type": "control", "description": "Automated monthly backup restore verification", "status": "active", "owner": "Frank Osei",
-    "tags": ["SOC2", "ISO27001"],
+    "name": "Datadog Inc.",
+    "type": "vendor",
+    "description": "Cloud monitoring and observability platform provider",
+    "status": "active",
+    "owner": "Frank Osei",
+    "tags": [
+      "SOC2",
+      "infrastructure"
+    ],
+    "criticality": "high",
+    "metadata": {
+      "vendor_type": "saas",
+      "contract_start": "2025-01-01",
+      "contract_end": "2027-12-31",
+      "contract_value": "72000",
+      "tier": "high",
+      "security_contact": "security@datadoghq.com",
+      "data_access": true,
+      "subprocessors": true,
+      "last_assessment": "2025-06-01",
+      "next_assessment_due": "2026-06-01",
+      "assessment_result": "approved",
+      "sla_url": "https://www.datadoghq.com/legal/sla/"
+    }
+  },
+  {
+    "name": "Slack/Salesforce",
+    "type": "vendor",
+    "description": "Team messaging and collaboration platform provider",
+    "status": "active",
+    "owner": "Nina Patel",
+    "tags": [
+      "SOC2",
+      "collaboration"
+    ],
+    "criticality": "high",
+    "metadata": {
+      "vendor_type": "saas",
+      "contract_start": "2023-06-01",
+      "contract_end": "2026-05-31",
+      "contract_value": "42000",
+      "tier": "medium",
+      "security_contact": "security@slack.com",
+      "data_access": true,
+      "subprocessors": true,
+      "last_assessment": "2025-08-15",
+      "next_assessment_due": "2026-08-15",
+      "assessment_result": "approved",
+      "sla_url": "https://slack.com/legal/sla"
+    }
+  },
+  {
+    "name": "PagerDuty",
+    "type": "vendor",
+    "description": "Incident management and on-call scheduling platform",
+    "status": "active",
+    "owner": "Frank Osei",
+    "tags": [
+      "SOC2",
+      "incident-management"
+    ],
+    "criticality": "high",
+    "metadata": {
+      "vendor_type": "saas",
+      "contract_start": "2024-01-01",
+      "contract_end": "2026-12-31",
+      "contract_value": "28000",
+      "tier": "high",
+      "security_contact": "security@pagerduty.com",
+      "data_access": false,
+      "subprocessors": true,
+      "last_assessment": "2025-04-01",
+      "next_assessment_due": "2026-04-01",
+      "assessment_result": "approved",
+      "sla_url": "https://www.pagerduty.com/legal/sla/"
+    }
+  },
+  {
+    "name": "MFA Enforcement",
+    "type": "control",
+    "description": "Multi-factor authentication required for all users",
+    "status": "active",
+    "owner": "Carol Davies",
+    "tags": [
+      "SOC2",
+      "PCI",
+      "GDPR"
+    ],
+    "criticality": "critical",
+    "metadata": {
+      "control_type": "preventive",
+      "implementation": "technical",
+      "automation_level": "fully_automated",
+      "frequency": "continuous",
+      "effectiveness": "effective",
+      "last_tested": "2026-02-15",
+      "next_test_due": "2026-05-15",
+      "evidence_url": "https://wiki.example.com/controls/mfa",
+      "framework_ref": "SOC2-CC6.1, PCI-8.3"
+    }
+  },
+  {
+    "name": "Quarterly Access Review Control",
+    "type": "control",
+    "description": "Periodic review of user access rights across all systems",
+    "status": "active",
+    "owner": "Carol Davies",
+    "tags": [
+      "SOC2",
+      "ISO27001"
+    ],
+    "criticality": "high",
+    "metadata": {
+      "control_type": "detective",
+      "implementation": "administrative",
+      "automation_level": "semi_automated",
+      "frequency": "quarterly",
+      "effectiveness": "effective",
+      "last_tested": "2026-01-20",
+      "next_test_due": "2026-04-20",
+      "evidence_url": "https://wiki.example.com/controls/access-review",
+      "framework_ref": "SOC2-CC6.1, ISO27001-A.9.2.5"
+    }
+  },
+  {
+    "name": "Encryption at Rest",
+    "type": "control",
+    "description": "AES-256 encryption for all data at rest",
+    "status": "active",
+    "owner": "Frank Osei",
+    "tags": [
+      "PCI",
+      "GDPR",
+      "SOC2"
+    ],
+    "criticality": "critical",
+    "metadata": {
+      "control_type": "preventive",
+      "implementation": "technical",
+      "automation_level": "fully_automated",
+      "frequency": "continuous",
+      "effectiveness": "effective",
+      "last_tested": "2026-01-10",
+      "next_test_due": "2026-04-10",
+      "evidence_url": "https://wiki.example.com/controls/encryption-at-rest",
+      "framework_ref": "PCI-3.4, GDPR-Art32"
+    }
+  },
+  {
+    "name": "WAF — Customer Portal",
+    "type": "control",
+    "description": "Web application firewall protecting customer-facing endpoints",
+    "status": "active",
+    "owner": "Carol Davies",
+    "tags": [
+      "PCI",
+      "security"
+    ],
+    "criticality": "high",
+    "metadata": {
+      "control_type": "preventive",
+      "implementation": "technical",
+      "automation_level": "fully_automated",
+      "frequency": "continuous",
+      "effectiveness": "effective",
+      "last_tested": "2026-03-01",
+      "next_test_due": "2026-06-01",
+      "evidence_url": "https://wiki.example.com/controls/waf",
+      "framework_ref": "PCI-6.6"
+    }
+  },
+  {
+    "name": "SAST/DAST Scanning",
+    "type": "control",
+    "description": "Static and dynamic application security testing in CI/CD",
+    "status": "active",
+    "owner": "Carol Davies",
+    "tags": [
+      "SOC2",
+      "PCI"
+    ],
+    "criticality": "high",
+    "metadata": {
+      "control_type": "detective",
+      "implementation": "technical",
+      "automation_level": "fully_automated",
+      "frequency": "per_deployment",
+      "effectiveness": "partially_effective",
+      "last_tested": "2026-03-18",
+      "next_test_due": "2026-06-18",
+      "evidence_url": "https://wiki.example.com/controls/sast-dast",
+      "framework_ref": "PCI-6.5, SOC2-CC8.1"
+    }
+  },
+  {
+    "name": "Network Segmentation",
+    "type": "control",
+    "description": "Micro-segmentation between production, staging, and corporate networks",
+    "status": "active",
+    "owner": "Frank Osei",
+    "tags": [
+      "PCI",
+      "SOC2"
+    ],
+    "criticality": "critical",
+    "metadata": {
+      "control_type": "preventive",
+      "implementation": "technical",
+      "automation_level": "semi_automated",
+      "frequency": "continuous",
+      "effectiveness": "effective",
+      "last_tested": "2025-12-01",
+      "next_test_due": "2026-06-01",
+      "evidence_url": "https://wiki.example.com/controls/network-segmentation",
+      "framework_ref": "PCI-1.3, SOC2-CC6.6"
+    }
+  },
+  {
+    "name": "Backup Verification",
+    "type": "control",
+    "description": "Automated monthly backup restore verification",
+    "status": "active",
+    "owner": "Frank Osei",
+    "tags": [
+      "SOC2",
+      "ISO27001"
+    ],
     "criticality": "medium",
-    "metadata": {"control_type": "detective", "implementation": "implemented", "automation_level": "semi_automated", "frequency": "monthly", "effectiveness": "effective", "last_tested": "2026-03-01", "next_test_due": "2026-04-01", "evidence_url": "https://wiki.example.com/controls/backup-verification", "framework_ref": "SOC2-A1.2, ISO27001-A.12.3"}
+    "metadata": {
+      "control_type": "detective",
+      "implementation": "technical",
+      "automation_level": "semi_automated",
+      "frequency": "monthly",
+      "effectiveness": "effective",
+      "last_tested": "2026-03-01",
+      "next_test_due": "2026-04-01",
+      "evidence_url": "https://wiki.example.com/controls/backup-verification",
+      "framework_ref": "SOC2-A1.2, ISO27001-A.12.3"
+    }
   },
-
   {
-    "name": "INC-2026-001 — Okta MFA Bypass", "type": "incident", "description": "Phishing campaign bypassed MFA for 3 users via AiTM proxy", "status": "active", "owner": "Carol Davies",
-    "tags": ["security", "phishing"],
+    "name": "INC-2026-001 — Okta MFA Bypass",
+    "type": "incident",
+    "description": "Phishing campaign bypassed MFA for 3 users via AiTM proxy",
+    "status": "active",
+    "owner": "Carol Davies",
+    "tags": [
+      "security",
+      "phishing"
+    ],
     "criticality": "critical",
-    "metadata": {"severity": "high", "incident_type": "security", "detected_at": "2026-02-10T08:30:00Z", "resolved_at": "2026-02-10T14:45:00Z", "root_cause": "Adversary-in-the-middle proxy captured session tokens; non-phishing-resistant MFA in use", "impact_summary": "3 accounts compromised, no data exfiltration confirmed", "affected_records": 0, "reported_externally": false, "lessons_learned": "Migrate to FIDO2/WebAuthn MFA; add conditional access policies for high-risk sign-ins", "post_mortem_url": "https://wiki.example.com/incidents/INC-2026-001"}
+    "metadata": {
+      "severity": "high",
+      "incident_type": "security",
+      "detected_at": "2026-02-10T08:30:00Z",
+      "resolved_at": "2026-02-10T14:45:00Z",
+      "root_cause": "Adversary-in-the-middle proxy captured session tokens; non-phishing-resistant MFA in use",
+      "impact_summary": "3 accounts compromised, no data exfiltration confirmed",
+      "affected_records": 0,
+      "reported_externally": false,
+      "lessons_learned": "Migrate to FIDO2/WebAuthn MFA; add conditional access policies for high-risk sign-ins",
+      "post_mortem_url": "https://wiki.example.com/incidents/INC-2026-001"
+    }
   },
   {
-    "name": "INC-2026-002 — Staging Data Leak", "type": "incident", "description": "Customer PII found in staging environment due to DB clone without masking", "status": "active", "owner": "Eve Novak",
-    "tags": ["privacy", "GDPR"],
+    "name": "INC-2026-002 — Staging Data Leak",
+    "type": "incident",
+    "description": "Customer PII found in staging environment due to DB clone without masking",
+    "status": "active",
+    "owner": "Eve Novak",
+    "tags": [
+      "privacy",
+      "GDPR"
+    ],
     "criticality": "high",
-    "metadata": {"severity": "medium", "incident_type": "privacy", "detected_at": "2026-01-22T11:00:00Z", "resolved_at": "2026-01-23T09:00:00Z", "root_cause": "Staging DB refreshed from production without running masking pipeline", "impact_summary": "~12,000 customer records exposed in staging; access limited to engineering team", "affected_records": 12000, "reported_externally": false, "lessons_learned": "Automated masking in DB refresh pipeline; added pre-refresh validation check", "post_mortem_url": "https://wiki.example.com/incidents/INC-2026-002"}
+    "metadata": {
+      "severity": "medium",
+      "incident_type": "privacy",
+      "detected_at": "2026-01-22T11:00:00Z",
+      "resolved_at": "2026-01-23T09:00:00Z",
+      "root_cause": "Staging DB refreshed from production without running masking pipeline",
+      "impact_summary": "~12,000 customer records exposed in staging; access limited to engineering team",
+      "affected_records": 12000,
+      "reported_externally": false,
+      "lessons_learned": "Automated masking in DB refresh pipeline; added pre-refresh validation check",
+      "post_mortem_url": "https://wiki.example.com/incidents/INC-2026-002"
+    }
   },
   {
-    "name": "INC-2025-047 — CI/CD Pipeline Outage", "type": "incident", "description": "Jenkins controller OOM caused 6-hour deployment freeze", "status": "inactive", "owner": "Frank Osei",
-    "tags": ["availability"],
+    "name": "INC-2025-047 — CI/CD Pipeline Outage",
+    "type": "incident",
+    "description": "Jenkins controller OOM caused 6-hour deployment freeze",
+    "status": "inactive",
+    "owner": "Frank Osei",
+    "tags": [
+      "availability"
+    ],
     "criticality": "medium",
-    "metadata": {"severity": "medium", "incident_type": "availability", "detected_at": "2025-11-03T14:20:00Z", "resolved_at": "2025-11-03T20:15:00Z", "root_cause": "Memory leak in Jenkins plugin caused controller OOM after 30 days uptime", "impact_summary": "No production deployments for 6 hours; hotfix delayed", "affected_records": 0, "reported_externally": false, "lessons_learned": "Weekly Jenkins restart scheduled; memory monitoring alert added; evaluating migration to Tekton", "post_mortem_url": "https://wiki.example.com/incidents/INC-2025-047"}
+    "metadata": {
+      "severity": "medium",
+      "incident_type": "availability",
+      "detected_at": "2025-11-03T14:20:00Z",
+      "resolved_at": "2025-11-03T20:15:00Z",
+      "root_cause": "Memory leak in Jenkins plugin caused controller OOM after 30 days uptime",
+      "impact_summary": "No production deployments for 6 hours; hotfix delayed",
+      "affected_records": 0,
+      "reported_externally": false,
+      "lessons_learned": "Weekly Jenkins restart scheduled; memory monitoring alert added; evaluating migration to Tekton",
+      "post_mortem_url": "https://wiki.example.com/incidents/INC-2025-047"
+    }
   },
-
   {
-    "name": "SOC 2", "type": "framework", "description": "SOC 2 Type II trust services criteria", "status": "active", "owner": "Dan Kim",
-    "tags": ["compliance", "audit"],
+    "name": "SOC 2",
+    "type": "framework",
+    "description": "SOC 2 Type II trust services criteria",
+    "status": "active",
+    "owner": "Dan Kim",
+    "tags": [
+      "compliance",
+      "audit"
+    ],
     "criticality": "critical",
-    "metadata": {"version": "2017", "governing_body": "AICPA", "scope": "All production systems processing customer data", "certification_status": "certified", "certification_date": "2025-08-15", "certification_expiry": "2026-08-15", "assessor": "Deloitte", "applicability": "Security, Availability, Confidentiality trust service categories"}
+    "metadata": {
+      "version": "2017",
+      "governing_body": "AICPA",
+      "scope": "All production systems processing customer data",
+      "certification_status": "certified",
+      "certification_date": "2025-08-15",
+      "certification_expiry": "2026-08-15",
+      "assessor": "Deloitte",
+      "applicability": "mandatory"
+    }
   },
   {
-    "name": "PCI DSS v4.0", "type": "framework", "description": "Payment Card Industry Data Security Standard version 4.0", "status": "active", "owner": "Dan Kim",
-    "tags": ["compliance", "payments"],
+    "name": "PCI DSS v4.0",
+    "type": "framework",
+    "description": "Payment Card Industry Data Security Standard version 4.0",
+    "status": "active",
+    "owner": "Dan Kim",
+    "tags": [
+      "compliance",
+      "payments"
+    ],
     "criticality": "critical",
-    "metadata": {"version": "4.0", "governing_body": "PCI SSC", "scope": "Cardholder data environment — Customer Portal and Stripe integration", "certification_status": "certified", "certification_date": "2025-10-01", "certification_expiry": "2026-10-01", "assessor": "Coalfire", "applicability": "All 12 PCI DSS requirements for Level 2 merchant"}
+    "metadata": {
+      "version": "4.0",
+      "governing_body": "PCI SSC",
+      "scope": "Cardholder data environment — Customer Portal and Stripe integration",
+      "certification_status": "certified",
+      "certification_date": "2025-10-01",
+      "certification_expiry": "2026-10-01",
+      "assessor": "Coalfire",
+      "applicability": "mandatory"
+    }
   },
   {
-    "name": "GDPR", "type": "framework", "description": "EU General Data Protection Regulation", "status": "active", "owner": "Eve Novak",
-    "tags": ["compliance", "privacy"],
+    "name": "GDPR",
+    "type": "framework",
+    "description": "EU General Data Protection Regulation",
+    "status": "active",
+    "owner": "Eve Novak",
+    "tags": [
+      "compliance",
+      "privacy"
+    ],
     "criticality": "critical",
-    "metadata": {"version": "2016/679", "governing_body": "European Commission / National DPAs", "scope": "All processing of EU resident personal data", "certification_status": "compliant", "certification_date": "2025-05-25", "certification_expiry": "2026-05-25", "assessor": "Internal DPO + external counsel", "applicability": "Data processing, storage, transfer, and subject rights"}
+    "metadata": {
+      "version": "2016/679",
+      "governing_body": "European Commission / National DPAs",
+      "scope": "All processing of EU resident personal data",
+      "certification_status": "compliant",
+      "certification_date": "2025-05-25",
+      "certification_expiry": "2026-05-25",
+      "assessor": "Internal DPO + external counsel",
+      "applicability": "mandatory"
+    }
   },
   {
-    "name": "ISO 27001:2022", "type": "framework", "description": "Information security management system standard", "status": "active", "owner": "Dan Kim",
-    "tags": ["compliance", "ISMS"],
+    "name": "ISO 27001:2022",
+    "type": "framework",
+    "description": "Information security management system standard",
+    "status": "active",
+    "owner": "Dan Kim",
+    "tags": [
+      "compliance",
+      "ISMS"
+    ],
     "criticality": "high",
-    "metadata": {"version": "2022", "governing_body": "ISO/IEC", "scope": "IT Department and Engineering ISMS", "certification_status": "in_progress", "certification_date": "", "certification_expiry": "2027-03-31", "assessor": "BSI Group", "applicability": "Annex A controls — Statement of Applicability covers 93 controls"}
+    "metadata": {
+      "version": "2022",
+      "governing_body": "ISO/IEC",
+      "scope": "Company-wide ISMS",
+      "certification_status": "in_progress",
+      "certification_date": "",
+      "certification_expiry": "2027-03-31",
+      "assessor": "BSI Group",
+      "applicability": "voluntary"
+    }
   }
 ]

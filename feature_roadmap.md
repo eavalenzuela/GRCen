@@ -1,5 +1,13 @@
 # GRCen Feature Roadmap
 
+## High Impact - Key Features
+
+### 1. Org Views
+A set of 3 graphs that display a tree-view of the Organization(s):
+* Org Chart: displays all Person assets in a standard org-chart-like representation
+* Business Structure: displays OU assets hierarchically, based on their owner relationships or direct links
+* Product View: Drop-down box with Product selection that shows Owner and Owner's OU above the Product, and Product Teams, Vendors, etc below
+
 ## Medium Impact — Usability
 
 ### 1. Drag-and-Drop Graph Relationships
