@@ -29,6 +29,10 @@
             {% if has_perm(user.role, Permission.VIEW_AUDIT) %}
             <a href="/admin/audit">Audit Log</a>
             {% endif %}
+            <a href="/tokens">API Tokens</a>
+            {% if has_perm(user.role, Permission.MANAGE_USERS) %}
+            <a href="/admin/tokens">Token Admin</a>
+            {% endif %}
             <a href="/notifications" class="notif-link">
                 Notifications
                 <span id="notif-badge"

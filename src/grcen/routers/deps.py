@@ -13,21 +13,46 @@ async def get_db(pool: asyncpg.Pool = Depends(get_pool)) -> asyncpg.Pool:
     return pool
 
 
-def _get_user_id_from_request(request: Request) -> str | None:
-    """Extract user identity from the request.
+async def _resolve_bearer_token(request: Request, pool: asyncpg.Pool) -> tuple[str, list[str]] | None:
+    """If an Authorization: Bearer header is present, validate it and return (user_id, permissions)."""
+    auth_header = request.headers.get("authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return None
 
-    Currently reads from the session cookie.  Future auth methods
-    (e.g. OIDC bearer token) can be added here as additional checks.
-    """
+    raw_token = auth_header[7:]
+    if not raw_token:
+        return None
+
+    from grcen.services.token_service import validate_token
+
+    token = await validate_token(pool, raw_token)
+    if token is None:
+        return None
+
+    return str(token.user_id), token.permissions
+
+
+def _get_user_id_from_session(request: Request) -> str | None:
+    """Extract user identity from the session cookie."""
     return request.session.get("user_id")
 
 
 async def get_current_user(
     request: Request, pool: asyncpg.Pool = Depends(get_db)
 ) -> User:
-    user_id = _get_user_id_from_request(request)
+    user_id: str | None = None
+
+    # Try Bearer token first
+    bearer = await _resolve_bearer_token(request, pool)
+    if bearer is not None:
+        user_id, token_permissions = bearer
+        request.state.token_permissions = token_permissions
+    else:
+        user_id = _get_user_id_from_session(request)
+
     if not user_id:
         raise HTTPException(status_code=401, detail="Not authenticated")
+
     user = await get_user_by_id(pool, UUID(user_id))
     if not user or not user.is_active:
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -37,7 +62,15 @@ async def get_current_user(
 async def get_current_user_or_none(
     request: Request, pool: asyncpg.Pool = Depends(get_db)
 ) -> User | None:
-    user_id = _get_user_id_from_request(request)
+    user_id: str | None = None
+
+    bearer = await _resolve_bearer_token(request, pool)
+    if bearer is not None:
+        user_id, token_permissions = bearer
+        request.state.token_permissions = token_permissions
+    else:
+        user_id = _get_user_id_from_session(request)
+
     if not user_id:
         return None
     return await get_user_by_id(pool, UUID(user_id))
@@ -46,10 +79,15 @@ async def get_current_user_or_none(
 def require_permission(*permissions: Permission):
     """Return a FastAPI dependency that enforces the given permissions."""
 
-    async def dependency(user: User = Depends(get_current_user)) -> User:
+    async def dependency(request: Request, user: User = Depends(get_current_user)) -> User:
         for perm in permissions:
+            # User's role must grant the permission
             if not has_permission(user.role, perm):
                 raise HTTPException(status_code=403, detail="Insufficient permissions")
+            # If authenticating via API token, the token must also include the permission
+            token_perms = getattr(request.state, "token_permissions", None)
+            if token_perms is not None and perm.value not in token_perms:
+                raise HTTPException(status_code=403, detail="Token lacks required permission")
         return user
 
     return dependency

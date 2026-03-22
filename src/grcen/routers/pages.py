@@ -989,3 +989,219 @@ async def admin_oidc_settings_submit(
     reset_oauth()
 
     return RedirectResponse("/admin/oidc-settings", status_code=302)
+
+
+# --- Token management pages ---
+
+
+@router.get("/tokens", response_class=HTMLResponse)
+async def my_tokens_page(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(get_current_user),
+    created_token: str | None = None,
+):
+    from grcen.permissions import ROLE_PERMISSIONS
+    from grcen.services import token_service
+
+    tokens = await token_service.list_tokens_for_user(pool, user.id)
+    max_expiry_days = await token_service.get_max_expiry_days(pool)
+    available_permissions = sorted(ROLE_PERMISSIONS.get(user.role, set()), key=lambda p: p.value)
+    notif_count = await alert_svc.count_unread_notifications(pool)
+    from datetime import UTC, datetime as dt
+
+    return templates.TemplateResponse(
+        "tokens/my_tokens.html",
+        {
+            "request": request,
+            "user": user,
+            "tokens": tokens,
+            "available_permissions": available_permissions,
+            "max_expiry_days": max_expiry_days,
+            "is_admin": has_permission(user.role, Permission.MANAGE_USERS),
+            "created_token": request.session.pop("created_token", None),
+            "error": request.session.pop("token_error", None),
+            "notif_count": notif_count,
+            "now": dt.now(UTC),
+        },
+    )
+
+
+@router.post("/tokens")
+async def my_tokens_create(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    from datetime import UTC, datetime as dt
+
+    from grcen.permissions import ROLE_PERMISSIONS
+    from grcen.services import token_service
+
+    form = await request.form()
+    name = str(form.get("name", "")).strip()
+    permissions = form.getlist("permissions")
+    expires_at_str = str(form.get("expires_at", "")).strip()
+    is_service_account = form.get("is_service_account") == "1"
+
+    if not name:
+        request.session["token_error"] = "Token name is required."
+        return RedirectResponse("/tokens", status_code=302)
+
+    if not permissions:
+        request.session["token_error"] = "At least one permission is required."
+        return RedirectResponse("/tokens", status_code=302)
+
+    # Validate permissions against user's role
+    role_perms = {p.value for p in ROLE_PERMISSIONS.get(user.role, set())}
+    invalid = [p for p in permissions if p not in role_perms]
+    if invalid:
+        request.session["token_error"] = f"Invalid permissions: {', '.join(invalid)}"
+        return RedirectResponse("/tokens", status_code=302)
+
+    if is_service_account and not has_permission(user.role, Permission.MANAGE_USERS):
+        request.session["token_error"] = "Only admins can create service account tokens."
+        return RedirectResponse("/tokens", status_code=302)
+
+    expires_at = None
+    if expires_at_str:
+        try:
+            expires_at = dt.fromisoformat(expires_at_str).replace(tzinfo=UTC)
+        except ValueError:
+            request.session["token_error"] = "Invalid expiration date format."
+            return RedirectResponse("/tokens", status_code=302)
+
+    token, raw = await token_service.create_token(
+        pool,
+        user_id=user.id,
+        name=name,
+        permissions=permissions,
+        expires_at=expires_at,
+        is_service_account=is_service_account,
+    )
+
+    await audit_svc.log_audit_event(
+        pool,
+        user_id=user.id,
+        username=user.username,
+        action="create",
+        entity_type="api_token",
+        entity_id=token.id,
+        entity_name=token.name,
+    )
+
+    request.session["created_token"] = raw
+    return RedirectResponse("/tokens", status_code=302)
+
+
+@router.post("/tokens/{token_id}/revoke")
+async def my_token_revoke(
+    token_id: UUID,
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    from grcen.services import token_service
+
+    token = await token_service.get_token_by_id(pool, token_id)
+    if not token or token.user_id != user.id:
+        request.session["token_error"] = "Token not found."
+        return RedirectResponse("/tokens", status_code=302)
+
+    await token_service.revoke_token(pool, token_id)
+    await audit_svc.log_audit_event(
+        pool,
+        user_id=user.id,
+        username=user.username,
+        action="revoke",
+        entity_type="api_token",
+        entity_id=token_id,
+        entity_name=token.name,
+    )
+    return RedirectResponse("/tokens", status_code=302)
+
+
+@router.get("/admin/tokens", response_class=HTMLResponse)
+async def admin_tokens_page(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+):
+    from grcen.services import token_service
+
+    tokens = await token_service.list_all_tokens(pool)
+    max_expiry_days = await token_service.get_max_expiry_days(pool)
+    users = await auth_svc.list_users(pool)
+    users_by_id = {u.id: u for u in users}
+    notif_count = await alert_svc.count_unread_notifications(pool)
+    from datetime import UTC, datetime as dt
+
+    return templates.TemplateResponse(
+        "admin/tokens.html",
+        {
+            "request": request,
+            "user": user,
+            "tokens": tokens,
+            "max_expiry_days": max_expiry_days,
+            "users_by_id": users_by_id,
+            "success": request.session.pop("token_success", None),
+            "error": request.session.pop("token_error", None),
+            "notif_count": notif_count,
+            "now": dt.now(UTC),
+        },
+    )
+
+
+@router.post("/admin/tokens/config")
+async def admin_tokens_config_submit(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+):
+    from grcen.services import token_service
+
+    form = await request.form()
+    raw = str(form.get("max_expiry_days", "")).strip()
+    days = int(raw) if raw else None
+
+    await token_service.set_max_expiry_days(pool, days)
+    await audit_svc.log_audit_event(
+        pool,
+        user_id=user.id,
+        username=user.username,
+        action="update",
+        entity_type="token_config",
+        entity_id=None,
+        entity_name="token_max_expiry_days",
+        changes={"max_expiry_days": days},
+    )
+    request.session["token_success"] = "Token settings updated."
+    return RedirectResponse("/admin/tokens", status_code=302)
+
+
+@router.post("/admin/tokens/{token_id}/revoke")
+async def admin_token_revoke(
+    token_id: UUID,
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+):
+    from grcen.services import token_service
+
+    token = await token_service.get_token_by_id(pool, token_id)
+    if not token:
+        request.session["token_error"] = "Token not found."
+        return RedirectResponse("/admin/tokens", status_code=302)
+
+    await token_service.revoke_token(pool, token_id)
+    await audit_svc.log_audit_event(
+        pool,
+        user_id=user.id,
+        username=user.username,
+        action="revoke",
+        entity_type="api_token",
+        entity_id=token_id,
+        entity_name=token.name,
+    )
+    request.session["token_success"] = f"Token '{token.name}' revoked."
+    return RedirectResponse("/admin/tokens", status_code=302)

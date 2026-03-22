@@ -27,7 +27,7 @@ async def pool():
 @pytest_asyncio.fixture(autouse=True)
 async def clean_tables(pool):
     yield
-    for table in ("audit_log", "notifications", "alerts", "attachments", "relationships", "assets", "users"):
+    for table in ("api_tokens", "app_settings", "audit_log", "notifications", "alerts", "attachments", "relationships", "assets", "users"):
         await pool.execute(f"DELETE FROM {table}")
     # Reset audit config to defaults so tests start fresh
     await pool.execute("UPDATE audit_config SET enabled = true, field_level = true")

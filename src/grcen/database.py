@@ -221,6 +221,29 @@ INSERT INTO oidc_config (key, value) VALUES
     ('default_role', 'viewer'),
     ('display_name', 'SSO')
 ON CONFLICT (key) DO NOTHING;
+
+-- API tokens for programmatic access
+CREATE TABLE IF NOT EXISTS api_tokens (
+    id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id            UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name               VARCHAR(150) NOT NULL,
+    token_hash         VARCHAR(255) NOT NULL,
+    permissions        TEXT[] NOT NULL,
+    expires_at         TIMESTAMPTZ,
+    last_used_at       TIMESTAMPTZ,
+    is_service_account BOOLEAN NOT NULL DEFAULT false,
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+    revoked            BOOLEAN NOT NULL DEFAULT false
+);
+CREATE INDEX IF NOT EXISTS idx_api_tokens_user ON api_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_api_tokens_hash ON api_tokens(token_hash);
+
+-- Generic app settings (key-value)
+CREATE TABLE IF NOT EXISTS app_settings (
+    key        VARCHAR(100) PRIMARY KEY,
+    value      TEXT NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 """
 
 

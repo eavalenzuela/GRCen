@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Token Management - GRCen{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>API Token Management</h1>
+    <div class="actions">
+        <a href="/tokens" class="btn">My Tokens</a>
+    </div>
+</div>
+
+{% if success %}
+<div class="alert alert-success">{{ success }}</div>
+{% endif %}
+{% if error %}
+<div class="alert alert-error">{{ error }}</div>
+{% endif %}
+
+<h2>Global Token Settings</h2>
+<form method="post" action="/admin/tokens/config">
+    <div class="form-group">
+        <label for="max_expiry_days">Maximum Token Lifetime (days)</label>
+        <input type="number" id="max_expiry_days" name="max_expiry_days" min="1"
+               value="{{ max_expiry_days or '' }}"
+               placeholder="Blank = no limit">
+        <small>Service account tokens are exempt from this limit.</small>
+    </div>
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Save</button>
+    </div>
+</form>
+
+<h2>All Tokens</h2>
+{% if tokens %}
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Owner</th>
+            <th>Permissions</th>
+            <th>Type</th>
+            <th>Expires</th>
+            <th>Last Used</th>
+            <th>Created</th>
+            <th>Status</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for t in tokens %}
+        <tr>
+            <td>{{ t.name }}</td>
+            <td>{{ users_by_id.get(t.user_id, {}).username if users_by_id.get(t.user_id) else t.user_id }}</td>
+            <td>
+                {% for p in t.permissions %}
+                <span class="badge">{{ p | replace('_', ' ') | title }}</span>
+                {% endfor %}
+            </td>
+            <td>{{ "Service" if t.is_service_account else "Personal" }}</td>
+            <td>{{ t.expires_at.strftime('%Y-%m-%d %H:%M') if t.expires_at else "Never" }}</td>
+            <td>{{ t.last_used_at.strftime('%Y-%m-%d %H:%M') if t.last_used_at else "Never" }}</td>
+            <td>{{ t.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+            <td>
+                {% if t.revoked %}
+                <span class="badge badge-inactive">Revoked</span>
+                {% elif t.expires_at and t.expires_at < now %}
+                <span class="badge badge-draft">Expired</span>
+                {% else %}
+                <span class="badge badge-active">Active</span>
+                {% endif %}
+            </td>
+            <td>
+                {% if not t.revoked %}
+                <form method="post" action="/admin/tokens/{{ t.id }}/revoke" style="display:inline"
+                      onsubmit="return confirm('Revoke token {{ t.name }}?')">
+                    <button type="submit" class="btn btn-sm btn-danger">Revoke</button>
+                </form>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No tokens have been created yet.</p>
+{% endif %}
+{% endblock %}

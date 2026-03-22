@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
@@ -23,6 +23,7 @@ from grcen.routers import (
     oidc,
     pages,
     relationships,
+    tokens,
 )
 
 scheduler = AsyncIOScheduler()
@@ -63,7 +64,13 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title=settings.APP_NAME, lifespan=lifespan)
+    app = FastAPI(
+        title=settings.APP_NAME,
+        lifespan=lifespan,
+        openapi_url="/api/openapi.json",
+        docs_url=None,   # We serve custom authenticated docs routes below
+        redoc_url=None,
+    )
 
     app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
 
@@ -79,9 +86,33 @@ def create_app() -> FastAPI:
     app.include_router(alerts.router)
     app.include_router(auth.router)
     app.include_router(oidc.router)
+    app.include_router(tokens.router)
 
     # Page routers
     app.include_router(pages.router)
+
+    # --- Authenticated OpenAPI docs ---
+    from grcen.routers.deps import get_current_user, get_db
+
+    @app.get("/docs", include_in_schema=False)
+    async def custom_swagger_ui(request: Request, pool=Depends(get_db)):
+        from fastapi.openapi.docs import get_swagger_ui_html
+
+        await get_current_user(request, pool)
+        return get_swagger_ui_html(
+            openapi_url=app.openapi_url,
+            title=f"{settings.APP_NAME} - API Docs",
+        )
+
+    @app.get("/redoc", include_in_schema=False)
+    async def custom_redoc(request: Request, pool=Depends(get_db)):
+        from fastapi.openapi.docs import get_redoc_html
+
+        await get_current_user(request, pool)
+        return get_redoc_html(
+            openapi_url=app.openapi_url,
+            title=f"{settings.APP_NAME} - API Docs",
+        )
 
     @app.exception_handler(HTTPException)
     async def http_exception_handler(request: Request, exc: HTTPException):
@@ -98,6 +129,24 @@ def create_app() -> FastAPI:
     @app.get("/health")
     async def health():
         return {"status": "ok"}
+
+    # Add Bearer token security scheme to the OpenAPI spec
+    _original_openapi = app.openapi
+
+    def custom_openapi():
+        if app.openapi_schema:
+            return app.openapi_schema
+        schema = _original_openapi()
+        schema.setdefault("components", {}).setdefault("securitySchemes", {})["BearerAuth"] = {
+            "type": "http",
+            "scheme": "bearer",
+            "description": "API token (prefix: grcen_). Create tokens at /tokens or via POST /api/tokens.",
+        }
+        schema["security"] = [{"BearerAuth": []}]
+        app.openapi_schema = schema
+        return schema
+
+    app.openapi = custom_openapi
 
     return app
 
