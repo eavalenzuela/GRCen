@@ -244,6 +244,27 @@ CREATE TABLE IF NOT EXISTS app_settings (
     value      TEXT NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- New asset types
+DO $$ BEGIN ALTER TYPE asset_type ADD VALUE 'vendor';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER TYPE asset_type ADD VALUE 'control';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER TYPE asset_type ADD VALUE 'incident';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER TYPE asset_type ADD VALUE 'framework';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- Global tags and criticality columns
+DO $$ BEGIN
+    ALTER TABLE assets ADD COLUMN tags TEXT[] DEFAULT '{}';
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+DO $$ BEGIN
+    ALTER TABLE assets ADD COLUMN criticality VARCHAR(20);
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+CREATE INDEX IF NOT EXISTS idx_assets_tags ON assets USING gin (tags);
 """
 
 

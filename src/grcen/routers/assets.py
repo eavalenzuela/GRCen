@@ -76,6 +76,8 @@ async def create_asset(
         owner_id=data.owner_id,
         metadata_=data.metadata_,
         updated_by=user.id,
+        tags=data.tags,
+        criticality=data.criticality,
     )
     await audit_svc.log_audit_event(
         pool,

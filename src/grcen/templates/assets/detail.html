@@ -38,9 +38,23 @@
         {{ asset.owner or '—' }}
         {% endif %}
     </div>
+    <div class="detail-field"><strong>Criticality:</strong>
+        {% if asset.criticality %}
+        <span class="badge badge-{{ asset.criticality }}">{{ asset.criticality | title }}</span>
+        {% else %}—{% endif %}
+    </div>
     <div class="detail-field"><strong>Created:</strong> {{ asset.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
     <div class="detail-field"><strong>Updated:</strong> {{ asset.updated_at.strftime('%Y-%m-%d %H:%M') }}</div>
 </div>
+
+{% if asset.tags %}
+<div class="tags-display" style="margin:0.5rem 0;">
+    <strong>Tags:</strong>
+    {% for tag in asset.tags %}
+    <span class="badge" style="margin-right:0.25rem;">{{ tag }}</span>
+    {% endfor %}
+</div>
+{% endif %}
 
 {% if linked_user %}
 <div class="detail-grid" style="margin-top:0.5rem">

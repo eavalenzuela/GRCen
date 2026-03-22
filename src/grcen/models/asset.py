@@ -18,6 +18,10 @@ class AssetType(enum.StrEnum):
     INTELLECTUAL_PROPERTY = "intellectual_property"
     RISK = "risk"
     ORGANIZATIONAL_UNIT = "organizational_unit"
+    VENDOR = "vendor"
+    CONTROL = "control"
+    INCIDENT = "incident"
+    FRAMEWORK = "framework"
 
 
 class AssetStatus(enum.StrEnum):
@@ -40,6 +44,8 @@ class Asset:
     created_at: datetime
     updated_at: datetime
     updated_by: UUID | None = None
+    tags: list[str] | None = None
+    criticality: str | None = None
 
     @classmethod
     def from_row(cls, row) -> "Asset":
@@ -57,4 +63,6 @@ class Asset:
             created_at=row["created_at"],
             updated_at=row["updated_at"],
             updated_by=row.get("updated_by"),
+            tags=list(row["tags"]) if row.get("tags") else [],
+            criticality=row.get("criticality"),
         )

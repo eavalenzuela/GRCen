@@ -13,6 +13,8 @@ class AssetCreate(BaseModel):
     status: AssetStatus = AssetStatus.ACTIVE
     owner_id: UUID | None = None
     metadata_: dict | None = None
+    tags: list[str] | None = None
+    criticality: str | None = None
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -23,6 +25,8 @@ class AssetUpdate(BaseModel):
     status: AssetStatus | None = None
     owner_id: UUID | None = None
     metadata_: dict | None = None
+    tags: list[str] | None = None
+    criticality: str | None = None
 
 
 class AssetResponse(BaseModel):
@@ -34,6 +38,8 @@ class AssetResponse(BaseModel):
     owner: str | None
     owner_id: UUID | None
     metadata_: dict | None
+    tags: list[str] | None = None
+    criticality: str | None = None
     created_at: datetime
     updated_at: datetime
     updated_by: UUID | None = None

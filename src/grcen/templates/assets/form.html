@@ -55,6 +55,24 @@
         {% endif %}
     </div>
 
+    <div class="form-group">
+        <label for="criticality">Criticality</label>
+        <select id="criticality" name="criticality">
+            <option value="">— None —</option>
+            <option value="critical" {% if asset and asset.criticality == 'critical' %}selected{% endif %}>Critical</option>
+            <option value="high" {% if asset and asset.criticality == 'high' %}selected{% endif %}>High</option>
+            <option value="medium" {% if asset and asset.criticality == 'medium' %}selected{% endif %}>Medium</option>
+            <option value="low" {% if asset and asset.criticality == 'low' %}selected{% endif %}>Low</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="tags">Tags <small>(comma-separated)</small></label>
+        <input type="text" id="tags" name="tags"
+               value="{{ (asset.tags or []) | join(', ') if asset else '' }}"
+               placeholder="e.g. SOC2, GDPR, critical-path">
+    </div>
+
     <div id="custom-fields">
         {% if asset and asset_custom_fields %}
             {# Edit mode: render fields for the known asset type #}

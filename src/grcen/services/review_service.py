@@ -20,6 +20,9 @@ REVIEW_DATE_FIELDS: dict[str, str] = {
     "intellectual_property": "expiry_date",
     "risk": "review_date",
     "organizational_unit": "next_review_due",
+    "vendor": "next_assessment_due",
+    "control": "next_test_due",
+    "framework": "certification_expiry",
     # audit uses end_date but audits are events, not recurring reviews
 }
 

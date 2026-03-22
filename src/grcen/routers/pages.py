@@ -59,6 +59,14 @@ RELATIONSHIP_LABELS: dict[str, tuple[str, str]] = {
     "mirrors": ("mirrors", "mirrored by"),
     "enforces": ("enforces", "enforced by"),
     "classifies": ("classifies", "classified by"),
+    "provides_service_to": ("provides service to", "serviced by"),
+    "affected_by": ("affected by", "affects"),
+    "triggered_by": ("triggered by", "triggered"),
+    "resulted_in": ("resulted in", "resulted from"),
+    "subprocessor_of": ("subprocessor of", "has subprocessor"),
+    "certifies": ("certifies", "certified by"),
+    "tested_by": ("tested by", "tests"),
+    "parent_of": ("parent of", "child of"),
 }
 
 
@@ -191,7 +199,7 @@ async def dashboard(
             "total_assets": total,
             "alerts": alerts[:5],
             "notif_count": notif_count,
-            "asset_types": list(AssetType),
+            "asset_types": sorted(AssetType, key=lambda t: t.value),
             "heatmap": heatmap,
             "top_risks": top_risks,
             "likelihood_levels": risk_svc.LIKELIHOOD_LEVELS,
@@ -270,7 +278,7 @@ async def asset_list(
             "page": page,
             "pages": (total + 24) // 25,
             "current_type": type,
-            "asset_types": list(AssetType),
+            "asset_types": sorted(AssetType, key=lambda t: t.value),
             "notif_count": notif_count,
             "filter_q": q or "",
             "filter_status": status or "",
@@ -300,7 +308,7 @@ async def asset_new(
             "request": request,
             "user": user,
             "asset": None,
-            "asset_types": list(AssetType),
+            "asset_types": sorted(AssetType, key=lambda t: t.value),
             "notif_count": notif_count,
             "custom_fields": CUSTOM_FIELDS,
         },
@@ -328,6 +336,9 @@ async def asset_create_submit(
             owner_id = _UUID(owner_id_str)
         except ValueError:
             pass
+    tags_raw = str(form.get("tags", "")).strip()
+    tags = [t.strip() for t in tags_raw.split(",") if t.strip()] if tags_raw else []
+    criticality = str(form.get("criticality", "")).strip() or None
     asset = await asset_svc.create_asset(
         pool,
         type=asset_type,
@@ -337,6 +348,8 @@ async def asset_create_submit(
         owner_id=owner_id,
         metadata_=metadata,
         updated_by=user.id,
+        tags=tags,
+        criticality=criticality,
     )
     await audit_svc.log_audit_event(
         pool,
@@ -383,7 +396,7 @@ async def asset_detail(
             "relationships": rels,
             "attachments": atts,
             "alerts": alerts,
-            "asset_types": list(AssetType),
+            "asset_types": sorted(AssetType, key=lambda t: t.value),
             "notif_count": notif_count,
             "asset_custom_fields": CUSTOM_FIELDS.get(asset.type, []),
             "linked_user": linked_user,
@@ -408,7 +421,7 @@ async def asset_edit(
             "request": request,
             "user": user,
             "asset": asset,
-            "asset_types": list(AssetType),
+            "asset_types": sorted(AssetType, key=lambda t: t.value),
             "notif_count": notif_count,
             "custom_fields": CUSTOM_FIELDS,
             "asset_custom_fields": CUSTOM_FIELDS.get(asset.type, []),
@@ -438,6 +451,9 @@ async def asset_update_submit(
             owner_id = _UUID(owner_id_str)
         except ValueError:
             pass
+    tags_raw = str(form.get("tags", "")).strip()
+    tags = [t.strip() for t in tags_raw.split(",") if t.strip()] if tags_raw else []
+    criticality = str(form.get("criticality", "")).strip() or None
     updated = await asset_svc.update_asset(
         pool,
         asset_id,
@@ -447,6 +463,8 @@ async def asset_update_submit(
         owner_id=owner_id,
         metadata_=metadata,
         updated_by=user.id,
+        tags=tags,
+        criticality=criticality,
     )
     if old and updated:
         diff = audit_svc.compute_diff(old.__dict__, updated.__dict__, _ASSET_FIELDS)
@@ -597,7 +615,7 @@ async def export_page(
         {
             "request": request,
             "user": user,
-            "asset_types": list(AssetType),
+            "asset_types": sorted(AssetType, key=lambda t: t.value),
             "notif_count": notif_count,
         },
     )
@@ -622,7 +640,7 @@ async def reviews_page(
             "request": request,
             "user": user,
             "reviews": reviews,
-            "asset_types": list(AssetType),
+            "asset_types": sorted(AssetType, key=lambda t: t.value),
             "current_type": type or "",
             "current_status": status or "",
             "notif_count": notif_count,

@@ -24,11 +24,13 @@ async def create_asset(
     owner_id: UUID | None = None,
     metadata_: dict | None = None,
     updated_by: UUID | None = None,
+    tags: list[str] | None = None,
+    criticality: str | None = None,
 ) -> Asset:
     row = await pool.fetchrow(
         """
-        INSERT INTO assets (id, type, name, description, status, owner_id, metadata, updated_by)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        INSERT INTO assets (id, type, name, description, status, owner_id, metadata, updated_by, tags, criticality)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING *
         """,
         uuid.uuid4(),
@@ -39,6 +41,8 @@ async def create_asset(
         owner_id,
         json.dumps(metadata_ or {}),
         updated_by,
+        tags or [],
+        criticality,
     )
     # Resolve owner name
     if owner_id:
@@ -162,6 +166,8 @@ async def update_asset(
     owner_id: UUID | None = None,
     metadata_: dict | None = None,
     updated_by: UUID | None = None,
+    tags: list[str] | None = None,
+    criticality: str | None = None,
 ) -> Asset | None:
     # Build SET clause dynamically from provided fields
     sets: list[str] = []
@@ -172,6 +178,7 @@ async def update_asset(
         ("name", name),
         ("description", description),
         ("status", status),
+        ("criticality", criticality),
     ]:
         if val is not None:
             sets.append(f"{col} = ${idx}")
@@ -186,6 +193,11 @@ async def update_asset(
     if metadata_ is not None:
         sets.append(f"metadata = ${idx}")
         vals.append(json.dumps(metadata_))
+        idx += 1
+
+    if tags is not None:
+        sets.append(f"tags = ${idx}")
+        vals.append(tags)
         idx += 1
 
     if updated_by is not None:
@@ -231,8 +243,8 @@ async def clone_asset(
     new_id = uuid.uuid4()
     row = await pool.fetchrow(
         """
-        INSERT INTO assets (id, type, name, description, status, owner_id, metadata, updated_by)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        INSERT INTO assets (id, type, name, description, status, owner_id, metadata, updated_by, tags, criticality)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING *
         """,
         new_id,
@@ -243,6 +255,8 @@ async def clone_asset(
         original.owner_id,
         json.dumps(original.metadata_ or {}),
         updated_by,
+        original.tags or [],
+        original.criticality,
     )
     if clone_relationships:
         # Clone relationships where the original is source
