@@ -43,8 +43,8 @@
                 </select>
             </div>
             <div class="form-group" style="margin-bottom:0;min-width:140px;">
-                <label>Owner</label>
-                <input type="text" name="owner" value="{{ filter_owner }}" placeholder="Owner...">
+                <label>{{ 'Manager' if current_type and current_type.value == 'person' else 'Owner' }}</label>
+                <input type="text" name="owner" value="{{ filter_owner }}" placeholder="{{ 'Manager' if current_type and current_type.value == 'person' else 'Owner' }}...">
             </div>
         </div>
         <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:end;margin-top:0.5rem;">
@@ -88,7 +88,7 @@
             {{ sort_header('name', 'Name') }}
             {{ sort_header('type', 'Type') }}
             {{ sort_header('status', 'Status') }}
-            {{ sort_header('owner', 'Owner') }}
+            {{ sort_header('owner', 'Manager' if current_type and current_type.value == 'person' else 'Owner') }}
             {{ sort_header('created_at', 'Created') }}
         </tr>
     </thead>
