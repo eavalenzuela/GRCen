@@ -23,16 +23,7 @@
             {% if has_perm(user.role, Permission.MANAGE_ALERTS) %}
             <a href="/alerts">Alerts</a>
             {% endif %}
-            {% if has_perm(user.role, Permission.MANAGE_USERS) %}
-            <a href="/admin/users">Users</a>
-            {% endif %}
-            {% if has_perm(user.role, Permission.VIEW_AUDIT) %}
-            <a href="/admin/audit">Audit Log</a>
-            {% endif %}
             <a href="/tokens">API Tokens</a>
-            {% if has_perm(user.role, Permission.MANAGE_USERS) %}
-            <a href="/admin/tokens">Token Admin</a>
-            {% endif %}
             <a href="/notifications" class="notif-link">
                 Notifications
                 <span id="notif-badge"
@@ -43,9 +34,24 @@
                     {% if notif_count %}({{ notif_count }}){% endif %}
                 </span>
             </a>
+            <span class="nav-separator"></span>
             <a href="/logout">Logout ({{ user.username }})</a>
         </div>
     </nav>
+    {% if has_perm(user.role, Permission.MANAGE_USERS) or has_perm(user.role, Permission.VIEW_AUDIT) %}
+    <nav class="admin-bar">
+        <span class="admin-bar-label">Admin</span>
+        {% if has_perm(user.role, Permission.MANAGE_USERS) %}
+        <a href="/admin/users">Users</a>
+        <a href="/admin/tokens">Tokens</a>
+        <a href="/admin/oidc-settings">SSO</a>
+        <a href="/admin/audit/settings">Audit Settings</a>
+        {% endif %}
+        {% if has_perm(user.role, Permission.VIEW_AUDIT) %}
+        <a href="/admin/audit">Audit Log</a>
+        {% endif %}
+    </nav>
+    {% endif %}
     {% endif %}
 
     <main class="container">

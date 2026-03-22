@@ -39,6 +39,31 @@ body {
 .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.9rem; }
 .nav-links a:hover { color: var(--primary); }
 .notif-link { position: relative; }
+.nav-separator { border-left: 1px solid var(--border); height: 1.25rem; }
+
+/* Admin sub-bar */
+.admin-bar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0.35rem 2rem;
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    justify-content: flex-end;
+}
+.admin-bar-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+}
+.admin-bar a {
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.8rem;
+}
+.admin-bar a:hover { color: var(--primary); }
 
 /* Container */
 .container { max-width: 1200px; margin: 2rem auto; padding: 0 1.5rem; }
