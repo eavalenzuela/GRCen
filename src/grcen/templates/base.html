@@ -13,17 +13,17 @@
         <div class="nav-brand"><a href="/">GRCen</a></div>
         <div class="nav-links">
             <a href="/assets">Assets</a>
+            <a href="/org-views">Org Views</a>
+            <a href="/reviews">Reviews</a>
+            {% if has_perm(user.role, Permission.MANAGE_ALERTS) %}
+            <a href="/alerts">Alerts</a>
+            {% endif %}
             {% if has_perm(user.role, Permission.IMPORT) %}
             <a href="/imports">Import</a>
             {% endif %}
             {% if has_perm(user.role, Permission.EXPORT) %}
             <a href="/exports">Export</a>
             {% endif %}
-            <a href="/reviews">Reviews</a>
-            {% if has_perm(user.role, Permission.MANAGE_ALERTS) %}
-            <a href="/alerts">Alerts</a>
-            {% endif %}
-            <a href="/tokens">API Tokens</a>
             <a href="/notifications" class="notif-link">
                 Notifications
                 <span id="notif-badge"

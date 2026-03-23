@@ -21,6 +21,7 @@ from grcen.routers import (
     graph,
     imports,
     oidc,
+    org_views,
     pages,
     relationships,
     tokens,
@@ -81,6 +82,7 @@ def create_app() -> FastAPI:
     app.include_router(relationships.router)
     app.include_router(attachments.router)
     app.include_router(graph.router)
+    app.include_router(org_views.router)
     app.include_router(imports.router)
     app.include_router(exports.router)
     app.include_router(alerts.router)

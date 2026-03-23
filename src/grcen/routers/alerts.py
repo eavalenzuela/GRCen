@@ -2,6 +2,7 @@ from uuid import UUID
 
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import HTMLResponse
 
 from grcen.models.user import User
 from grcen.permissions import Permission
@@ -132,13 +133,15 @@ async def list_notifications(
     return [NotificationResponse.model_validate(n, from_attributes=True) for n in notifs]
 
 
-@router.get("/notifications/count")
+@router.get("/notifications/count", response_class=HTMLResponse)
 async def notification_count(
     pool: asyncpg.Pool = Depends(get_db),
     _user: User = Depends(require_permission(Permission.VIEW)),
 ):
     count = await alert_svc.count_unread_notifications(pool)
-    return {"count": count}
+    if count:
+        return HTMLResponse(f"({count})")
+    return HTMLResponse("")
 
 
 @router.post("/notifications/{notif_id}/read", status_code=204)

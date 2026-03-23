@@ -114,8 +114,7 @@ async def login_page(
     if user:
         return RedirectResponse("/", status_code=302)
     oidc_cfg = await oidc_settings.get_settings(pool)
-    return templates.TemplateResponse("auth/login.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "auth/login.html", context={
         "oidc_enabled": oidc_cfg.enabled,
         "oidc_display_name": oidc_cfg.display_name,
     })
@@ -129,9 +128,7 @@ async def login_submit(request: Request, pool: asyncpg.Pool = Depends(get_db)):
     user = await auth_svc.authenticate_user(pool, str(username), str(password))
     if not user:
         oidc_cfg = await oidc_settings.get_settings(pool)
-        return templates.TemplateResponse(
-            "auth/login.html", {
-                "request": request,
+        return templates.TemplateResponse(request, "auth/login.html", context={
                 "error": "Invalid credentials",
                 "oidc_enabled": oidc_cfg.enabled,
                 "oidc_display_name": oidc_cfg.display_name,
@@ -190,10 +187,7 @@ async def dashboard(
     heatmap = await risk_svc.get_risk_heatmap(pool)
     top_risks = await risk_svc.get_top_risks(pool)
     review_counts = await review_svc.get_review_counts(pool)
-    return templates.TemplateResponse(
-        "dashboard.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "dashboard.html", context={
             "user": user,
             "recent_assets": assets,
             "total_assets": total,
@@ -216,7 +210,7 @@ async def dashboard(
 @router.get("/assets", response_class=HTMLResponse)
 async def asset_list(
     request: Request,
-    type: AssetType | None = None,
+    type: str | None = None,
     q: str | None = None,
     status: str | None = None,
     owner: str | None = None,
@@ -230,12 +224,13 @@ async def asset_list(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.VIEW)),
 ):
+    asset_type = AssetType(type) if type else None
     metadata_filters = None
     if meta_key and meta_value:
         metadata_filters = {meta_key: meta_value}
     items, total = await asset_svc.list_assets(
         pool,
-        asset_type=type,
+        asset_type=asset_type,
         page=page,
         page_size=25,
         q=q,
@@ -250,8 +245,8 @@ async def asset_list(
     notif_count = await alert_svc.count_unread_notifications(pool)
     # Build filter params string for pagination links
     filter_params = ""
-    if type:
-        filter_params += f"&type={type.value}"
+    if asset_type:
+        filter_params += f"&type={asset_type.value}"
     if q:
         filter_params += f"&q={q}"
     if status:
@@ -268,16 +263,13 @@ async def asset_list(
         filter_params += f"&sort={sort}"
     if order != "asc":
         filter_params += f"&order={order}"
-    return templates.TemplateResponse(
-        "assets/list.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "assets/list.html", context={
             "user": user,
             "assets": items,
             "total": total,
             "page": page,
             "pages": (total + 24) // 25,
-            "current_type": type,
+            "current_type": asset_type,
             "asset_types": sorted(AssetType, key=lambda t: t.value),
             "notif_count": notif_count,
             "filter_q": q or "",
@@ -302,10 +294,7 @@ async def asset_new(
     pool: asyncpg.Pool = Depends(get_db),
 ):
     notif_count = await alert_svc.count_unread_notifications(pool)
-    return templates.TemplateResponse(
-        "assets/form.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "assets/form.html", context={
             "user": user,
             "asset": None,
             "asset_types": sorted(AssetType, key=lambda t: t.value),
@@ -387,10 +376,7 @@ async def asset_detail(
         )
         if row:
             linked_user = dict(row)
-    return templates.TemplateResponse(
-        "assets/detail.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "assets/detail.html", context={
             "user": user,
             "asset": asset,
             "relationships": rels,
@@ -415,10 +401,7 @@ async def asset_edit(
     if not asset:
         return HTMLResponse("Not found", status_code=404)
     notif_count = await alert_svc.count_unread_notifications(pool)
-    return templates.TemplateResponse(
-        "assets/form.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "assets/form.html", context={
             "user": user,
             "asset": asset,
             "asset_types": sorted(AssetType, key=lambda t: t.value),
@@ -573,10 +556,7 @@ async def graph_page(
     if not asset:
         return HTMLResponse("Not found", status_code=404)
     notif_count = await alert_svc.count_unread_notifications(pool)
-    return templates.TemplateResponse(
-        "graph/view.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "graph/view.html", context={
             "user": user,
             "asset": asset,
             "notif_count": notif_count,
@@ -594,9 +574,7 @@ async def import_page(
     user: User = Depends(require_permission(Permission.IMPORT)),
 ):
     notif_count = await alert_svc.count_unread_notifications(pool)
-    return templates.TemplateResponse(
-        "imports/index.html",
-        {"request": request, "user": user, "notif_count": notif_count},
+    return templates.TemplateResponse(request, "imports/index.html", context={"user": user, "notif_count": notif_count},
     )
 
 
@@ -610,10 +588,7 @@ async def export_page(
     user: User = Depends(require_permission(Permission.EXPORT)),
 ):
     notif_count = await alert_svc.count_unread_notifications(pool)
-    return templates.TemplateResponse(
-        "exports/index.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "exports/index.html", context={
             "user": user,
             "asset_types": sorted(AssetType, key=lambda t: t.value),
             "notif_count": notif_count,
@@ -634,10 +609,7 @@ async def reviews_page(
 ):
     reviews = await review_svc.get_reviews(pool, asset_type=type, status_filter=status)
     notif_count = await alert_svc.count_unread_notifications(pool)
-    return templates.TemplateResponse(
-        "reviews/index.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "reviews/index.html", context={
             "user": user,
             "reviews": reviews,
             "asset_types": sorted(AssetType, key=lambda t: t.value),
@@ -659,12 +631,26 @@ async def alerts_page(
 ):
     alerts = await alert_svc.list_alerts(pool)
     notif_count = await alert_svc.count_unread_notifications(pool)
-    return templates.TemplateResponse(
-        "alerts/list.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "alerts/list.html", context={
             "user": user,
             "alerts": alerts,
+            "notif_count": notif_count,
+        },
+    )
+
+
+# --- Org Views page ---
+
+
+@router.get("/org-views", response_class=HTMLResponse)
+async def org_views_page(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.VIEW)),
+):
+    notif_count = await alert_svc.count_unread_notifications(pool)
+    return templates.TemplateResponse(request, "org_views.html", context={
+            "user": user,
             "notif_count": notif_count,
         },
     )
@@ -681,10 +667,7 @@ async def notifications_page(
 ):
     notifs = await alert_svc.list_notifications(pool)
     notif_count = await alert_svc.count_unread_notifications(pool)
-    return templates.TemplateResponse(
-        "alerts/notifications.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "alerts/notifications.html", context={
             "user": user,
             "notifications": notifs,
             "notif_count": notif_count,
@@ -703,10 +686,7 @@ async def admin_users(
 ):
     users = await auth_svc.list_users(pool)
     notif_count = await alert_svc.count_unread_notifications(pool)
-    return templates.TemplateResponse(
-        "admin/users.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "admin/users.html", context={
             "user": user,
             "users": users,
             "roles": list(UserRole),
@@ -722,10 +702,7 @@ async def admin_user_new(
     user: User = Depends(require_permission(Permission.MANAGE_USERS)),
 ):
     notif_count = await alert_svc.count_unread_notifications(pool)
-    return templates.TemplateResponse(
-        "admin/user_form.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "admin/user_form.html", context={
             "user": user,
             "edit_user": None,
             "roles": list(UserRole),
@@ -746,10 +723,7 @@ async def admin_user_create_submit(
     role = UserRole(form["role"])
     if not username or not password:
         notif_count = await alert_svc.count_unread_notifications(pool)
-        return templates.TemplateResponse(
-            "admin/user_form.html",
-            {
-                "request": request,
+        return templates.TemplateResponse(request, "admin/user_form.html", context={
                 "user": user,
                 "edit_user": None,
                 "roles": list(UserRole),
@@ -785,10 +759,7 @@ async def admin_user_edit(
     person_assets = await pool.fetch(
         "SELECT id, name FROM assets WHERE type = 'person' ORDER BY name"
     )
-    return templates.TemplateResponse(
-        "admin/user_form.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "admin/user_form.html", context={
             "user": user,
             "edit_user": edit_user,
             "roles": list(UserRole),
@@ -908,10 +879,7 @@ async def admin_audit_log(
         pool, entity_type=entity_type, action=action, username=username, page=page
     )
     notif_count = await alert_svc.count_unread_notifications(pool)
-    return templates.TemplateResponse(
-        "admin/audit_log.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "admin/audit_log.html", context={
             "user": user,
             "logs": logs,
             "total": total,
@@ -933,10 +901,7 @@ async def admin_audit_settings(
 ):
     configs = await audit_svc.get_audit_config_all(pool)
     notif_count = await alert_svc.count_unread_notifications(pool)
-    return templates.TemplateResponse(
-        "admin/audit_settings.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "admin/audit_settings.html", context={
             "user": user,
             "configs": configs,
             "notif_count": notif_count,
@@ -971,10 +936,7 @@ async def admin_oidc_settings(
 ):
     oidc_cfg = await oidc_settings.get_settings(pool)
     notif_count = await alert_svc.count_unread_notifications(pool)
-    return templates.TemplateResponse(
-        "admin/oidc_settings.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "admin/oidc_settings.html", context={
             "user": user,
             "oidc": oidc_cfg,
             "roles": list(UserRole),
@@ -1028,10 +990,7 @@ async def my_tokens_page(
     notif_count = await alert_svc.count_unread_notifications(pool)
     from datetime import UTC, datetime as dt
 
-    return templates.TemplateResponse(
-        "tokens/my_tokens.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "tokens/my_tokens.html", context={
             "user": user,
             "tokens": tokens,
             "available_permissions": available_permissions,
@@ -1154,10 +1113,7 @@ async def admin_tokens_page(
     notif_count = await alert_svc.count_unread_notifications(pool)
     from datetime import UTC, datetime as dt
 
-    return templates.TemplateResponse(
-        "admin/tokens.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "admin/tokens.html", context={
             "user": user,
             "tokens": tokens,
             "max_expiry_days": max_expiry_days,

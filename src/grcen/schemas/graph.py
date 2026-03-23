@@ -5,6 +5,7 @@ class GraphNode(BaseModel):
     id: str
     label: str
     type: str
+    subtitle: str = ""
 
 
 class GraphEdge(BaseModel):

@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Org Views - GRCen{% endblock %}
+{% block content %}
+<h1>Org Views</h1>
+
+<div class="org-tabs">
+    <button class="org-tab active" data-tab="org-chart">Org Chart</button>
+    <button class="org-tab" data-tab="business-structure">Business Structure</button>
+    <button class="org-tab" data-tab="product-view">Product View</button>
+</div>
+
+<div class="org-tab-panel active" id="panel-org-chart">
+    <div class="org-tree-container">
+        <canvas id="canvas-org-chart"></canvas>
+    </div>
+</div>
+
+<div class="org-tab-panel" id="panel-business-structure">
+    <div class="org-tree-container">
+        <canvas id="canvas-business-structure"></canvas>
+    </div>
+</div>
+
+<div class="org-tab-panel" id="panel-product-view">
+    <div class="org-product-controls">
+        <label for="product-select">Product:</label>
+        <select id="product-select">
+            <option value="">Select a product…</option>
+        </select>
+    </div>
+    <div class="org-tree-container">
+        <canvas id="canvas-product-view"></canvas>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/org_tree.js"></script>
+<script>
+(function() {
+    // Tab switching
+    const tabs = document.querySelectorAll('.org-tab');
+    const panels = document.querySelectorAll('.org-tab-panel');
+    const loaded = {};
+
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            tabs.forEach(t => t.classList.remove('active'));
+            panels.forEach(p => p.classList.remove('active'));
+            tab.classList.add('active');
+            const panelId = 'panel-' + tab.dataset.tab;
+            document.getElementById(panelId).classList.add('active');
+            loadTab(tab.dataset.tab);
+        });
+    });
+
+    function loadTab(name) {
+        if (name === 'org-chart' && !loaded['org-chart']) {
+            loaded['org-chart'] = true;
+            fetch('/api/org-views/org-chart')
+                .then(r => r.json())
+                .then(data => renderOrgTree('canvas-org-chart', data));
+        } else if (name === 'business-structure' && !loaded['business-structure']) {
+            loaded['business-structure'] = true;
+            fetch('/api/org-views/business-structure')
+                .then(r => r.json())
+                .then(data => renderOrgTree('canvas-business-structure', data));
+        } else if (name === 'product-view' && !loaded['product-list']) {
+            loaded['product-list'] = true;
+            fetch('/api/org-views/products')
+                .then(r => r.json())
+                .then(products => {
+                    const sel = document.getElementById('product-select');
+                    products.forEach(p => {
+                        const opt = document.createElement('option');
+                        opt.value = p.id;
+                        opt.textContent = p.name;
+                        sel.appendChild(opt);
+                    });
+                });
+        }
+    }
+
+    // Product selection
+    document.getElementById('product-select').addEventListener('change', function() {
+        if (!this.value) return;
+        fetch('/api/org-views/product/' + this.value)
+            .then(r => r.json())
+            .then(data => renderOrgTree('canvas-product-view', data));
+    });
+
+    // Load first tab on page load
+    loadTab('org-chart');
+})();
+</script>
+{% endblock %}
