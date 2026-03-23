@@ -6,6 +6,10 @@ GRCen is purpose-built to map assets (organizational assets, not just physical o
 
 ## Key Features
 
+| Dashboard | Asset Detail | Org Views |
+|:-:|:-:|:-:|
+| ![Dashboard](images/dashboard.png) | ![Asset Example](images/asset_example.png) | ![Org Views](images/org_views_product.png) |
+
 - **Asset graph** — 12 built-in asset types (People, Policies, Systems, Risks, Devices, and more) linked by described relationships. Search from any node to understand how it connects to everything else.
 - **Visual relationship graphs** — Interactive node graphs that show how assets relate at a glance.
 - **Advanced search & filtering** — Full-text search across names, descriptions, and owners. Filter by type, status, date range, and metadata fields. Sortable columns and an advanced search toggle for progressive disclosure.
