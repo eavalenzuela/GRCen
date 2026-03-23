@@ -620,6 +620,81 @@ async def reviews_page(
     )
 
 
+# --- Risk Management page ---
+
+
+@router.get("/risk-management", response_class=HTMLResponse)
+async def risk_management_page(
+    request: Request,
+    category: str | None = None,
+    treatment: str | None = None,
+    effectiveness: str | None = None,
+    owner: str | None = None,
+    overdue: str | None = None,
+    likelihood: str | None = None,
+    impact: str | None = None,
+    sort: str = "score",
+    order: str = "desc",
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.VIEW)),
+):
+    is_overdue = overdue == "1"
+    risks = await risk_svc.get_risk_register(
+        pool,
+        category=category,
+        treatment=treatment,
+        effectiveness=effectiveness,
+        owner=owner,
+        overdue=is_overdue,
+        likelihood_filter=likelihood,
+        impact_filter=impact,
+        sort=sort,
+        order=order,
+    )
+    summary = await risk_svc.get_risk_summary(pool)
+    heatmap = await risk_svc.get_risk_heatmap(pool)
+    notif_count = await alert_svc.count_unread_notifications(pool)
+
+    # Build filter_params for sort links
+    filter_params = ""
+    if category:
+        filter_params += f"&category={category}"
+    if treatment:
+        filter_params += f"&treatment={treatment}"
+    if effectiveness:
+        filter_params += f"&effectiveness={effectiveness}"
+    if owner:
+        filter_params += f"&owner={owner}"
+    if is_overdue:
+        filter_params += "&overdue=1"
+    if likelihood:
+        filter_params += f"&likelihood={likelihood}"
+    if impact:
+        filter_params += f"&impact={impact}"
+
+    return templates.TemplateResponse(request, "risks/index.html", context={
+            "user": user,
+            "risks": risks,
+            "summary": summary,
+            "heatmap": heatmap,
+            "notif_count": notif_count,
+            "likelihood_levels": risk_svc.LIKELIHOOD_LEVELS,
+            "impact_levels": risk_svc.IMPACT_LEVELS,
+            "score_color": risk_svc.score_color,
+            "filter_category": category or "",
+            "filter_treatment": treatment or "",
+            "filter_effectiveness": effectiveness or "",
+            "filter_owner": owner or "",
+            "filter_overdue": is_overdue,
+            "filter_likelihood": likelihood or "",
+            "filter_impact": impact or "",
+            "current_sort": sort,
+            "current_order": order,
+            "filter_params": filter_params,
+        },
+    )
+
+
 # --- Alerts page ---
 
 

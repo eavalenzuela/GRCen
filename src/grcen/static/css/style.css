@@ -212,6 +212,44 @@ th a:hover { color: var(--primary); }
 .risk-high { background: #fed7aa; color: #9a3412; }
 .risk-critical { background: #fecaca; color: #991b1b; }
 
+/* Risk Management page */
+.risk-summary-row { display: flex; gap: 0.75rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+.risk-stat-card { flex: 1; min-width: 100px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; text-align: center; }
+.risk-stat-value { font-size: 1.75rem; font-weight: 700; color: var(--text); }
+.risk-stat-label { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.risk-stat-critical .risk-stat-value { color: #991b1b; }
+.risk-stat-critical { border-left: 3px solid #fecaca; }
+.risk-stat-high .risk-stat-value { color: #9a3412; }
+.risk-stat-high { border-left: 3px solid #fed7aa; }
+.risk-stat-medium .risk-stat-value { color: #92400e; }
+.risk-stat-medium { border-left: 3px solid #fef3c7; }
+.risk-stat-low .risk-stat-value { color: #166534; }
+.risk-stat-low { border-left: 3px solid #dcfce7; }
+.risk-stat-warn .risk-stat-value { color: #dc2626; }
+.risk-stat-warn { border-left: 3px solid #fecaca; }
+
+.risk-top-row { display: flex; gap: 1.5rem; margin-bottom: 1.5rem; align-items: flex-start; }
+.risk-heatmap-card { flex: 1; min-width: 0; }
+.risk-heatmap-card h2 { margin-top: 0; }
+.risk-filters-card { width: 300px; flex-shrink: 0; }
+.risk-filters-card h2 { margin-top: 0; }
+.risk-filter-form .form-group { margin-bottom: 0.75rem; }
+.risk-filter-form label { display: block; font-size: 0.8rem; font-weight: 500; margin-bottom: 0.25rem; color: var(--text-muted); }
+.risk-filter-form input[type="checkbox"] { margin-right: 0.35rem; }
+.risk-filter-actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
+
+.heatmap-clickable { cursor: pointer; }
+.heatmap-clickable:hover { outline: 2px solid var(--primary); outline-offset: -2px; }
+.heatmap-selected { outline: 3px solid var(--primary); outline-offset: -3px; }
+.heatmap-empty-link { display: block; width: 100%; height: 100%; min-height: 1.5rem; }
+
+.risk-active-filters { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; font-size: 0.85rem; color: var(--text-muted); flex-wrap: wrap; }
+.risk-active-filters .badge { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
+
+.sort-link { text-decoration: none; color: inherit; white-space: nowrap; }
+.sort-link:hover { color: var(--primary); }
+.sort-arrow { font-size: 0.7rem; margin-left: 0.2rem; }
+
 /* Review status badges */
 .review-overdue { background: #fee2e2; color: #991b1b; }
 .review-due-soon { background: #fef3c7; color: #92400e; }

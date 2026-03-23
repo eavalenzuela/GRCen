@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+{% block title %}Risk Management - GRCen{% endblock %}
+{% block content %}
+<h1>Risk Management</h1>
+
+{# ── Summary stats ─────────────────────────────────────────────────── #}
+<div class="risk-summary-row">
+    <div class="risk-stat-card">
+        <div class="risk-stat-value">{{ summary.total }}</div>
+        <div class="risk-stat-label">Total Risks</div>
+    </div>
+    <div class="risk-stat-card risk-stat-critical">
+        <div class="risk-stat-value">{{ summary.by_severity.critical }}</div>
+        <div class="risk-stat-label">Critical</div>
+    </div>
+    <div class="risk-stat-card risk-stat-high">
+        <div class="risk-stat-value">{{ summary.by_severity.high }}</div>
+        <div class="risk-stat-label">High</div>
+    </div>
+    <div class="risk-stat-card risk-stat-medium">
+        <div class="risk-stat-value">{{ summary.by_severity.medium }}</div>
+        <div class="risk-stat-label">Medium</div>
+    </div>
+    <div class="risk-stat-card risk-stat-low">
+        <div class="risk-stat-value">{{ summary.by_severity.low }}</div>
+        <div class="risk-stat-label">Low</div>
+    </div>
+    <div class="risk-stat-card {% if summary.overdue > 0 %}risk-stat-warn{% endif %}">
+        <div class="risk-stat-value">{{ summary.overdue }}</div>
+        <div class="risk-stat-label">Overdue Reviews</div>
+    </div>
+    <div class="risk-stat-card {% if summary.no_treatment > 0 %}risk-stat-warn{% endif %}">
+        <div class="risk-stat-value">{{ summary.no_treatment }}</div>
+        <div class="risk-stat-label">No Treatment</div>
+    </div>
+</div>
+
+{# ── Heatmap + Filters side by side ───────────────────────────────── #}
+<div class="risk-top-row">
+    <div class="card risk-heatmap-card">
+        <h2>Risk Heatmap</h2>
+        <table class="heatmap-table">
+            <thead>
+                <tr>
+                    <th></th>
+                    {% for imp in impact_levels %}
+                    <th>{{ imp | replace('_', ' ') | title }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for l_idx in range(likelihood_levels | length, 0, -1) %}
+                <tr>
+                    <th class="heatmap-row-label">{{ likelihood_levels[l_idx - 1] | replace('_', ' ') | title }}</th>
+                    {% for i_idx in range(1, impact_levels | length + 1) %}
+                    {% set cell = heatmap.get((l_idx, i_idx), []) %}
+                    {% set score = l_idx * i_idx %}
+                    <td class="heatmap-cell heatmap-{{ score_color(score) }}{% if cell %} heatmap-populated{% endif %} heatmap-clickable
+                        {%- if filter_likelihood == likelihood_levels[l_idx - 1] and filter_impact == impact_levels[i_idx - 1] %} heatmap-selected{% endif %}"
+                        {% if cell %}title="{% for r in cell %}{{ r.name }}{% if not loop.last %}, {% endif %}{% endfor %}"{% endif %}>
+                        {% if cell %}
+                        <a href="/risk-management?likelihood={{ likelihood_levels[l_idx - 1] }}&impact={{ impact_levels[i_idx - 1] }}">{{ cell | length }}</a>
+                        {% else %}
+                        <a href="/risk-management?likelihood={{ likelihood_levels[l_idx - 1] }}&impact={{ impact_levels[i_idx - 1] }}" class="heatmap-empty-link"></a>
+                        {% endif %}
+                    </td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div class="heatmap-labels">
+            <span class="heatmap-axis-label">Likelihood &uarr;</span>
+            <span class="heatmap-axis-label">Impact &rarr;</span>
+        </div>
+        <div class="heatmap-legend">
+            <span class="heatmap-legend-item"><span class="heatmap-swatch heatmap-low"></span> Low</span>
+            <span class="heatmap-legend-item"><span class="heatmap-swatch heatmap-medium"></span> Medium</span>
+            <span class="heatmap-legend-item"><span class="heatmap-swatch heatmap-high"></span> High</span>
+            <span class="heatmap-legend-item"><span class="heatmap-swatch heatmap-critical"></span> Critical</span>
+        </div>
+    </div>
+
+    <div class="card risk-filters-card">
+        <h2>Filters</h2>
+        <form method="get" action="/risk-management" class="risk-filter-form">
+            <div class="form-group">
+                <label for="f-category">Category</label>
+                <select name="category" id="f-category">
+                    <option value="">All</option>
+                    {% for c in ["security", "compliance", "operational", "financial", "reputational", "strategic"] %}
+                    <option value="{{ c }}" {% if filter_category == c %}selected{% endif %}>{{ c | replace('_', ' ') | title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="f-treatment">Treatment</label>
+                <select name="treatment" id="f-treatment">
+                    <option value="">All</option>
+                    {% for t in ["mitigate", "accept", "transfer", "avoid"] %}
+                    <option value="{{ t }}" {% if filter_treatment == t %}selected{% endif %}>{{ t | title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="f-effectiveness">Control Effectiveness</label>
+                <select name="effectiveness" id="f-effectiveness">
+                    <option value="">All</option>
+                    {% for e in ["effective", "partially_effective", "ineffective", "not_assessed"] %}
+                    <option value="{{ e }}" {% if filter_effectiveness == e %}selected{% endif %}>{{ e | replace('_', ' ') | title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="f-owner">Owner</label>
+                <input type="text" name="owner" id="f-owner" value="{{ filter_owner }}" placeholder="Search by name...">
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" name="overdue" value="1" {% if filter_overdue %}checked{% endif %}>
+                    Overdue reviews only
+                </label>
+            </div>
+            <div class="risk-filter-actions">
+                <button type="submit" class="btn btn-primary">Apply</button>
+                <a href="/risk-management" class="btn">Clear</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+{# ── Active filter indicator ───────────────────────────────────────── #}
+{% if filter_category or filter_treatment or filter_effectiveness or filter_owner or filter_overdue or filter_likelihood or filter_impact %}
+<div class="risk-active-filters">
+    <span>Active filters:</span>
+    {% if filter_likelihood and filter_impact %}
+    <span class="badge">{{ filter_likelihood | replace('_', ' ') | title }} / {{ filter_impact | replace('_', ' ') | title }}</span>
+    {% endif %}
+    {% if filter_category %}
+    <span class="badge">{{ filter_category | replace('_', ' ') | title }}</span>
+    {% endif %}
+    {% if filter_treatment %}
+    <span class="badge">{{ filter_treatment | title }}</span>
+    {% endif %}
+    {% if filter_effectiveness %}
+    <span class="badge">{{ filter_effectiveness | replace('_', ' ') | title }}</span>
+    {% endif %}
+    {% if filter_owner %}
+    <span class="badge">Owner: {{ filter_owner }}</span>
+    {% endif %}
+    {% if filter_overdue %}
+    <span class="badge">Overdue</span>
+    {% endif %}
+    <a href="/risk-management" class="btn" style="margin-left:0.5rem;font-size:0.8rem;">Clear all</a>
+</div>
+{% endif %}
+
+{# ── Risk register table ───────────────────────────────────────────── #}
+<div class="card">
+    <h2>Risk Register ({{ risks | length }})</h2>
+    <table>
+        <thead>
+            <tr>
+                {% macro sort_link(field, label) %}
+                {% set new_order = "asc" if current_sort == field and current_order == "desc" else "desc" %}
+                <th><a href="/risk-management?sort={{ field }}&order={{ new_order }}{{ filter_params }}" class="sort-link">
+                    {{ label }}
+                    {% if current_sort == field %}
+                    <span class="sort-arrow">{{ '&#9650;' if current_order == 'asc' else '&#9660;' }}</span>
+                    {% endif %}
+                </a></th>
+                {% endmacro %}
+                {{ sort_link("name", "Risk") }}
+                {{ sort_link("score", "Score") }}
+                <th>Likelihood</th>
+                <th>Impact</th>
+                {{ sort_link("risk_category", "Category") }}
+                {{ sort_link("treatment", "Treatment") }}
+                <th>Effectiveness</th>
+                {{ sort_link("owner", "Owner") }}
+                <th>Review</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for risk in risks %}
+            <tr>
+                <td><a href="/assets/{{ risk.id }}">{{ risk.name }}</a></td>
+                <td><span class="badge risk-{{ risk.color }}">{{ risk.score }}</span></td>
+                <td>{{ risk.likelihood | replace('_', ' ') | title if risk.likelihood else '-' }}</td>
+                <td>{{ risk.impact | replace('_', ' ') | title if risk.impact else '-' }}</td>
+                <td>{{ risk.risk_category | replace('_', ' ') | title if risk.risk_category else '-' }}</td>
+                <td>{{ risk.treatment | replace('_', ' ') | title if risk.treatment else '-' }}</td>
+                <td>{{ risk.control_effectiveness | replace('_', ' ') | title if risk.control_effectiveness else '-' }}</td>
+                <td>{{ risk.owner or '-' }}</td>
+                <td>
+                    {% if risk.is_overdue %}
+                    <span class="badge review-overdue">Overdue</span>
+                    {% elif risk.review_date %}
+                    {{ risk.review_date }}
+                    {% else %}
+                    -
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            {% if not risks %}
+            <tr><td colspan="9" style="text-align:center;color:var(--text-muted);">No risks match the current filters.</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
