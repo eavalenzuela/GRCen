@@ -265,7 +265,7 @@ async def test_person_detail_shows_linked_user(auth_client, pool):
 async def test_admin_oidc_settings_page(auth_client, pool):
     resp = await auth_client.get("/admin/oidc-settings")
     assert resp.status_code == 200
-    assert b"OIDC/SSO Settings" in resp.content
+    assert b"SSO Settings" in resp.content
     assert b"Issuer URL" in resp.content
 
 

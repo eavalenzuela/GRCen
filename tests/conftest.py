@@ -12,6 +12,10 @@ os.environ["DATABASE_URL"] = os.environ.get(
 )
 os.environ["SECRET_KEY"] = "test-secret"
 os.environ["DEBUG"] = "true"
+os.environ["SSL_CERTFILE"] = ""
+os.environ["SSL_KEYFILE"] = ""
+os.environ["ENCRYPTION_KEY"] = ""
+os.environ["ENCRYPTION_KEY_RETIRED"] = ""
 
 from grcen.database import close_pool, init_pool, init_schema  # noqa: E402
 from grcen.main import app  # noqa: E402

@@ -18,17 +18,21 @@ services:
   app:
     build: .
     ports:
-      - "8000:8000"
+      - "8443:8443"
     environment:
       DATABASE_URL: postgresql://grcen:grcen@db:5432/grcen
-      SECRET_KEY: change-me-in-production
-      DEBUG: "false"
+      SECRET_KEY: "${SECRET_KEY:?Set SECRET_KEY in .env}"
+      ENCRYPTION_KEY: "${ENCRYPTION_KEY:-}"
+      DEBUG: "${DEBUG:-false}"
       UPLOAD_DIR: /app/uploads
+      SSL_CERTFILE: "${SSL_CERTFILE:-}"
+      SSL_KEYFILE: "${SSL_KEYFILE:-}"
     depends_on:
       db:
         condition: service_healthy
     volumes:
       - uploads:/app/uploads
+      - ./certs:/certs:ro
 
 volumes:
   pgdata:

@@ -228,7 +228,7 @@ async def test_saml_sls_404_when_disabled(client, pool):
 async def test_admin_saml_settings_page(auth_client, pool):
     resp = await auth_client.get("/admin/saml-settings")
     assert resp.status_code == 200
-    assert b"SAML 2.0 Settings" in resp.content
+    assert b"SSO Settings" in resp.content
     assert b"IdP Entity ID" in resp.content
 
 
