@@ -87,7 +87,7 @@ async def clean_tables(pool):
     from grcen.rate_limit import _reset as _reset_rate_limit
     _reset_rate_limit()
     yield
-    for table in ("sessions", "api_tokens", "app_settings", "audit_log", "notifications", "alerts", "attachments", "relationships", "assets", "users"):
+    for table in ("sessions", "api_tokens", "app_settings", "audit_log", "notifications", "alerts", "attachments", "relationships", "assets", "users", "encryption_config"):
         await pool.execute(f"DELETE FROM {table}")
     # Reset audit config to defaults so tests start fresh
     await pool.execute("UPDATE audit_config SET enabled = true, field_level = true")
@@ -104,6 +104,10 @@ async def clean_tables(pool):
     """)
     from grcen.services import oidc_settings
     oidc_settings._cache = None
+    # Reset encryption config cache
+    from grcen.services import encryption_config as _enc_cfg
+    _enc_cfg._cache = None
+    _enc_cfg._profile_cache = None
     # Reset login rate limiter between tests
     from grcen.rate_limit import _reset as _reset_rate_limit
     _reset_rate_limit()

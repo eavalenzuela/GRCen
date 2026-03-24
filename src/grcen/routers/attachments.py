@@ -1,9 +1,11 @@
 import os
+import re
 import uuid as uuid_mod
 from uuid import UUID
 
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi.responses import Response
 
 from grcen.config import settings
 from grcen.models.attachment import AttachmentKind
@@ -13,6 +15,8 @@ from grcen.routers.deps import get_db, require_permission
 from grcen.schemas.attachment import AttachmentCreate, AttachmentResponse
 from grcen.services import attachment as att_svc
 from grcen.services import audit_service as audit_svc
+from grcen.services import encryption_config
+from grcen.services.encryption import decrypt_bytes, encrypt_bytes
 
 router = APIRouter(prefix="/api/assets/{asset_id}/attachments", tags=["attachments"])
 
@@ -55,10 +59,7 @@ async def create_attachment(
 def _sanitize_filename(raw: str | None) -> str:
     """Strip directory components and dangerous characters from an upload filename."""
     name = os.path.basename(raw or "uploaded_file")
-    # Keep only safe characters
-    import re
     name = re.sub(r"[^a-zA-Z0-9._\-]", "_", name)
-    # Truncate the original portion to 200 chars
     return name[:200]
 
 
@@ -104,6 +105,12 @@ async def upload_file(
         chunks.append(chunk)
     content = b"".join(chunks)
 
+    # Encrypt file contents if the file_contents scope is active.
+    file_encrypted = False
+    if await encryption_config.is_scope_active(pool, "file_contents"):
+        content = encrypt_bytes(content, "file_contents")
+        file_encrypted = True
+
     with open(filepath, "wb") as f:
         f.write(content)
 
@@ -113,6 +120,7 @@ async def upload_file(
         kind=AttachmentKind.FILE,
         name=file.filename or "uploaded_file",
         url_or_path=filepath,
+        encrypted=file_encrypted,
     )
     await audit_svc.log_audit_event(
         pool,
@@ -125,6 +133,34 @@ async def upload_file(
         changes=audit_svc.create_snapshot(att.__dict__, _ATT_FIELDS),
     )
     return AttachmentResponse.model_validate(att, from_attributes=True)
+
+
+@router.get("/{att_id}/download")
+async def download_file(
+    asset_id: UUID,
+    att_id: UUID,
+    pool: asyncpg.Pool = Depends(get_db),
+    _user: User = Depends(require_permission(Permission.VIEW)),
+):
+    att = await att_svc.get_attachment(pool, att_id)
+    if not att or att.asset_id != asset_id:
+        raise HTTPException(status_code=404, detail="Attachment not found")
+    if att.kind != AttachmentKind.FILE or not att.url_or_path:
+        raise HTTPException(status_code=400, detail="Not a downloadable file")
+    if not os.path.isfile(att.url_or_path):
+        raise HTTPException(status_code=404, detail="File not found on disk")
+
+    with open(att.url_or_path, "rb") as f:
+        data = f.read()
+
+    if att.encrypted:
+        data = decrypt_bytes(data, "file_contents")
+
+    return Response(
+        content=data,
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": f'attachment; filename="{att.name}"'},
+    )
 
 
 @router.delete("/{att_id}", status_code=204)

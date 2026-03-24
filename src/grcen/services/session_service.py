@@ -6,6 +6,9 @@ from uuid import UUID
 
 import asyncpg
 
+from grcen.services import encryption_config
+from grcen.services.encryption import encrypt_field
+
 
 async def create_session(
     pool: asyncpg.Pool,
@@ -15,12 +18,15 @@ async def create_session(
 ) -> str:
     """Create a new server-side session and return the session ID."""
     session_id = secrets.token_urlsafe(32)
+    stored_ip = ip_address
+    if ip_address and await encryption_config.is_scope_active(pool, "session_pii"):
+        stored_ip = encrypt_field(ip_address, "session_pii")
     await pool.execute(
         """INSERT INTO sessions (session_id, user_id, ip_address, user_agent)
            VALUES ($1, $2, $3, $4)""",
         session_id,
         user_id,
-        ip_address,
+        stored_ip,
         (user_agent or "")[:512],  # truncate long user-agent strings
     )
     return session_id

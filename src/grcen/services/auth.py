@@ -6,9 +6,13 @@ import bcrypt
 
 from grcen.models.user import User
 from grcen.permissions import UserRole
+from grcen.services import encryption_config
+from grcen.services.encryption import blind_index, decrypt_field, encrypt_field
 
 # Sentinel value for users without a local password (e.g. future OIDC/SSO users).
 _UNUSABLE_PASSWORD = "!unusable"
+
+_SCOPE = "user_pii"
 
 
 def hash_password(password: str) -> str:
@@ -19,6 +23,39 @@ def verify_password(plain: str, hashed: str) -> bool:
     if hashed == _UNUSABLE_PASSWORD:
         return False
     return bcrypt.checkpw(plain.encode(), hashed.encode())
+
+
+# ── encryption helpers ────────────────────────────────────────────────────
+
+
+async def _pii_active(pool: asyncpg.Pool) -> bool:
+    return await encryption_config.is_scope_active(pool, _SCOPE)
+
+
+def _decrypt_user_email(user: User) -> User:
+    """Decrypt the email field on a User object (no-op if plaintext)."""
+    if user.email:
+        user.email = decrypt_field(user.email, _SCOPE)
+    return user
+
+
+def _decrypt_users_email(users: list[User]) -> list[User]:
+    for u in users:
+        if u.email:
+            u.email = decrypt_field(u.email, _SCOPE)
+    return users
+
+
+async def _prepare_email(pool: asyncpg.Pool, email: str | None) -> tuple[str | None, str | None]:
+    """Return (stored_email, blind_idx) — encrypting if the scope is active."""
+    if not email:
+        return email, None
+    if await _pii_active(pool):
+        return encrypt_field(email, _SCOPE), blind_index(email)
+    return email, None
+
+
+# ── public API ────────────────────────────────────────────────────────────
 
 
 async def create_user(
@@ -45,7 +82,7 @@ async def create_user(
         role == UserRole.ADMIN,
         role.value,
     )
-    return User.from_row(row)
+    return _decrypt_user_email(User.from_row(row))
 
 
 async def check_lockout(pool: asyncpg.Pool, username: str) -> bool:
@@ -58,7 +95,6 @@ async def check_lockout(pool: asyncpg.Pool, username: str) -> bool:
         return False
     locked = row["locked_until"]
     if locked.tzinfo is None:
-        from datetime import timezone
         locked = locked.replace(tzinfo=UTC)
     return datetime.now(UTC) < locked
 
@@ -103,7 +139,7 @@ async def authenticate_user(
     row = await pool.fetchrow("SELECT * FROM users WHERE username = $1", username)
     if not row:
         return None
-    user = User.from_row(row)
+    user = _decrypt_user_email(User.from_row(row))
     if not verify_password(password, user.hashed_password):
         return None
     return user
@@ -111,12 +147,13 @@ async def authenticate_user(
 
 async def get_user_by_id(pool: asyncpg.Pool, user_id: UUID) -> User | None:
     row = await pool.fetchrow("SELECT * FROM users WHERE id = $1", user_id)
-    return User.from_row(row) if row else None
+    return _decrypt_user_email(User.from_row(row)) if row else None
 
 
 async def list_users(pool: asyncpg.Pool) -> list[User]:
     rows = await pool.fetch("SELECT * FROM users ORDER BY username")
-    return [User.from_row(r) for r in rows]
+    users = [User.from_row(r) for r in rows]
+    return _decrypt_users_email(users)
 
 
 async def update_user_role(pool: asyncpg.Pool, user_id: UUID, role: UserRole) -> User | None:
@@ -127,7 +164,7 @@ async def update_user_role(pool: asyncpg.Pool, user_id: UUID, role: UserRole) ->
         role == UserRole.ADMIN,
         user_id,
     )
-    return User.from_row(row) if row else None
+    return _decrypt_user_email(User.from_row(row)) if row else None
 
 
 async def set_user_active(pool: asyncpg.Pool, user_id: UUID, active: bool) -> User | None:
@@ -136,7 +173,7 @@ async def set_user_active(pool: asyncpg.Pool, user_id: UUID, active: bool) -> Us
         active,
         user_id,
     )
-    return User.from_row(row) if row else None
+    return _decrypt_user_email(User.from_row(row)) if row else None
 
 
 async def delete_user(pool: asyncpg.Pool, user_id: UUID) -> bool:
@@ -146,12 +183,18 @@ async def delete_user(pool: asyncpg.Pool, user_id: UUID) -> bool:
 
 async def get_user_by_oidc_sub(pool: asyncpg.Pool, oidc_sub: str) -> User | None:
     row = await pool.fetchrow("SELECT * FROM users WHERE oidc_sub = $1", oidc_sub)
-    return User.from_row(row) if row else None
+    return _decrypt_user_email(User.from_row(row)) if row else None
 
 
 async def get_user_by_email(pool: asyncpg.Pool, email: str) -> User | None:
-    row = await pool.fetchrow("SELECT * FROM users WHERE email = $1", email)
-    return User.from_row(row) if row else None
+    if await _pii_active(pool):
+        idx = blind_index(email)
+        row = await pool.fetchrow(
+            "SELECT * FROM users WHERE email_blind_idx = $1", idx
+        )
+    else:
+        row = await pool.fetchrow("SELECT * FROM users WHERE email = $1", email)
+    return _decrypt_user_email(User.from_row(row)) if row else None
 
 
 async def create_oidc_user(
@@ -161,19 +204,23 @@ async def create_oidc_user(
     oidc_sub: str,
     role: UserRole = UserRole.VIEWER,
 ) -> User:
+    stored_email, email_idx = await _prepare_email(pool, email)
     row = await pool.fetchrow(
-        """INSERT INTO users (id, username, email, hashed_password, is_active, is_admin, role, oidc_sub)
-           VALUES ($1, $2, $3, $4, true, $5, $6, $7)
+        """INSERT INTO users
+               (id, username, email, email_blind_idx, hashed_password,
+                is_active, is_admin, role, oidc_sub)
+           VALUES ($1, $2, $3, $4, $5, true, $6, $7, $8)
            RETURNING *""",
         uuid.uuid4(),
         username,
-        email,
+        stored_email,
+        email_idx,
         _UNUSABLE_PASSWORD,
         role == UserRole.ADMIN,
         role.value,
         oidc_sub,
     )
-    return User.from_row(row)
+    return _decrypt_user_email(User.from_row(row))
 
 
 async def update_oidc_user(
@@ -188,8 +235,12 @@ async def update_oidc_user(
     params: list = []
     idx = 1
     if email is not None:
+        stored_email, email_idx = await _prepare_email(pool, email)
         sets.append(f"email = ${idx}")
-        params.append(email)
+        params.append(stored_email)
+        idx += 1
+        sets.append(f"email_blind_idx = ${idx}")
+        params.append(email_idx)
         idx += 1
     if role is not None:
         sets.append(f"role = ${idx}")
@@ -207,7 +258,7 @@ async def update_oidc_user(
         f"UPDATE users SET {', '.join(sets)} WHERE id = ${idx} RETURNING *",
         *params,
     )
-    return User.from_row(row) if row else None
+    return _decrypt_user_email(User.from_row(row)) if row else None
 
 
 async def set_person_asset_link(
@@ -218,4 +269,4 @@ async def set_person_asset_link(
         person_asset_id,
         user_id,
     )
-    return User.from_row(row) if row else None
+    return _decrypt_user_email(User.from_row(row)) if row else None

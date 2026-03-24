@@ -34,5 +34,9 @@ class Settings(BaseSettings):
     SSL_CERTFILE: str | None = None
     SSL_KEYFILE: str | None = None
 
+    # Encryption at rest — base64url-encoded 32-byte keys. Empty = disabled.
+    ENCRYPTION_KEY: str = ""
+    ENCRYPTION_KEY_RETIRED: str = ""  # previous key, decrypt-only, for rotation
+
 
 settings = Settings()

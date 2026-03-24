@@ -4,6 +4,9 @@ from uuid import UUID
 
 import asyncpg
 
+from grcen.services import encryption_config
+from grcen.services.encryption import encrypt_field
+
 # Module-level config cache: {entity_type: (enabled, field_level)}
 _config_cache: dict[str, tuple[bool, bool]] | None = None
 
@@ -60,6 +63,43 @@ def delete_snapshot(obj: dict, fields: list[str]) -> dict:
     return {f: {"old": _serialize(obj.get(f))} for f in fields if obj.get(f) is not None}
 
 
+# --- PII sanitization for audit snapshots ---
+
+# Fields covered by encryption scopes that may appear in audit diffs.
+_PII_SCOPE_FIELDS: dict[str, set[str]] = {
+    "user_pii": {"email"},
+    "session_pii": {"ip_address", "user_agent"},
+}
+
+
+async def _sanitize_changes(pool: asyncpg.Pool, changes: dict | None) -> dict | None:
+    """Encrypt PII values inside audit change dicts when audit_pii is active."""
+    if not changes:
+        return changes
+    scopes = await encryption_config.get_active_scopes(pool)
+    if "audit_pii" not in scopes:
+        return changes
+
+    pii_fields: set[str] = set()
+    for scope_name, fields in _PII_SCOPE_FIELDS.items():
+        if scope_name in scopes:
+            pii_fields.update(fields)
+
+    if not pii_fields:
+        return changes
+
+    sanitized = {}
+    for field, val in changes.items():
+        if field in pii_fields and isinstance(val, dict):
+            sanitized[field] = {
+                k: encrypt_field(str(v), "audit_pii") if v is not None else v
+                for k, v in val.items()
+            }
+        else:
+            sanitized[field] = val
+    return sanitized
+
+
 # --- Core logging ---
 
 
@@ -79,6 +119,7 @@ async def log_audit_event(
     if not entry or not entry[0]:  # not enabled
         return
     final_changes = changes if entry[1] else None  # strip if field_level disabled
+    final_changes = await _sanitize_changes(pool, final_changes)
     await pool.execute(
         """INSERT INTO audit_log (user_id, username, action, entity_type, entity_id, entity_name, changes)
            VALUES ($1, $2, $3, $4, $5, $6, $7)""",

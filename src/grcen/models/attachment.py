@@ -19,6 +19,7 @@ class Attachment:
     url_or_path: str | None
     created_at: datetime
     updated_at: datetime
+    encrypted: bool = False
 
     @classmethod
     def from_row(cls, row) -> "Attachment":
@@ -30,4 +31,5 @@ class Attachment:
             url_or_path=row["url_or_path"],
             created_at=row["created_at"],
             updated_at=row["updated_at"],
+            encrypted=row.get("encrypted", False),
         )

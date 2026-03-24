@@ -173,7 +173,7 @@ def cli():
     """CLI entrypoint for management commands."""
     if len(sys.argv) < 2:
         print("Usage: grcen <command>")
-        print("Commands: createadmin, runserver")
+        print("Commands: createadmin, runserver, generate-key, rotate-keys")
         sys.exit(1)
 
     command = sys.argv[1]
@@ -189,6 +189,10 @@ def cli():
             ssl_kwargs["ssl_keyfile"] = settings.SSL_KEYFILE
         port = 8443 if ssl_kwargs else 8000
         uvicorn.run("grcen.main:app", host="0.0.0.0", port=port, reload=settings.DEBUG, **ssl_kwargs)
+    elif command == "generate-key":
+        _generate_key()
+    elif command == "rotate-keys":
+        asyncio.run(_rotate_keys())
     else:
         print(f"Unknown command: {command}")
         sys.exit(1)
@@ -206,4 +210,42 @@ async def _create_admin():
 
     user = await create_user(pool, username, password, role=UserRole.ADMIN)
     print(f"Admin user '{user.username}' created (id={user.id}, role={user.role.value})")
+    await close_pool()
+
+
+def _generate_key():
+    """Print a fresh 32-byte base64url encryption key."""
+    import base64
+    import secrets
+
+    key = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode()
+    print(f"ENCRYPTION_KEY={key}")
+
+
+async def _rotate_keys():
+    """Re-encrypt all active scopes with the current active key."""
+    from grcen.services import encryption_config, encryption_migrate
+    from grcen.services.encryption import is_encryption_enabled
+
+    if not is_encryption_enabled():
+        print("Error: ENCRYPTION_KEY is not set.")
+        sys.exit(1)
+
+    pool = await init_pool()
+    await init_schema()
+
+    active = await encryption_config.get_active_scopes(pool)
+    if not active:
+        print("No encryption scopes are active. Nothing to rotate.")
+        await close_pool()
+        return
+
+    total = 0
+    for scope_name in sorted(active):
+        count = await encryption_migrate.rotate_scope(pool, scope_name)
+        print(f"  {scope_name}: {count} value(s) re-encrypted.")
+        total += count
+
+    print(f"Done. {total} total value(s) rotated.")
+    print("You may now remove ENCRYPTION_KEY_RETIRED from your environment.")
     await close_pool()

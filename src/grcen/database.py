@@ -290,6 +290,29 @@ DO $$ BEGIN
     ALTER TABLE users ADD COLUMN locked_until TIMESTAMPTZ;
 EXCEPTION WHEN duplicate_column THEN NULL;
 END $$;
+
+-- Encryption at rest configuration
+CREATE TABLE IF NOT EXISTS encryption_config (
+    key        VARCHAR(100) PRIMARY KEY,
+    value      TEXT NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Blind index for encrypted email lookups
+DO $$ BEGIN
+    ALTER TABLE users ADD COLUMN email_blind_idx VARCHAR(64);
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+CREATE INDEX IF NOT EXISTS idx_users_email_blind ON users(email_blind_idx);
+
+-- Per-file encryption flag
+DO $$ BEGIN
+    ALTER TABLE attachments ADD COLUMN encrypted BOOLEAN NOT NULL DEFAULT false;
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+
+-- Widen sessions.ip_address to hold encrypted ciphertext
+ALTER TABLE sessions ALTER COLUMN ip_address TYPE TEXT;
 """
 
 

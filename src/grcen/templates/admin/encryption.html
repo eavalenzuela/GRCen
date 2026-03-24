@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% block title %}Encryption Settings - GRCen{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Encryption at Rest</h1>
+</div>
+
+<p><a href="/admin/users">&larr; Back to Users</a></p>
+
+{% if success %}
+<div class="alert" style="background:#dcfce7; color:#166534; border:1px solid #bbf7d0;">
+    {{ success }}
+</div>
+{% endif %}
+{% if error %}
+<div class="alert" style="background:#fee2e2; color:#991b1b; border:1px solid #fecaca;">
+    {{ error }}
+</div>
+{% endif %}
+
+{% if not key_configured %}
+<div class="alert" style="background:#fef3c7; color:#92400e; border:1px solid #fde68a;">
+    <strong>No encryption key configured.</strong>
+    Set the <code>ENCRYPTION_KEY</code> environment variable to enable encryption.
+    Generate a key with: <code>grcen generate-key</code>
+</div>
+{% else %}
+<div class="alert" style="background:#dcfce7; color:#166534; border:1px solid #bbf7d0;">
+    Encryption key is <strong>configured</strong>.
+    {% if active_profile %}
+        Active profile: <strong>{{ all_profiles[active_profile].display_name if active_profile in all_profiles else active_profile }}</strong>
+        ({{ active_scopes | length }} scope{{ "s" if active_scopes | length != 1 else "" }} enabled).
+    {% else %}
+        No profile selected &mdash; encryption is available but no scopes are active.
+    {% endif %}
+</div>
+{% endif %}
+
+<form method="post" action="/admin/encryption" class="card">
+    {% include "partials/csrf.html" %}
+
+    <fieldset {% if not key_configured %}disabled{% endif %}>
+        <h3>Encryption Profile</h3>
+        <p style="color:#6b7280; margin-bottom:1rem;">
+            Profiles bundle scopes that match common compliance requirements.
+        </p>
+
+        {% for pname, profile in all_profiles.items() %}
+        <label style="display:block; margin-bottom:0.75rem; cursor:pointer;">
+            <input type="radio" name="profile" value="{{ pname }}"
+                   {% if active_profile == pname %}checked{% endif %}
+                   onchange="onProfileChange()">
+            <strong>{{ profile.display_name }}</strong>
+            &mdash; {{ profile.description }}
+        </label>
+        {% endfor %}
+
+        <label style="display:block; margin-bottom:0.75rem; cursor:pointer;">
+            <input type="radio" name="profile" value=""
+                   {% if not active_profile %}checked{% endif %}
+                   onchange="onProfileChange()">
+            <strong>Disabled</strong>
+            &mdash; No encryption scopes active.
+        </label>
+
+        <h3 style="margin-top:2rem;">Encryption Scopes</h3>
+        <p style="color:#6b7280; margin-bottom:1rem;">
+            When using the <em>Custom</em> profile, select individual scopes below.
+            For named profiles, scopes are determined by the profile.
+        </p>
+
+        <table class="table">
+            <thead>
+                <tr>
+                    <th style="width:2rem;"></th>
+                    <th>Scope</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sname, scope in all_scopes.items() %}
+                <tr>
+                    <td>
+                        <input type="checkbox" name="scope_{{ sname }}" id="scope_{{ sname }}"
+                               class="scope-checkbox"
+                               {% if sname in active_scopes %}checked{% endif %}>
+                    </td>
+                    <td>
+                        <label for="scope_{{ sname }}" style="font-weight:600; cursor:pointer;">
+                            {{ scope.display_name }}
+                        </label>
+                    </td>
+                    <td>
+                        {{ scope.description }}
+                        {% if scope.warning %}
+                        <br><small style="color:#b45309;">{{ scope.warning }}</small>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </fieldset>
+
+    <div class="form-actions" style="margin-top:1.5rem;">
+        <button type="submit" class="btn btn-primary" {% if not key_configured %}disabled{% endif %}>
+            Apply Changes
+        </button>
+    </div>
+</form>
+
+<div class="card" style="margin-top:2rem;">
+    <h3>Key Management</h3>
+    <p>The encryption key is provided via the <code>ENCRYPTION_KEY</code> environment variable
+       (base64url-encoded, 32 bytes).</p>
+
+    <h4 style="margin-top:1rem;">Generate a key</h4>
+    <pre style="background:#f3f4f6; padding:0.75rem; border-radius:4px; overflow-x:auto;">grcen generate-key</pre>
+
+    <h4 style="margin-top:1rem;">Rotate keys</h4>
+    <ol style="margin-left:1.5rem;">
+        <li>Set <code>ENCRYPTION_KEY</code> to the new key.</li>
+        <li>Set <code>ENCRYPTION_KEY_RETIRED</code> to the old key.</li>
+        <li>Restart the application.</li>
+        <li>Run <code>grcen rotate-keys</code> to re-encrypt all data with the new key.</li>
+        <li>Remove <code>ENCRYPTION_KEY_RETIRED</code> and restart.</li>
+    </ol>
+</div>
+
+<script nonce="{{ request.state.csp_nonce }}">
+var profileScopes = {{ profile_scopes_json | safe }};
+
+function onProfileChange() {
+    var selected = document.querySelector('input[name="profile"]:checked');
+    if (!selected) return;
+    var profile = selected.value;
+    var checkboxes = document.querySelectorAll('.scope-checkbox');
+    var isCustom = (profile === 'custom');
+
+    if (profile && profile !== 'custom' && profileScopes[profile]) {
+        var scopes = profileScopes[profile];
+        checkboxes.forEach(function(cb) {
+            var scopeName = cb.name.replace('scope_', '');
+            cb.checked = scopes.indexOf(scopeName) !== -1;
+            cb.disabled = true;
+            cb.style.opacity = '0.6';
+        });
+    } else if (isCustom) {
+        checkboxes.forEach(function(cb) {
+            cb.disabled = false;
+            cb.style.opacity = '1';
+        });
+    } else {
+        checkboxes.forEach(function(cb) {
+            cb.checked = false;
+            cb.disabled = true;
+            cb.style.opacity = '0.6';
+        });
+    }
+}
+
+document.addEventListener('DOMContentLoaded', onProfileChange);
+</script>
+{% endblock %}

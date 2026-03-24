@@ -13,11 +13,12 @@ async def create_attachment(
     kind: AttachmentKind,
     name: str,
     url_or_path: str | None = None,
+    encrypted: bool = False,
 ) -> Attachment:
     row = await pool.fetchrow(
         """
-        INSERT INTO attachments (id, asset_id, kind, name, url_or_path)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO attachments (id, asset_id, kind, name, url_or_path, encrypted)
+        VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING *
         """,
         uuid.uuid4(),
@@ -25,6 +26,7 @@ async def create_attachment(
         kind.value,
         name,
         url_or_path,
+        encrypted,
     )
     return Attachment.from_row(row)
 

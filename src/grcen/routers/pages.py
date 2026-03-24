@@ -6,21 +6,27 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from grcen.custom_fields import CUSTOM_FIELDS, coerce_value
-from grcen.rate_limit import check_login_rate_limit
 from grcen.models.asset import AssetType
 from grcen.models.user import User
-from grcen.permissions import Permission, has_permission
-from grcen.routers.deps import get_current_user, get_current_user_or_none, get_db, require_permission
+from grcen.permissions import Permission, UserRole, has_permission
+from grcen.rate_limit import check_login_rate_limit
+from grcen.routers.deps import (
+    get_current_user,
+    get_current_user_or_none,
+    get_db,
+    require_permission,
+)
 from grcen.services import alert_service as alert_svc
 from grcen.services import asset as asset_svc
 from grcen.services import attachment as att_svc
-from grcen.services import relationship as rel_svc
-from grcen.permissions import UserRole
-from grcen.services import auth as auth_svc
 from grcen.services import audit_service as audit_svc
-from grcen.services import oidc_settings
+from grcen.services import auth as auth_svc
+from grcen.services import encryption_config, oidc_settings
+from grcen.services import relationship as rel_svc
 from grcen.services import review_service as review_svc
 from grcen.services import risk_service as risk_svc
+from grcen.services.encryption import is_encryption_enabled
+from grcen.services.encryption_scopes import ALL_PROFILES, ALL_SCOPES
 
 # Static mapping: relationship_type -> (outgoing_label, incoming_label)
 RELATIONSHIP_LABELS: dict[str, tuple[str, str]] = {
@@ -1143,7 +1149,8 @@ async def my_tokens_page(
     max_expiry_days = await token_service.get_max_expiry_days(pool)
     available_permissions = sorted(ROLE_PERMISSIONS.get(user.role, set()), key=lambda p: p.value)
     notif_count = await alert_svc.count_unread_notifications(pool)
-    from datetime import UTC, datetime as dt
+    from datetime import UTC
+    from datetime import datetime as dt
 
     return templates.TemplateResponse(request, "tokens/my_tokens.html", context={
             "user": user,
@@ -1165,7 +1172,8 @@ async def my_tokens_create(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    from datetime import UTC, datetime as dt
+    from datetime import UTC
+    from datetime import datetime as dt
 
     from grcen.permissions import ROLE_PERMISSIONS
     from grcen.services import token_service
@@ -1266,7 +1274,8 @@ async def admin_tokens_page(
     users = await auth_svc.list_users(pool)
     users_by_id = {u.id: u for u in users}
     notif_count = await alert_svc.count_unread_notifications(pool)
-    from datetime import UTC, datetime as dt
+    from datetime import UTC
+    from datetime import datetime as dt
 
     return templates.TemplateResponse(request, "admin/tokens.html", context={
             "user": user,
@@ -1334,3 +1343,95 @@ async def admin_token_revoke(
     )
     request.session["token_success"] = f"Token '{token.name}' revoked."
     return RedirectResponse("/admin/tokens", status_code=302)
+
+
+# --- Encryption Settings ---
+
+
+@router.get("/admin/encryption", response_class=HTMLResponse)
+async def admin_encryption(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+):
+    import json as _json
+
+    active_profile = await encryption_config.get_active_profile(pool)
+    active_scopes = await encryption_config.get_active_scopes(pool)
+    notif_count = await alert_svc.count_unread_notifications(pool)
+    success = request.session.pop("enc_success", None)
+    error = request.session.pop("enc_error", None)
+    # Build a JSON map of profile -> scope list for the JS toggle logic.
+    profile_scopes = {
+        p.name: list(p.scope_names) for p in ALL_PROFILES.values()
+    }
+    return templates.TemplateResponse(request, "admin/encryption.html", context={
+        "user": user,
+        "notif_count": notif_count,
+        "key_configured": is_encryption_enabled(),
+        "active_profile": active_profile,
+        "active_scopes": active_scopes,
+        "all_profiles": ALL_PROFILES,
+        "all_scopes": ALL_SCOPES,
+        "profile_scopes_json": _json.dumps(profile_scopes),
+        "success": success,
+        "error": error,
+    })
+
+
+@router.post("/admin/encryption")
+async def admin_encryption_submit(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+):
+    if not is_encryption_enabled():
+        request.session["enc_error"] = (
+            "Encryption key not configured. Set the ENCRYPTION_KEY environment variable."
+        )
+        return RedirectResponse("/admin/encryption", status_code=302)
+
+    form = await request.form()
+    profile = str(form.get("profile", "")).strip()
+
+    custom_scopes: list[str] = []
+    if profile == "custom":
+        for scope_name in ALL_SCOPES:
+            if f"scope_{scope_name}" in form:
+                custom_scopes.append(scope_name)
+
+    # Determine which scopes are changing.
+    old_scopes = await encryption_config.get_active_scopes(pool)
+    new_scopes = await encryption_config.set_profile(pool, profile, custom_scopes)
+
+    # Run migrations for scopes that were added or removed.
+    from grcen.services import encryption_migrate
+
+    added = new_scopes - old_scopes
+    removed = old_scopes - new_scopes
+    migrated = 0
+    for scope_name in added:
+        migrated += await encryption_migrate.migrate_scope(pool, scope_name, encrypt=True)
+    for scope_name in removed:
+        migrated += await encryption_migrate.migrate_scope(pool, scope_name, encrypt=False)
+
+    await audit_svc.log_audit_event(
+        pool,
+        user_id=user.id,
+        username=user.username,
+        action="edit",
+        entity_type="encryption_config",
+        entity_name="encryption",
+        changes={
+            "profile": {"old": await encryption_config.get_active_profile(pool), "new": profile},
+            "scopes": {"old": sorted(old_scopes), "new": sorted(new_scopes)},
+        },
+    )
+
+    parts = []
+    if profile:
+        parts.append(f"Profile set to {profile}.")
+    if migrated:
+        parts.append(f"{migrated} value(s) migrated.")
+    request.session["enc_success"] = " ".join(parts) or "Encryption settings saved."
+    return RedirectResponse("/admin/encryption", status_code=302)
