@@ -134,7 +134,7 @@ def create_app() -> FastAPI:
         if exc.status_code == 403 and "text/html" in request.headers.get("accept", ""):
             from grcen.routers.pages import templates
             return templates.TemplateResponse(
-                "errors/403.html", {"request": request, "user": None}, status_code=403
+                request, "errors/403.html", context={"user": None}, status_code=403
             )
         if exc.status_code == 401 and "text/html" in request.headers.get("accept", ""):
             from fastapi.responses import RedirectResponse
