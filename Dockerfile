@@ -1,5 +1,8 @@
 FROM python:3.12-slim AS builder
 
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    pkg-config libxmlsec1-dev libxmlsec1-openssl && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY src/ src/
@@ -7,7 +10,8 @@ RUN pip install --no-cache-dir .
 
 FROM python:3.12-slim
 
-RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl libxmlsec1 libxmlsec1-openssl && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages

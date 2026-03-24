@@ -313,6 +313,39 @@ END $$;
 
 -- Widen sessions.ip_address to hold encrypted ciphertext
 ALTER TABLE sessions ALTER COLUMN ip_address TYPE TEXT;
+
+-- SAML 2.0 configuration (key-value, mirrors oidc_config)
+CREATE TABLE IF NOT EXISTS saml_config (
+    key         VARCHAR(50) PRIMARY KEY,
+    value       TEXT NOT NULL DEFAULT '',
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Seed default SAML config
+INSERT INTO saml_config (key, value) VALUES
+    ('idp_entity_id', ''),
+    ('idp_sso_url', ''),
+    ('idp_slo_url', ''),
+    ('idp_x509_cert', ''),
+    ('sp_entity_id', ''),
+    ('sp_private_key', ''),
+    ('sp_x509_cert', ''),
+    ('name_id_format', 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress'),
+    ('role_attribute', 'Role'),
+    ('role_mapping', '{}'),
+    ('default_role', 'viewer'),
+    ('display_name', 'SAML SSO'),
+    ('want_assertions_signed', 'true'),
+    ('want_name_id_encrypted', 'false')
+ON CONFLICT (key) DO NOTHING;
+
+-- SAML: stable subject identifier on users
+DO $$ BEGIN
+    ALTER TABLE users ADD COLUMN saml_sub VARCHAR(255);
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+CREATE UNIQUE INDEX IF NOT EXISTS ix_users_saml_sub
+    ON users (saml_sub) WHERE saml_sub IS NOT NULL;
 """
 
 

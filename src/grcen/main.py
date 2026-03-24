@@ -24,6 +24,7 @@ from grcen.routers import (
     org_views,
     pages,
     relationships,
+    saml,
     tokens,
 )
 
@@ -101,6 +102,7 @@ def create_app() -> FastAPI:
     app.include_router(alerts.router)
     app.include_router(auth.router)
     app.include_router(oidc.router)
+    app.include_router(saml.router)
     app.include_router(tokens.router)
 
     # Page routers

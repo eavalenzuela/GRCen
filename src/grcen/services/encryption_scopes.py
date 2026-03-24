@@ -61,12 +61,12 @@ SCOPE_SSO_SECRETS = EncryptionScope(
             filter_key_column="key",
             filter_key_values=("client_secret",),
         ),
-        # Future SAML targets register here:
-        # FieldTarget(
-        #     table="saml_config", column="value",
-        #     filter_key_column="key",
-        #     filter_key_values=("private_key", "signing_cert", "encryption_cert"),
-        # ),
+        FieldTarget(
+            table="saml_config",
+            column="value",
+            filter_key_column="key",
+            filter_key_values=("sp_private_key",),
+        ),
     ),
 )
 

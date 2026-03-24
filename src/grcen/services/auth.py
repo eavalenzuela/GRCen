@@ -261,6 +261,75 @@ async def update_oidc_user(
     return _decrypt_user_email(User.from_row(row)) if row else None
 
 
+async def get_user_by_saml_sub(pool: asyncpg.Pool, saml_sub: str) -> User | None:
+    row = await pool.fetchrow("SELECT * FROM users WHERE saml_sub = $1", saml_sub)
+    return _decrypt_user_email(User.from_row(row)) if row else None
+
+
+async def create_saml_user(
+    pool: asyncpg.Pool,
+    username: str,
+    email: str | None,
+    saml_sub: str,
+    role: UserRole = UserRole.VIEWER,
+) -> User:
+    stored_email, email_idx = await _prepare_email(pool, email)
+    row = await pool.fetchrow(
+        """INSERT INTO users
+               (id, username, email, email_blind_idx, hashed_password,
+                is_active, is_admin, role, saml_sub)
+           VALUES ($1, $2, $3, $4, $5, true, $6, $7, $8)
+           RETURNING *""",
+        uuid.uuid4(),
+        username,
+        stored_email,
+        email_idx,
+        _UNUSABLE_PASSWORD,
+        role == UserRole.ADMIN,
+        role.value,
+        saml_sub,
+    )
+    return _decrypt_user_email(User.from_row(row))
+
+
+async def update_saml_user(
+    pool: asyncpg.Pool,
+    user_id: UUID,
+    *,
+    email: str | None = None,
+    role: UserRole | None = None,
+    saml_sub: str | None = None,
+) -> User | None:
+    sets = ["updated_at = now()"]
+    params: list = []
+    idx = 1
+    if email is not None:
+        stored_email, email_idx = await _prepare_email(pool, email)
+        sets.append(f"email = ${idx}")
+        params.append(stored_email)
+        idx += 1
+        sets.append(f"email_blind_idx = ${idx}")
+        params.append(email_idx)
+        idx += 1
+    if role is not None:
+        sets.append(f"role = ${idx}")
+        params.append(role.value)
+        idx += 1
+        sets.append(f"is_admin = ${idx}")
+        params.append(role == UserRole.ADMIN)
+        idx += 1
+    if saml_sub is not None:
+        sets.append(f"saml_sub = ${idx}")
+        params.append(saml_sub)
+        idx += 1
+    params.append(user_id)
+    row = await pool.fetchrow(
+        f"UPDATE users SET {', '.join(sets)} WHERE id = ${idx} RETURNING *",
+        *params,
+    )
+    return _decrypt_user_email(User.from_row(row)) if row else None
+
+
 async def set_person_asset_link(
     pool: asyncpg.Pool, user_id: UUID, person_asset_id: UUID | None
 ) -> User | None:

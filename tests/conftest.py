@@ -104,6 +104,21 @@ async def clean_tables(pool):
     """)
     from grcen.services import oidc_settings
     oidc_settings._cache = None
+    # Reset SAML config to defaults
+    await pool.execute("DELETE FROM saml_config")
+    await pool.execute("""
+        INSERT INTO saml_config (key, value) VALUES
+            ('idp_entity_id', ''), ('idp_sso_url', ''), ('idp_slo_url', ''),
+            ('idp_x509_cert', ''), ('sp_entity_id', ''), ('sp_private_key', ''),
+            ('sp_x509_cert', ''),
+            ('name_id_format', 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress'),
+            ('role_attribute', 'Role'), ('role_mapping', '{}'),
+            ('default_role', 'viewer'), ('display_name', 'SAML SSO'),
+            ('want_assertions_signed', 'true'), ('want_name_id_encrypted', 'false')
+        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+    """)
+    from grcen.services import saml_settings as _saml_settings
+    _saml_settings._cache = None
     # Reset encryption config cache
     from grcen.services import encryption_config as _enc_cfg
     _enc_cfg._cache = None

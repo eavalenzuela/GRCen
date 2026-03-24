@@ -18,10 +18,17 @@
         </div>
         <button type="submit" class="btn btn-primary" style="width:100%">Login</button>
     </form>
-    {% if oidc_enabled %}
+    {% if oidc_enabled or saml_enabled %}
     <div style="text-align:center; margin:1.5rem 0; color:var(--text-muted)">or</div>
+    {% endif %}
+    {% if oidc_enabled %}
     <a href="/auth/oidc/login" class="btn" style="width:100%; text-align:center; display:block;">
         Sign in with {{ oidc_display_name }}
+    </a>
+    {% endif %}
+    {% if saml_enabled %}
+    <a href="/auth/saml/login" class="btn" style="width:100%; text-align:center; display:block; {% if oidc_enabled %}margin-top:0.5rem;{% endif %}">
+        Sign in with {{ saml_display_name }}
     </a>
     {% endif %}
 </div>

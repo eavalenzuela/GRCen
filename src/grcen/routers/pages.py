@@ -21,7 +21,7 @@ from grcen.services import asset as asset_svc
 from grcen.services import attachment as att_svc
 from grcen.services import audit_service as audit_svc
 from grcen.services import auth as auth_svc
-from grcen.services import encryption_config, oidc_settings
+from grcen.services import encryption_config, oidc_settings, saml_settings
 from grcen.services import relationship as rel_svc
 from grcen.services import review_service as review_svc
 from grcen.services import risk_service as risk_svc
@@ -151,6 +151,18 @@ def _extract_metadata(form, asset_type: AssetType) -> dict:
 # --- Auth pages ---
 
 
+async def _sso_context(pool: asyncpg.Pool) -> dict:
+    """Gather SSO provider state for the login template."""
+    oidc_cfg = await oidc_settings.get_settings(pool)
+    saml_cfg = await saml_settings.get_settings(pool)
+    return {
+        "oidc_enabled": oidc_cfg.enabled,
+        "oidc_display_name": oidc_cfg.display_name,
+        "saml_enabled": saml_cfg.enabled,
+        "saml_display_name": saml_cfg.display_name,
+    }
+
+
 @router.get("/login", response_class=HTMLResponse)
 async def login_page(
     request: Request,
@@ -159,11 +171,9 @@ async def login_page(
 ):
     if user:
         return RedirectResponse("/", status_code=302)
-    oidc_cfg = await oidc_settings.get_settings(pool)
-    return templates.TemplateResponse(request, "auth/login.html", context={
-        "oidc_enabled": oidc_cfg.enabled,
-        "oidc_display_name": oidc_cfg.display_name,
-    })
+    return templates.TemplateResponse(
+        request, "auth/login.html", context=await _sso_context(pool)
+    )
 
 
 @router.post("/login")
@@ -177,12 +187,10 @@ async def login_submit(request: Request, pool: asyncpg.Pool = Depends(get_db), _
 
     # Check lockout
     if await auth_svc.check_lockout(pool, username):
-        oidc_cfg = await oidc_settings.get_settings(pool)
-        return templates.TemplateResponse(request, "auth/login.html", context={
-                "error": "Too many failed attempts. Try again later.",
-                "oidc_enabled": oidc_cfg.enabled,
-                "oidc_display_name": oidc_cfg.display_name,
-            }
+        ctx = await _sso_context(pool)
+        ctx["error"] = "Too many failed attempts. Try again later."
+        return templates.TemplateResponse(
+            request, "auth/login.html", context=ctx
         )
 
     user = await auth_svc.authenticate_user(pool, username, password)
@@ -192,12 +200,10 @@ async def login_submit(request: Request, pool: asyncpg.Pool = Depends(get_db), _
             app_settings.LOGIN_MAX_FAILED_ATTEMPTS,
             app_settings.LOGIN_LOCKOUT_MINUTES,
         )
-        oidc_cfg = await oidc_settings.get_settings(pool)
-        return templates.TemplateResponse(request, "auth/login.html", context={
-                "error": "Invalid credentials",
-                "oidc_enabled": oidc_cfg.enabled,
-                "oidc_display_name": oidc_cfg.display_name,
-            }
+        ctx = await _sso_context(pool)
+        ctx["error"] = "Invalid credentials"
+        return templates.TemplateResponse(
+            request, "auth/login.html", context=ctx
         )
 
     await auth_svc.record_successful_login(pool, user.id)
@@ -1130,6 +1136,63 @@ async def admin_oidc_settings_submit(
     reset_oauth()
 
     return RedirectResponse("/admin/oidc-settings", status_code=302)
+
+
+# --- SAML Settings ---
+
+
+@router.get("/admin/saml-settings", response_class=HTMLResponse)
+async def admin_saml_settings(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+):
+    saml_cfg = await saml_settings.get_settings(pool)
+    notif_count = await alert_svc.count_unread_notifications(pool)
+    return templates.TemplateResponse(
+        request,
+        "admin/saml_settings.html",
+        context={
+            "user": user,
+            "saml": saml_cfg,
+            "roles": list(UserRole),
+            "notif_count": notif_count,
+        },
+    )
+
+
+@router.post("/admin/saml-settings")
+async def admin_saml_settings_submit(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+):
+    form = await request.form()
+
+    # Preserve existing private key if the placeholder was submitted.
+    sp_private_key = str(form.get("sp_private_key", "")).strip()
+    if sp_private_key == "********":
+        current = await saml_settings.get_settings(pool)
+        sp_private_key = current.sp_private_key
+
+    await saml_settings.update_settings(
+        pool,
+        idp_entity_id=str(form.get("idp_entity_id", "")).strip(),
+        idp_sso_url=str(form.get("idp_sso_url", "")).strip(),
+        idp_slo_url=str(form.get("idp_slo_url", "")).strip(),
+        idp_x509_cert=str(form.get("idp_x509_cert", "")).strip(),
+        sp_entity_id=str(form.get("sp_entity_id", "")).strip(),
+        sp_x509_cert=str(form.get("sp_x509_cert", "")).strip(),
+        sp_private_key=sp_private_key,
+        name_id_format=str(form.get("name_id_format", "")).strip(),
+        role_attribute=str(form.get("role_attribute", "Role")).strip(),
+        role_mapping=str(form.get("role_mapping", "{}")).strip(),
+        default_role=str(form.get("default_role", "viewer")).strip(),
+        display_name=str(form.get("display_name", "SAML SSO")).strip(),
+        want_assertions_signed="true" if "want_assertions_signed" in form else "false",
+        want_name_id_encrypted="true" if "want_name_id_encrypted" in form else "false",
+    )
+    return RedirectResponse("/admin/saml-settings", status_code=302)
 
 
 # --- Token management pages ---
