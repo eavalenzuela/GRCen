@@ -6,6 +6,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from grcen.custom_fields import CUSTOM_FIELDS, coerce_value
+from grcen.rate_limit import check_login_rate_limit
 from grcen.models.asset import AssetType
 from grcen.models.user import User
 from grcen.permissions import Permission, has_permission
@@ -85,7 +86,46 @@ templates.env.globals["has_perm"] = has_permission
 templates.env.globals["Permission"] = Permission
 templates.env.globals["rel_label"] = _rel_direction_label
 
-router = APIRouter(tags=["pages"])
+async def _csrf_check(request: Request):
+    """Verify CSRF token on POST form submissions.
+
+    Accepts the token from either:
+    - A ``csrf_token`` form field (standard HTML forms)
+    - The ``X-CSRF-Token`` header (useful for programmatic clients)
+    """
+    if request.method != "POST":
+        return
+
+    expected = request.session.get("csrf_token", "")
+    if not expected:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="CSRF token mismatch")
+
+    # Check header first (e.g. from test clients or JS fetch)
+    header_token = request.headers.get("x-csrf-token", "")
+    if header_token:
+        import hmac
+        if hmac.compare_digest(str(header_token), str(expected)):
+            return
+
+    # Fall back to form field
+    content_type = request.headers.get("content-type", "")
+    is_form = (
+        "application/x-www-form-urlencoded" in content_type
+        or "multipart/form-data" in content_type
+    )
+    if is_form:
+        form = await request.form()
+        submitted = form.get("csrf_token", "")
+        import hmac
+        if submitted and hmac.compare_digest(str(submitted), str(expected)):
+            return
+
+    from fastapi import HTTPException
+    raise HTTPException(status_code=403, detail="CSRF token mismatch")
+
+
+router = APIRouter(tags=["pages"], dependencies=[Depends(_csrf_check)])
 
 
 def _extract_metadata(form, asset_type: AssetType) -> dict:
@@ -121,12 +161,31 @@ async def login_page(
 
 
 @router.post("/login")
-async def login_submit(request: Request, pool: asyncpg.Pool = Depends(get_db)):
+async def login_submit(request: Request, pool: asyncpg.Pool = Depends(get_db), _rl=Depends(check_login_rate_limit)):
+    from grcen.config import settings as app_settings
+    from grcen.services import session_service
+
     form = await request.form()
-    username = form.get("username", "")
-    password = form.get("password", "")
-    user = await auth_svc.authenticate_user(pool, str(username), str(password))
+    username = str(form.get("username", ""))
+    password = str(form.get("password", ""))
+
+    # Check lockout
+    if await auth_svc.check_lockout(pool, username):
+        oidc_cfg = await oidc_settings.get_settings(pool)
+        return templates.TemplateResponse(request, "auth/login.html", context={
+                "error": "Too many failed attempts. Try again later.",
+                "oidc_enabled": oidc_cfg.enabled,
+                "oidc_display_name": oidc_cfg.display_name,
+            }
+        )
+
+    user = await auth_svc.authenticate_user(pool, username, password)
     if not user:
+        await auth_svc.record_failed_login(
+            pool, username,
+            app_settings.LOGIN_MAX_FAILED_ATTEMPTS,
+            app_settings.LOGIN_LOCKOUT_MINUTES,
+        )
         oidc_cfg = await oidc_settings.get_settings(pool)
         return templates.TemplateResponse(request, "auth/login.html", context={
                 "error": "Invalid credentials",
@@ -134,7 +193,19 @@ async def login_submit(request: Request, pool: asyncpg.Pool = Depends(get_db)):
                 "oidc_display_name": oidc_cfg.display_name,
             }
         )
-    request.session["user_id"] = str(user.id)
+
+    await auth_svc.record_successful_login(pool, user.id)
+
+    # Session fixation prevention: clear old session, create server-side session
+    request.session.clear()
+    session_id = await session_service.create_session(
+        pool,
+        user.id,
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+    )
+    request.session["session_id"] = session_id
+
     await audit_svc.log_audit_event(
         pool,
         user_id=user.id,
@@ -149,7 +220,12 @@ async def login_submit(request: Request, pool: asyncpg.Pool = Depends(get_db)):
 
 @router.get("/logout")
 async def logout(request: Request, pool: asyncpg.Pool = Depends(get_db)):
+    from grcen.services import session_service
+
     oidc_id_token = request.session.get("oidc_id_token")
+    session_id = request.session.get("session_id")
+    if session_id:
+        await session_service.invalidate_session(pool, session_id)
     request.session.clear()
 
     oidc_cfg = await oidc_settings.get_settings(pool)
@@ -529,13 +605,17 @@ async def owner_search(
     results = await asset_svc.search_assets(
         pool, q, types=[AssetType.PERSON, AssetType.ORGANIZATIONAL_UNIT],
     )
+    from html import escape
     html = ""
     for a in results[:10]:
         label = a.type.value.replace("_", " ").title()
+        safe_name = escape(a.name, quote=True)
+        # Use data attributes instead of inline JS to prevent XSS
         html += (
             f'<div class="autocomplete-item" '
-            f"onclick=\"selectOwner('{a.id}', '{a.name}')\">"
-            f"{a.name} <small>({label})</small></div>"
+            f'data-id="{a.id}" data-name="{safe_name}" '
+            f'onclick="selectOwner(this.dataset.id, this.dataset.name)">'
+            f"{safe_name} <small>({label})</small></div>"
         )
     if not html:
         html = '<div class="autocomplete-item" style="color:var(--text-muted)">No results</div>'

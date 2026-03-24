@@ -73,7 +73,20 @@ def create_app() -> FastAPI:
         redoc_url=None,
     )
 
-    app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
+    from grcen.middleware import SecurityHeadersMiddleware
+
+    # When TLS is configured (directly or behind a proxy), redirect HTTP→HTTPS and set HSTS
+    if settings.SSL_CERTFILE or not settings.DEBUG:
+        from grcen.middleware import HTTPSRedirectMiddleware
+        app.add_middleware(HTTPSRedirectMiddleware)
+
+    app.add_middleware(SecurityHeadersMiddleware)
+    app.add_middleware(
+        SessionMiddleware,
+        secret_key=settings.SECRET_KEY,
+        https_only=not settings.DEBUG,
+        same_site="lax",
+    )
 
     app.mount("/static", StaticFiles(directory="src/grcen/static"), name="static")
 
@@ -170,7 +183,12 @@ def cli():
     elif command == "runserver":
         import uvicorn
 
-        uvicorn.run("grcen.main:app", host="0.0.0.0", port=8000, reload=settings.DEBUG)
+        ssl_kwargs = {}
+        if settings.SSL_CERTFILE and settings.SSL_KEYFILE:
+            ssl_kwargs["ssl_certfile"] = settings.SSL_CERTFILE
+            ssl_kwargs["ssl_keyfile"] = settings.SSL_KEYFILE
+        port = 8443 if ssl_kwargs else 8000
+        uvicorn.run("grcen.main:app", host="0.0.0.0", port=port, reload=settings.DEBUG, **ssl_kwargs)
     else:
         print(f"Unknown command: {command}")
         sys.exit(1)

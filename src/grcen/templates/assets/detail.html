@@ -12,6 +12,7 @@
         {% endif %}
         {% if has_perm(user.role, Permission.CREATE) %}
         <form method="post" action="/assets/{{ asset.id }}/clone" style="display:inline">
+            {% include "partials/csrf.html" %}
             <label style="font-size:0.8rem;cursor:pointer;">
                 <input type="checkbox" name="clone_relationships" style="vertical-align:middle;"> + rels
             </label>
@@ -21,6 +22,7 @@
         {% if has_perm(user.role, Permission.DELETE) %}
         <form method="post" action="/assets/{{ asset.id }}/delete" style="display:inline"
               onsubmit="return confirm('Delete this asset?')">
+            {% include "partials/csrf.html" %}
             <button type="submit" class="btn btn-danger">Delete</button>
         </form>
         {% endif %}

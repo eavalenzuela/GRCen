@@ -36,7 +36,7 @@
 
 {% block scripts %}
 <script src="/static/js/org_tree.js"></script>
-<script>
+<script nonce="{{ request.state.csp_nonce }}">
 (function() {
     // Tab switching
     const tabs = document.querySelectorAll('.org-tab');

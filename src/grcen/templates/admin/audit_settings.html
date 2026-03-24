@@ -6,6 +6,7 @@
 <p><a href="/admin/audit">&larr; Back to Audit Log</a></p>
 
 <form method="post" action="/admin/audit/settings">
+    {% include "partials/csrf.html" %}
     <table class="table">
         <thead>
             <tr>
@@ -37,7 +38,7 @@
     <button type="submit" class="btn" style="margin-top:1rem;">Save Settings</button>
 </form>
 
-<script>
+<script nonce="{{ request.state.csp_nonce }}">
 function toggleFieldLevel(entityType) {
     var enabled = document.getElementById('enabled_' + entityType);
     var fieldLevel = document.getElementById('field_level_' + entityType);

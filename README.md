@@ -56,6 +56,10 @@ grcen runserver
 
 The app will be available at `http://localhost:8000`. Database tables are created automatically on startup.
 
+## Configuring HTTPS
+
+GRCen supports HTTPS via an nginx reverse proxy (recommended for production) or direct TLS termination. See **[configure_https.md](configure_https.md)** for detailed setup instructions.
+
 ## SSO/OIDC Configuration
 
 GRCen supports any OIDC-compliant identity provider. SSO is configured entirely from the admin UI — no environment variables needed.

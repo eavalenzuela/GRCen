@@ -19,6 +19,7 @@
 {% endif %}
 
 <form method="post" action="/admin/oidc-settings" class="card">
+    {% include "partials/csrf.html" %}
     <h3>Provider</h3>
     <div class="form-group">
         <label for="issuer_url">Issuer URL</label>

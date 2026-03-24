@@ -10,6 +10,7 @@
 {% endif %}
 
 <form method="post" action="{{ '/admin/users/' ~ edit_user.id ~ '/edit' if edit_user else '/admin/users/new' }}">
+    {% include "partials/csrf.html" %}
     <div class="form-group">
         <label for="username">Username</label>
         {% if edit_user %}

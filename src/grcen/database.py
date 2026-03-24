@@ -265,6 +265,31 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_column THEN NULL;
 END $$;
 CREATE INDEX IF NOT EXISTS idx_assets_tags ON assets USING gin (tags);
+
+-- Server-side sessions
+CREATE TABLE IF NOT EXISTS sessions (
+    session_id  VARCHAR(64) PRIMARY KEY,
+    user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    last_active TIMESTAMPTZ NOT NULL DEFAULT now(),
+    ip_address  VARCHAR(45),
+    user_agent  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+
+-- Login tracking and lockout columns
+DO $$ BEGIN
+    ALTER TABLE users ADD COLUMN last_login TIMESTAMPTZ;
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+DO $$ BEGIN
+    ALTER TABLE users ADD COLUMN failed_login_count INTEGER NOT NULL DEFAULT 0;
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+DO $$ BEGIN
+    ALTER TABLE users ADD COLUMN locked_until TIMESTAMPTZ;
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
 """
 
 
@@ -296,7 +321,17 @@ async def get_pool() -> asyncpg.Pool:
 
 
 async def init_schema() -> None:
-    """Create all tables and types if they don't already exist."""
+    """Create all tables and types if they don't already exist.
+
+    Uses a PostgreSQL advisory lock to prevent deadlocks when multiple
+    workers start simultaneously (e.g. Gunicorn with multiple uvicorn workers).
+    """
     p = await get_pool()
-    await p.execute(SCHEMA_SQL)
-    await p.execute(MIGRATION_SQL)
+    async with p.acquire() as conn:
+        # Advisory lock ID 1 — only one connection runs migrations at a time
+        await conn.execute("SELECT pg_advisory_lock(1)")
+        try:
+            await conn.execute(SCHEMA_SQL)
+            await conn.execute(MIGRATION_SQL)
+        finally:
+            await conn.execute("SELECT pg_advisory_unlock(1)")

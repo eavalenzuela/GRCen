@@ -28,25 +28,28 @@ async def viewer_user(pool):
 
 @pytest_asyncio.fixture
 async def admin_session(pool, admin_user):
+    from tests.conftest import login_with_csrf
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
-        await c.post("/login", data={"username": admin_user.username, "password": "testpass"})
+        await login_with_csrf(c, admin_user.username, "testpass")
         yield c
 
 
 @pytest_asyncio.fixture
 async def editor_session(pool, editor_user):
+    from tests.conftest import login_with_csrf
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
-        await c.post("/login", data={"username": editor_user.username, "password": "testpass"})
+        await login_with_csrf(c, editor_user.username, "testpass")
         yield c
 
 
 @pytest_asyncio.fixture
 async def viewer_session(pool, viewer_user):
+    from tests.conftest import login_with_csrf
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
-        await c.post("/login", data={"username": viewer_user.username, "password": "testpass"})
+        await login_with_csrf(c, viewer_user.username, "testpass")
         yield c
 
 
@@ -106,7 +109,7 @@ async def test_empty_permissions_rejected(admin_session, pool):
     resp = await admin_session.post(
         "/api/tokens/", json={"name": "empty", "permissions": []},
     )
-    assert resp.status_code == 400
+    assert resp.status_code == 422
 
 
 @pytest.mark.asyncio
@@ -114,7 +117,7 @@ async def test_unknown_permission_rejected(admin_session, pool):
     resp = await admin_session.post(
         "/api/tokens/", json={"name": "bad", "permissions": ["nonexistent"]},
     )
-    assert resp.status_code == 400
+    assert resp.status_code == 422
 
 
 # --- Bearer token authentication ---
@@ -260,9 +263,10 @@ async def test_admin_can_list_all_tokens(pool, admin_user, editor_user):
     await token_service.create_token(pool, admin_user.id, "admin-t", ["view"])
     await token_service.create_token(pool, editor_user.id, "editor-t", ["view"])
 
+    from tests.conftest import login_with_csrf
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
-        await c.post("/login", data={"username": admin_user.username, "password": "testpass"})
+        await login_with_csrf(c, admin_user.username, "testpass")
         resp = await c.get("/api/tokens/all")
         assert resp.status_code == 200
         names = {t["name"] for t in resp.json()}
@@ -277,9 +281,10 @@ async def test_admin_can_revoke_other_admins_token(pool):
 
     token, _ = await token_service.create_token(pool, admin2.id, "a2-token", ["view"])
 
+    from tests.conftest import login_with_csrf
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
-        await c.post("/login", data={"username": admin1.username, "password": "testpass"})
+        await login_with_csrf(c, admin1.username, "testpass")
         resp = await c.delete(f"/api/tokens/all/{token.id}")
         assert resp.status_code == 204
 

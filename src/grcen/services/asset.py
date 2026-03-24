@@ -119,7 +119,11 @@ async def list_assets(
         idx += 1
 
     if metadata_filters:
+        import re
         for key, value in metadata_filters.items():
+            # Validate key is a safe identifier to prevent SQL injection
+            if not re.match(r"^[a-zA-Z0-9_\-]+$", key):
+                continue
             where_parts.append(f"a.metadata->>'{key}' = ${idx}")
             vals.append(value)
             idx += 1

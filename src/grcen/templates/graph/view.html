@@ -25,7 +25,7 @@
 {% block scripts %}
 <script src="/static/js/cytoscape.min.js"></script>
 <script src="/static/js/graph.js"></script>
-<script>
+<script nonce="{{ request.state.csp_nonce }}">
     initGraph('{{ asset.id }}', 1);
     document.getElementById('depth-select').addEventListener('change', function() {
         initGraph('{{ asset.id }}', parseInt(this.value));

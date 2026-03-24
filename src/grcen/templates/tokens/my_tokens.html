@@ -24,6 +24,7 @@
 
 <h2>Create New Token</h2>
 <form method="post" action="/tokens">
+    {% include "partials/csrf.html" %}
     <div class="form-group">
         <label for="name">Token Name</label>
         <input type="text" id="name" name="name" required placeholder="e.g. CI pipeline, monitoring script">
@@ -95,6 +96,7 @@
                 {% if not t.revoked %}
                 <form method="post" action="/tokens/{{ t.id }}/revoke" style="display:inline"
                       onsubmit="return confirm('Revoke token {{ t.name }}?')">
+                    {% include "partials/csrf.html" %}
                     <button type="submit" class="btn btn-sm btn-danger">Revoke</button>
                 </form>
                 {% endif %}

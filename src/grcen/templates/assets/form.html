@@ -4,6 +4,7 @@
 <h1>{% if asset %}Edit {{ asset.name }}{% else %}New Asset{% endif %}</h1>
 
 <form method="post" action="{% if asset %}/assets/{{ asset.id }}/edit{% else %}/assets/new{% endif %}">
+    {% include "partials/csrf.html" %}
     {% if not asset %}
     <div class="form-group">
         <label for="type">Type</label>
@@ -135,7 +136,7 @@
     </div>
 </form>
 
-<script>
+<script nonce="{{ request.state.csp_nonce }}">
 function selectOwner(id, name) {
     document.getElementById('owner_search').value = name;
     document.getElementById('owner_id').value = id;

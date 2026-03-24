@@ -48,6 +48,55 @@ async def create_user(
     return User.from_row(row)
 
 
+async def check_lockout(pool: asyncpg.Pool, username: str) -> bool:
+    """Return True if the user account is currently locked out."""
+    from datetime import UTC, datetime
+    row = await pool.fetchrow(
+        "SELECT locked_until FROM users WHERE username = $1", username
+    )
+    if not row or not row["locked_until"]:
+        return False
+    locked = row["locked_until"]
+    if locked.tzinfo is None:
+        from datetime import timezone
+        locked = locked.replace(tzinfo=UTC)
+    return datetime.now(UTC) < locked
+
+
+async def record_failed_login(
+    pool: asyncpg.Pool, username: str, max_attempts: int, lockout_minutes: int
+) -> None:
+    """Increment failed login count and lock the account if threshold is reached."""
+    from datetime import UTC, datetime, timedelta
+    await pool.execute(
+        """UPDATE users
+           SET failed_login_count = failed_login_count + 1,
+               locked_until = CASE
+                   WHEN failed_login_count + 1 >= $2
+                   THEN $3
+                   ELSE locked_until
+               END,
+               updated_at = now()
+           WHERE username = $1""",
+        username,
+        max_attempts,
+        datetime.now(UTC) + timedelta(minutes=lockout_minutes),
+    )
+
+
+async def record_successful_login(pool: asyncpg.Pool, user_id: UUID) -> None:
+    """Reset failed login counters and set last_login timestamp."""
+    from datetime import UTC, datetime
+    await pool.execute(
+        """UPDATE users
+           SET failed_login_count = 0, locked_until = NULL,
+               last_login = $1, updated_at = now()
+           WHERE id = $2""",
+        datetime.now(UTC),
+        user_id,
+    )
+
+
 async def authenticate_user(
     pool: asyncpg.Pool, username: str, password: str
 ) -> User | None:

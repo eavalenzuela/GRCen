@@ -1,0 +1,35 @@
+# Production deployment with nginx TLS termination
+#
+# Usage:
+#   1. Place your TLS cert/key in ./deploy/ssl/ (fullchain.pem, privkey.pem)
+#   2. Update deploy/nginx.conf with your domain name
+#   3. Run: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# For direct TLS (without nginx), use the base docker-compose.yml with:
+#   SSL_CERTFILE=/certs/fullchain.pem SSL_KEYFILE=/certs/privkey.pem
+#   and mount your certs volume.
+
+services:
+  app:
+    ports:
+      - "8000"  # Internal only — nginx handles external traffic
+    environment:
+      DEBUG: "false"
+      SECRET_KEY: "${SECRET_KEY:?Set SECRET_KEY in .env}"
+
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./deploy/ssl:/etc/nginx/ssl:ro
+      - ./src/grcen/static:/app/src/grcen/static:ro
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  uploads:

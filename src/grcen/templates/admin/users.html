@@ -34,12 +34,14 @@
                 <a href="/admin/users/{{ u.id }}/edit" class="btn btn-sm">Edit</a>
                 {% if u.id != user.id %}
                 <form method="post" action="/admin/users/{{ u.id }}/toggle-active" style="display:inline">
+                    {% include "partials/csrf.html" %}
                     <button type="submit" class="btn btn-sm">
                         {{ "Deactivate" if u.is_active else "Activate" }}
                     </button>
                 </form>
                 <form method="post" action="/admin/users/{{ u.id }}/delete" style="display:inline"
                       onsubmit="return confirm('Delete user {{ u.username }}?')">
+                    {% include "partials/csrf.html" %}
                     <button type="submit" class="btn btn-sm btn-danger">Delete</button>
                 </form>
                 {% endif %}

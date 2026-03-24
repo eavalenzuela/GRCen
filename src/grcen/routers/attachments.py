@@ -52,6 +52,16 @@ async def create_attachment(
     return AttachmentResponse.model_validate(att, from_attributes=True)
 
 
+def _sanitize_filename(raw: str | None) -> str:
+    """Strip directory components and dangerous characters from an upload filename."""
+    name = os.path.basename(raw or "uploaded_file")
+    # Keep only safe characters
+    import re
+    name = re.sub(r"[^a-zA-Z0-9._\-]", "_", name)
+    # Truncate the original portion to 200 chars
+    return name[:200]
+
+
 @router.post("/upload", response_model=AttachmentResponse, status_code=201)
 async def upload_file(
     asset_id: UUID,
@@ -59,13 +69,41 @@ async def upload_file(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.CREATE)),
 ):
+    # Content-type allowlist
+    allowed_types = {t.strip() for t in settings.ALLOWED_UPLOAD_TYPES.split(",")}
+    if file.content_type and file.content_type not in allowed_types:
+        raise HTTPException(status_code=415, detail="File type not allowed")
+
     upload_dir = os.path.join(settings.UPLOAD_DIR, str(asset_id))
     os.makedirs(upload_dir, exist_ok=True)
 
-    filename = f"{uuid_mod.uuid4()}_{file.filename}"
+    safe_name = _sanitize_filename(file.filename)
+    filename = f"{uuid_mod.uuid4()}_{safe_name}"
     filepath = os.path.join(upload_dir, filename)
 
-    content = await file.read()
+    # Path traversal check
+    real_upload_dir = os.path.realpath(upload_dir)
+    real_filepath = os.path.realpath(filepath)
+    if not real_filepath.startswith(real_upload_dir + os.sep):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    # Chunked read with size limit
+    max_bytes = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = await file.read(64 * 1024)  # 64 KB chunks
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > max_bytes:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File exceeds maximum size of {settings.MAX_UPLOAD_SIZE_MB} MB",
+            )
+        chunks.append(chunk)
+    content = b"".join(chunks)
+
     with open(filepath, "wb") as f:
         f.write(content)
 
@@ -97,7 +135,7 @@ async def delete_attachment(
     user: User = Depends(require_permission(Permission.DELETE)),
 ):
     old = await att_svc.get_attachment(pool, att_id)
-    if not old:
+    if not old or old.asset_id != asset_id:
         raise HTTPException(status_code=404, detail="Attachment not found")
     deleted = await att_svc.delete_attachment(pool, att_id)
     if not deleted:

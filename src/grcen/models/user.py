@@ -17,6 +17,9 @@ class User:
     oidc_sub: str | None = None
     person_asset_id: UUID | None = None
     email: str | None = None
+    last_login: datetime | None = None
+    failed_login_count: int = 0
+    locked_until: datetime | None = None
 
     @property
     def is_admin(self) -> bool:
@@ -39,4 +42,7 @@ class User:
             oidc_sub=row.get("oidc_sub"),
             person_asset_id=row.get("person_asset_id"),
             email=row.get("email"),
+            last_login=row.get("last_login"),
+            failed_login_count=row.get("failed_login_count", 0),
+            locked_until=row.get("locked_until"),
         )

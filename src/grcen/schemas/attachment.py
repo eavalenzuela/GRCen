@@ -1,15 +1,15 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from grcen.models.attachment import AttachmentKind
 
 
 class AttachmentCreate(BaseModel):
     kind: AttachmentKind
-    name: str
-    url_or_path: str | None = None
+    name: str = Field(min_length=1, max_length=255)
+    url_or_path: str | None = Field(default=None, max_length=2048)
 
 
 class AttachmentResponse(BaseModel):
