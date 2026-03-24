@@ -19,7 +19,8 @@ GRCen is purpose-built to map assets (organizational assets, not just physical o
 - **Asset cloning** — Duplicate any asset with a single click, optionally including all its relationships.
 - **Schedulable alerts** — Set reminders for annual reviews, audits, certifications, or any recurring process.
 - **Role-based access control** — Four roles (Admin, Editor, Viewer, Auditor) with granular permissions.
-- **SSO/OIDC authentication** — Integrate with any OIDC-compliant identity provider (Keycloak, Azure AD, Google, etc.). Claim-based role mapping, automatic Person asset provisioning on first login, and local password auth as a fallback.
+- **SSO authentication (OIDC & SAML 2.0)** — Integrate with any OIDC-compliant identity provider (Keycloak, Azure AD, Google, etc.) or any SAML 2.0 IdP. Claim/attribute-based role mapping, automatic Person asset provisioning on first login, and local password auth as a fallback. Both protocols are configured entirely from the admin UI.
+- **Encryption at rest** — Optional application-level field encryption (AES-256-GCM) for sensitive data. Choose a compliance profile (Minimal, GDPR, Full) or select individual scopes. Covers SSO secrets, user PII, session metadata, audit snapshots, asset custom fields, and uploaded files. BYO encryption key via environment variable with zero-downtime key rotation. See **[configure_encryption.md](configure_encryption.md)**.
 - **Configurable audit trail** — Track who changed what and when. Admins choose which entity types are logged and whether to capture field-level diffs.
 - **Custom fields** — Extend asset types with additional metadata fields without changing the schema.
 
@@ -60,13 +61,29 @@ The app will be available at `http://localhost:8000`. Database tables are create
 
 GRCen supports HTTPS via an nginx reverse proxy (recommended for production) or direct TLS termination. See **[configure_https.md](configure_https.md)** for detailed setup instructions.
 
-## SSO/OIDC Configuration
+## Encryption at Rest
 
-GRCen supports any OIDC-compliant identity provider. SSO is configured entirely from the admin UI — no environment variables needed.
+GRCen supports optional application-level encryption of sensitive database fields and uploaded files. Encryption uses AES-256-GCM with per-scope key derivation from a single master key you provide. See **[configure_encryption.md](configure_encryption.md)** for detailed setup instructions.
+
+Quick start: generate a key with `grcen generate-key`, set the `ENCRYPTION_KEY` environment variable, restart, and select a profile from **Admin > Encryption Settings**.
+
+## SSO Configuration (OIDC & SAML 2.0)
+
+GRCen supports both OIDC and SAML 2.0 identity providers. Both are configured entirely from the admin UI — no environment variables needed.
+
+### OIDC
 
 1. Log in as an admin and go to **Users > SSO Settings**
 2. Enter your identity provider's Issuer URL, Client ID, and Client Secret
 3. Optionally configure role mapping (map IdP groups to GRCen roles) and the default role for new SSO users
 4. Save — the login page immediately shows a "Sign in with SSO" button
 
-On first SSO login, a Person asset is automatically created and linked to the user account. Admins can change this link from the user edit page.
+### SAML 2.0
+
+1. Log in as an admin and go to **Users > SAML Settings**
+2. Enter your IdP's Entity ID, SSO URL, and X.509 certificate
+3. Optionally configure SP signing certificates, role attribute mapping, and the default role
+4. Save — the login page shows a "Sign in with SAML SSO" button
+5. Register GRCen with your IdP using the SP metadata URL shown on the settings page (`/auth/saml/metadata`)
+
+Both protocols support automatic user provisioning and Person asset creation on first login, role synchronization on each login, and can be enabled simultaneously. Admins can manage linked user accounts from the user edit page.
