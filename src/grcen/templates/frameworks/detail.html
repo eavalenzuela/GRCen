@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}{{ detail.framework.name }} - GRCen{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>{{ detail.framework.name }}</h1>
+    <p>
+        <a href="/frameworks">← All Frameworks</a>
+        &nbsp; | &nbsp;
+        <a href="/assets/{{ detail.framework.id }}">View as asset</a>
+    </p>
+</div>
+
+<div class="card">
+    <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:1rem;">
+        <div>
+            <small>Version</small>
+            <div>{{ detail.framework.metadata.get('version', '—') }}</div>
+        </div>
+        <div>
+            <small>Governing Body</small>
+            <div>{{ detail.framework.metadata.get('governing_body', '—') }}</div>
+        </div>
+        <div>
+            <small>Status</small>
+            <div>{{ detail.framework.metadata.get('certification_status', '—') }}</div>
+        </div>
+        <div>
+            <small>Coverage</small>
+            <div style="font-weight:600;">
+                {{ detail.coverage_percent }}% ({{ detail.satisfied_count }}/{{ detail.requirements | length }})
+            </div>
+        </div>
+    </div>
+    {% if detail.framework.description %}
+    <p style="margin-top:1rem; color:#374151;">{{ detail.framework.description }}</p>
+    {% endif %}
+</div>
+
+<div class="card" style="margin-top:1.5rem;">
+    <h3>Requirements
+        <span style="color:#6b7280; font-weight:normal; font-size:0.9rem;">
+            &nbsp;— {{ detail.gap_count }} gap{{ 's' if detail.gap_count != 1 else '' }}
+        </span>
+    </h3>
+    {% if detail.requirements %}
+    <table class="table">
+        <thead>
+            <tr><th>Status</th><th>Requirement</th><th>Satisfied by</th></tr>
+        </thead>
+        <tbody>
+        {% for req in detail.requirements %}
+            <tr>
+                <td>
+                    {% if req.satisfied %}
+                    <span style="color:#166534;">✓ satisfied</span>
+                    {% else %}
+                    <span style="color:#991b1b;">gap</span>
+                    {% endif %}
+                </td>
+                <td><a href="/assets/{{ req.id }}">{{ req.name }}</a></td>
+                <td>
+                    {% if req.satisfiers %}
+                    {% for s in req.satisfiers %}
+                        <a href="/assets/{{ s.id }}">{{ s.name }}</a>
+                        <small style="color:#6b7280;">({{ s.type }}, {{ s.via }})</small>{% if not loop.last %},{% endif %}
+                    {% endfor %}
+                    {% else %}
+                    <span style="color:#6b7280;">—</span>
+                    {% endif %}
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color:#6b7280;">No requirements linked. Add <code>parent_of</code> relationships from the framework to its requirements.</p>
+    {% endif %}
+</div>
+
+<div style="display:grid; grid-template-columns: 1fr 1fr; gap:1.5rem; margin-top:1.5rem;">
+    <div class="card">
+        <h3>Audits</h3>
+        {% if detail.audits %}
+        <ul style="list-style:none; padding:0;">
+        {% for a in detail.audits %}
+            <li style="padding:0.25rem 0;">
+                <a href="/assets/{{ a.id }}">{{ a.name }}</a>
+                <small style="color:#6b7280;">({{ a.status }})</small>
+            </li>
+        {% endfor %}
+        </ul>
+        {% else %}
+        <p style="color:#6b7280;">No audits linked via <code>certifies</code>.</p>
+        {% endif %}
+    </div>
+    <div class="card">
+        <h3>Certified Vendors</h3>
+        {% if detail.vendors %}
+        <ul style="list-style:none; padding:0;">
+        {% for v in detail.vendors %}
+            <li style="padding:0.25rem 0;"><a href="/assets/{{ v.id }}">{{ v.name }}</a></li>
+        {% endfor %}
+        </ul>
+        {% else %}
+        <p style="color:#6b7280;">No vendors linked via <code>certified_by</code>.</p>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card" style="margin-top:1.5rem;">
+    <h3>In-Scope Assets
+        <span style="color:#6b7280; font-weight:normal; font-size:0.9rem;">
+            &nbsp;— {{ detail.in_scope_assets | length }}
+        </span>
+    </h3>
+    {% if detail.in_scope_assets %}
+    <table class="table">
+        <thead><tr><th>Type</th><th>Asset</th><th>Status</th></tr></thead>
+        <tbody>
+        {% for a in detail.in_scope_assets %}
+            <tr>
+                <td>{{ a.type }}</td>
+                <td><a href="/assets/{{ a.id }}">{{ a.name }}</a></td>
+                <td>{{ a.status }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color:#6b7280;">No assets are linked to any requirement in this framework yet.</p>
+    {% endif %}
+</div>
+{% endblock %}

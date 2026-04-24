@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Frameworks - GRCen{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Compliance Frameworks</h1>
+</div>
+
+{% if not frameworks %}
+<div class="card">
+    <p style="color:#6b7280;">
+        No frameworks yet. Create an asset of type <code>framework</code> and link requirements to it with
+        <code>parent_of</code> relationships to see them here.
+    </p>
+</div>
+{% else %}
+<div class="card">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Framework</th>
+                <th>Certification</th>
+                <th style="width:35%;">Coverage</th>
+                <th style="text-align:right;">Requirements</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for fw in frameworks %}
+            <tr>
+                <td>
+                    <a href="/frameworks/{{ fw.id }}">{{ fw.name }}</a>
+                    {% if fw.metadata.get('version') %}
+                    <span style="color:#6b7280;"> — {{ fw.metadata.version }}</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% set cs = fw.metadata.get('certification_status') %}
+                    {% if cs == 'certified' %}<span style="color:#166534;">certified</span>
+                    {% elif cs == 'in_progress' %}<span style="color:#92400e;">in progress</span>
+                    {% elif cs == 'not_started' %}<span style="color:#991b1b;">not started</span>
+                    {% elif cs %}{{ cs }}
+                    {% else %}—{% endif %}
+                </td>
+                <td>
+                    <div style="background:#e5e7eb; border-radius:4px; height:10px; position:relative; overflow:hidden;">
+                        <div style="background:{% if fw.coverage_percent >= 80 %}#16a34a{% elif fw.coverage_percent >= 40 %}#ca8a04{% else %}#dc2626{% endif %};
+                                    width:{{ fw.coverage_percent }}%; height:100%;"></div>
+                    </div>
+                    <small>{{ fw.coverage_percent }}% ({{ fw.satisfied_count }}/{{ fw.requirement_count }})</small>
+                </td>
+                <td style="text-align:right;">{{ fw.requirement_count }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+{% endblock %}

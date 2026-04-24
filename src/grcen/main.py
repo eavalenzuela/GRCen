@@ -18,6 +18,7 @@ from grcen.routers import (
     attachments,
     auth,
     exports,
+    frameworks,
     graph,
     imports,
     oidc,
@@ -100,6 +101,7 @@ def create_app() -> FastAPI:
     app.include_router(imports.router)
     app.include_router(exports.router)
     app.include_router(alerts.router)
+    app.include_router(frameworks.router)
     app.include_router(auth.router)
     app.include_router(oidc.router)
     app.include_router(saml.router)

@@ -1,7 +1,7 @@
 from uuid import UUID
 
 import asyncpg
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
@@ -21,7 +21,13 @@ from grcen.services import asset as asset_svc
 from grcen.services import attachment as att_svc
 from grcen.services import audit_service as audit_svc
 from grcen.services import auth as auth_svc
-from grcen.services import encryption_config, oidc_settings, saml_settings, smtp_settings
+from grcen.services import (
+    encryption_config,
+    framework_service,
+    oidc_settings,
+    saml_settings,
+    smtp_settings,
+)
 from grcen.services import relationship as rel_svc
 from grcen.services import review_service as review_svc
 from grcen.services import risk_service as risk_svc
@@ -1431,6 +1437,42 @@ async def admin_webhook_test(
         detail = f"HTTP {status}" if status else (err or "error")
         msg = f"fail:Ping failed: {detail}"
     return RedirectResponse(f"/admin/webhooks?flash={msg}", status_code=302)
+
+
+# --- Compliance Framework dashboards ---
+
+
+@router.get("/frameworks", response_class=HTMLResponse)
+async def frameworks_index(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.VIEW)),
+):
+    frameworks = await framework_service.list_frameworks(pool)
+    notif_count = await alert_svc.count_unread_notifications(pool)
+    return templates.TemplateResponse(
+        request,
+        "frameworks/index.html",
+        context={"user": user, "frameworks": frameworks, "notif_count": notif_count},
+    )
+
+
+@router.get("/frameworks/{framework_id}", response_class=HTMLResponse)
+async def framework_detail(
+    request: Request,
+    framework_id: UUID,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.VIEW)),
+):
+    detail = await framework_service.get_framework_detail(pool, framework_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="Framework not found")
+    notif_count = await alert_svc.count_unread_notifications(pool)
+    return templates.TemplateResponse(
+        request,
+        "frameworks/detail.html",
+        context={"user": user, "detail": detail, "notif_count": notif_count},
+    )
 
 
 # --- User self-service settings ---

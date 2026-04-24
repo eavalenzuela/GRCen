@@ -42,11 +42,11 @@ GRCen (pronounced "gurken") is a free and open-source GRC (Governance, Risk, Com
 - Optional application-level encryption at rest (AES-256-GCM, scope-based keys, zero-downtime rotation, blind indexes)
 - Risk register with 5x5 heatmap, filtering, and overdue tracking
 - Org Views (hierarchical tree views with orthogonal connectors)
+- Compliance framework dashboards at `/frameworks` and `/frameworks/{id}` with coverage bars, gap highlighting, audit + vendor panels, and matching `GET /api/frameworks/` and `GET /api/frameworks/{id}` JSON endpoints
 - REST API: full CRUD for assets/relationships, `/api/graph/{id}` subgraph queries, bulk endpoints at `/api/imports/assets/bulk` and `/api/imports/relationships/bulk` (with `dry_run`), relationship preview at `/api/imports/relationships/preview`, authenticated `/docs` OpenAPI UI, Bearer token auth via `/api/tokens` with per-token permission scoping
 
 ## Known Gaps (see `feature_roadmap.md` for the full list)
 
-- Compliance framework dashboards (data model supports framework→requirement→audit mapping; UI views are missing)
 - Attachments on relationships (asset-only today)
 - Multi-tenancy / multi-org
 - PDF report generation

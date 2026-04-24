@@ -13,8 +13,8 @@ Admins manage webhooks at `/admin/webhooks`; each endpoint gets HMAC-SHA256-sign
 ### 3. REST API for Assets & Relationships — **SHIPPED**
 (The initial review was wrong: per-asset/per-relationship CRUD + `/api/graph/{id}` + filtered list/search have existed. Bearer tokens work via `/api/tokens`. Auth + RBAC + per-token permission checks live in `routers/deps.py`.) Added in this pass: `POST /api/imports/assets/bulk` and `POST /api/imports/relationships/bulk` for JSON-body batch inserts with `dry_run=true` support, a `preview` endpoint for relationship files, and OpenAPI summaries on every route so `/docs` is self-describing.
 
-### 4. Compliance Framework Dashboards
-Sample data (`sample_data/relationships.csv:367-387`) already models SOC2 / PCI DSS / GDPR / ISO27001 → requirements → audits. The UI is missing. Add `/frameworks` index and `/frameworks/{id}` detail pages showing: requirements, coverage (requirements with satisfying controls vs. unsatisfied), in-scope assets, audits, and gap highlights.
+### 4. Compliance Framework Dashboards — **SHIPPED**
+`/frameworks` lists every framework with a coverage bar; `/frameworks/{id}` shows requirements (with ✓ satisfied / gap status and the policies, controls, systems, or processes covering them), audits linked via `certifies`, vendors linked via `certified_by`, and all in-scope assets. Coverage logic in `services/framework_service.py` treats a requirement as satisfied if it has an outbound `satisfied_by`/`implemented_by` edge or an inbound `satisfies` edge from a control. Matching REST endpoints at `GET /api/frameworks/` and `GET /api/frameworks/{id}` for programmatic access. Remaining: per-framework gap report export (CSV/PDF), "last audited" rollups, and a control-library view that inverts the graph (controls → which requirements they cover).
 
 ### 5. Relationship Bulk Import — **SHIPPED** (folded into #3)
 Relationship file upload was already wired to `/api/imports/relationships/execute`. This pass added the matching `/preview` endpoint, a `dry_run` flag on both asset and relationship execute routes, and the JSON-body `/bulk` endpoints covered in #3.
