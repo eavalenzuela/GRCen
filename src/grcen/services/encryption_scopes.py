@@ -84,6 +84,15 @@ SCOPE_SMTP_SECRETS = EncryptionScope(
     ),
 )
 
+SCOPE_WEBHOOK_SECRETS = EncryptionScope(
+    name="webhook_secrets",
+    display_name="Webhook Signing Secrets",
+    description="HMAC secrets used to sign outgoing webhook payloads",
+    targets=(
+        FieldTarget(table="webhooks", column="secret"),
+    ),
+)
+
 SCOPE_USER_PII = EncryptionScope(
     name="user_pii",
     display_name="User PII",
@@ -135,6 +144,7 @@ ALL_SCOPES: dict[str, EncryptionScope] = {
     for s in [
         SCOPE_SSO_SECRETS,
         SCOPE_SMTP_SECRETS,
+        SCOPE_WEBHOOK_SECRETS,
         SCOPE_USER_PII,
         SCOPE_SESSION_PII,
         SCOPE_AUDIT_PII,
@@ -148,8 +158,8 @@ ALL_SCOPES: dict[str, EncryptionScope] = {
 PROFILE_MINIMAL = EncryptionProfile(
     name="minimal",
     display_name="Minimal (Secrets Only)",
-    description="Encrypts SSO and SMTP secrets.  No PII encryption.",
-    scope_names=("sso_secrets", "smtp_secrets"),
+    description="Encrypts SSO, SMTP, and webhook secrets.  No PII encryption.",
+    scope_names=("sso_secrets", "smtp_secrets", "webhook_secrets"),
 )
 
 PROFILE_GDPR = EncryptionProfile(
@@ -159,7 +169,14 @@ PROFILE_GDPR = EncryptionProfile(
         "Encrypts all personal data: emails, IP addresses, audit snapshots.  "
         "Satisfies GDPR Art.\u00a032(1)(a) pseudonymisation and encryption."
     ),
-    scope_names=("sso_secrets", "smtp_secrets", "user_pii", "session_pii", "audit_pii"),
+    scope_names=(
+        "sso_secrets",
+        "smtp_secrets",
+        "webhook_secrets",
+        "user_pii",
+        "session_pii",
+        "audit_pii",
+    ),
 )
 
 PROFILE_FULL = EncryptionProfile(
@@ -169,6 +186,7 @@ PROFILE_FULL = EncryptionProfile(
     scope_names=(
         "sso_secrets",
         "smtp_secrets",
+        "webhook_secrets",
         "user_pii",
         "session_pii",
         "audit_pii",

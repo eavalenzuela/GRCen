@@ -1281,6 +1281,158 @@ async def admin_smtp_settings_submit(
     return RedirectResponse("/admin/smtp-settings", status_code=302)
 
 
+# --- Webhook management ---
+
+
+def _parse_event_filter(raw: str) -> list[str]:
+    return [p.strip() for p in raw.split(",") if p.strip()]
+
+
+def _decode_flash(flash: str | None) -> dict | None:
+    if not flash:
+        return None
+    ok, _, message = flash.partition(":")
+    return {"ok": ok == "ok", "message": message or flash}
+
+
+@router.get("/admin/webhooks", response_class=HTMLResponse)
+async def admin_webhooks_page(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+    flash: str | None = None,
+):
+    from grcen.services import webhook_service
+
+    hooks = await webhook_service.list_webhooks(pool)
+    deliveries = await pool.fetch(
+        """SELECT event, url, status_code, error, attempted_at
+           FROM webhook_deliveries
+           ORDER BY attempted_at DESC LIMIT 20"""
+    )
+    notif_count = await alert_svc.count_unread_notifications(pool)
+    return templates.TemplateResponse(
+        request,
+        "admin/webhooks.html",
+        context={
+            "user": user,
+            "webhooks": hooks,
+            "deliveries": deliveries,
+            "flash": _decode_flash(flash),
+            "notif_count": notif_count,
+        },
+    )
+
+
+@router.post("/admin/webhooks")
+async def admin_webhooks_create(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    _user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+):
+    from grcen.services import webhook_service
+
+    form = await request.form()
+    name = str(form.get("name", "")).strip()
+    url = str(form.get("url", "")).strip()
+    if not name or not url:
+        return RedirectResponse(
+            "/admin/webhooks?flash=fail:Name and URL are required", status_code=302
+        )
+    await webhook_service.create_webhook(
+        pool,
+        name=name,
+        url=url,
+        secret=str(form.get("secret", "")).strip(),
+        enabled="enabled" in form,
+        event_filter=_parse_event_filter(str(form.get("event_filter", ""))),
+    )
+    return RedirectResponse("/admin/webhooks?flash=ok:Webhook created", status_code=302)
+
+
+@router.get("/admin/webhooks/{webhook_id}/edit", response_class=HTMLResponse)
+async def admin_webhook_edit_page(
+    request: Request,
+    webhook_id: UUID,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+):
+    from grcen.services import webhook_service
+
+    hook = await webhook_service.get_webhook(pool, webhook_id)
+    if not hook:
+        raise HTTPException(status_code=404, detail="Webhook not found")
+    notif_count = await alert_svc.count_unread_notifications(pool)
+    return templates.TemplateResponse(
+        request,
+        "admin/webhook_edit.html",
+        context={"user": user, "hook": hook, "notif_count": notif_count},
+    )
+
+
+@router.post("/admin/webhooks/{webhook_id}/edit")
+async def admin_webhook_edit_submit(
+    request: Request,
+    webhook_id: UUID,
+    pool: asyncpg.Pool = Depends(get_db),
+    _user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+):
+    from grcen.services import webhook_service
+
+    form = await request.form()
+    # Preserve existing secret if the placeholder was submitted.
+    secret = str(form.get("secret", ""))
+    if secret == "********":
+        current = await webhook_service.get_webhook(pool, webhook_id)
+        secret = current.secret if current else ""
+    hook = await webhook_service.update_webhook(
+        pool,
+        webhook_id,
+        name=str(form.get("name", "")).strip(),
+        url=str(form.get("url", "")).strip(),
+        secret=secret,
+        enabled="enabled" in form,
+        event_filter=_parse_event_filter(str(form.get("event_filter", ""))),
+    )
+    if not hook:
+        raise HTTPException(status_code=404, detail="Webhook not found")
+    return RedirectResponse("/admin/webhooks?flash=ok:Webhook updated", status_code=302)
+
+
+@router.post("/admin/webhooks/{webhook_id}/delete")
+async def admin_webhook_delete(
+    webhook_id: UUID,
+    pool: asyncpg.Pool = Depends(get_db),
+    _user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+):
+    from grcen.services import webhook_service
+
+    await webhook_service.delete_webhook(pool, webhook_id)
+    return RedirectResponse("/admin/webhooks?flash=ok:Webhook deleted", status_code=302)
+
+
+@router.post("/admin/webhooks/{webhook_id}/test")
+async def admin_webhook_test(
+    webhook_id: UUID,
+    pool: asyncpg.Pool = Depends(get_db),
+    _user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+):
+    from grcen.services import webhook_service
+
+    hook = await webhook_service.get_webhook(pool, webhook_id)
+    if not hook:
+        raise HTTPException(status_code=404, detail="Webhook not found")
+    ok, status, err = await webhook_service.send_to_webhook(
+        pool, hook, "ping", {"message": "Test ping from GRCen"}, alert_id=None
+    )
+    if ok:
+        msg = f"ok:Ping succeeded (HTTP {status})"
+    else:
+        detail = f"HTTP {status}" if status else (err or "error")
+        msg = f"fail:Ping failed: {detail}"
+    return RedirectResponse(f"/admin/webhooks?flash={msg}", status_code=302)
+
+
 # --- User self-service settings ---
 
 

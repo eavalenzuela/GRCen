@@ -372,6 +372,34 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_column THEN NULL;
 END $$;
 
+-- Outbound webhooks
+CREATE TABLE IF NOT EXISTS webhooks (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name          VARCHAR(150) NOT NULL,
+    url           TEXT NOT NULL,
+    secret        TEXT NOT NULL DEFAULT '',
+    enabled       BOOLEAN NOT NULL DEFAULT true,
+    event_filter  TEXT[] NOT NULL DEFAULT '{}',
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS webhook_deliveries (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    webhook_id    UUID REFERENCES webhooks(id) ON DELETE CASCADE,
+    alert_id      UUID REFERENCES alerts(id) ON DELETE SET NULL,
+    event         VARCHAR(64) NOT NULL,
+    url           TEXT NOT NULL,
+    status_code   INTEGER,
+    response_body TEXT,
+    error         TEXT,
+    attempted_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_webhook
+    ON webhook_deliveries(webhook_id);
+CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_attempted_at
+    ON webhook_deliveries(attempted_at DESC);
+
 -- Email delivery log (one row per attempted send)
 CREATE TABLE IF NOT EXISTS notification_deliveries (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),

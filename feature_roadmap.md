@@ -7,8 +7,8 @@ Tracks known gaps identified during the project review. Items marked **SHIPPED**
 ### 1. Email Notification Delivery — **SHIPPED**
 Admin configures SMTP at `/admin/smtp-settings`; users opt in at `/settings`; firing alerts send to the asset owner (or admin fallback) and log every attempt to `notification_deliveries`.
 
-### 2. Webhook Notification Delivery
-Alerts can't post to Slack, PagerDuty, Teams, or custom endpoints. Add a `webhook_config` table (url, secret, event filters), HMAC-sign outgoing payloads, and extend `fire_alert` alongside the existing email path. Also needed: digest/batch mode so bulk fires don't spam.
+### 2. Webhook Notification Delivery — **SHIPPED**
+Admins manage webhooks at `/admin/webhooks`; each endpoint gets HMAC-SHA256-signed JSON posts with `X-GRCen-Event`/`X-GRCen-Signature`/`X-GRCen-Delivery` headers. `fire_alert` dispatches `alert.fired`; admins can send a `ping` event from the UI. All attempts log to `webhook_deliveries`. Remaining work: retry/backoff policy for failed deliveries, digest/batch mode so bulk fires don't spam, and more event types beyond `alert.fired` (e.g. `asset.created`, `risk.review_due`).
 
 ### 3. REST API for Assets & Relationships
 Token management exists at `/api/tokens`, but there are no authenticated REST endpoints for the core graph. Integrations (ticketing, SIEM, CI/CD) currently have to scrape HTML. Models and services already exist — mostly needs routers + OpenAPI annotations. Endpoints: `GET/POST/PATCH/DELETE /api/assets`, `/api/relationships`, `/api/assets/{id}/graph`, plus bulk variants.

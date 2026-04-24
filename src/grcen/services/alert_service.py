@@ -111,14 +111,27 @@ async def fire_alert(pool: asyncpg.Pool, alert_id: UUID) -> None:
         alert.title,
         alert.message,
     )
+    asset_row = await pool.fetchrow(
+        "SELECT name FROM assets WHERE id = $1", alert.asset_id
+    )
+    asset_name = asset_row["name"] if asset_row else str(alert.asset_id)
+    link = f"{settings.APP_BASE_URL.rstrip('/')}/assets/{alert.asset_id}"
+
     try:
-        await _deliver_email(pool, alert)
+        await _deliver_email(pool, alert, asset_name, link)
     except Exception:
-        # Email delivery must never break alert firing or the scheduler.
+        # Delivery must never break alert firing or the scheduler.
         log.exception("Email delivery failed for alert %s", alert.id)
 
+    try:
+        await _deliver_webhooks(pool, alert, asset_name, link)
+    except Exception:
+        log.exception("Webhook delivery failed for alert %s", alert.id)
 
-async def _deliver_email(pool: asyncpg.Pool, alert: Alert) -> None:
+
+async def _deliver_email(
+    pool: asyncpg.Pool, alert: Alert, asset_name: str, link: str
+) -> None:
     from grcen.services import email_service
     from grcen.services import smtp_settings as smtp_svc
 
@@ -130,11 +143,6 @@ async def _deliver_email(pool: asyncpg.Pool, alert: Alert) -> None:
     if not recipients:
         return
 
-    asset_row = await pool.fetchrow(
-        "SELECT name FROM assets WHERE id = $1", alert.asset_id
-    )
-    asset_name = asset_row["name"] if asset_row else str(alert.asset_id)
-    link = f"{settings.APP_BASE_URL.rstrip('/')}/assets/{alert.asset_id}"
     subject = f"[GRCen] {alert.title}"
     body_lines = [alert.title]
     if alert.message:
@@ -154,6 +162,22 @@ async def _deliver_email(pool: asyncpg.Pool, alert: Alert) -> None:
             alert_id=alert.id,
             user_id=user_id,
         )
+
+
+async def _deliver_webhooks(
+    pool: asyncpg.Pool, alert: Alert, asset_name: str, link: str
+) -> None:
+    from grcen.services import webhook_service
+
+    data = {
+        "alert_id": str(alert.id),
+        "asset_id": str(alert.asset_id),
+        "asset_name": asset_name,
+        "title": alert.title,
+        "message": alert.message,
+        "link": link,
+    }
+    await webhook_service.dispatch(pool, "alert.fired", data, alert_id=alert.id)
 
 
 async def list_notifications(

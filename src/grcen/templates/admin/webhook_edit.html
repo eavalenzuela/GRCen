@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Edit Webhook - GRCen{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Edit Webhook</h1>
+</div>
+
+<form method="post" action="/admin/webhooks/{{ hook.id }}/edit" class="card">
+    {% include "partials/csrf.html" %}
+    <div class="form-group">
+        <label for="name">Name</label>
+        <input type="text" id="name" name="name" value="{{ hook.name }}" required>
+    </div>
+    <div class="form-group">
+        <label for="url">Payload URL</label>
+        <input type="url" id="url" name="url" value="{{ hook.url }}" required>
+    </div>
+    <div class="form-group">
+        <label for="secret">Signing Secret</label>
+        <input type="password" id="secret" name="secret"
+               value="{{ '********' if hook.secret else '' }}"
+               placeholder="Leave as ******** to keep current">
+        <small>Clear the field and save to remove the secret.</small>
+    </div>
+    <div class="form-group">
+        <label for="event_filter">Event Filter (comma-separated, blank = all)</label>
+        <input type="text" id="event_filter" name="event_filter"
+               value="{{ hook.event_filter | join(',') }}">
+    </div>
+    <div class="form-group">
+        <label><input type="checkbox" name="enabled" {% if hook.enabled %}checked{% endif %}> Enabled</label>
+    </div>
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Save</button>
+        <a href="/admin/webhooks" class="btn">Cancel</a>
+    </div>
+</form>
+{% endblock %}

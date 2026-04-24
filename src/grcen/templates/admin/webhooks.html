@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Webhooks - GRCen{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Webhooks</h1>
+</div>
+
+{% if flash %}
+<div class="alert" style="background:{% if flash.ok %}#dcfce7; color:#166534; border:1px solid #bbf7d0{% else %}#fee2e2; color:#991b1b; border:1px solid #fecaca{% endif %};">
+    {{ flash.message }}
+</div>
+{% endif %}
+
+<div class="card">
+    <h3>Registered Webhooks</h3>
+    {% if webhooks %}
+    <table class="table">
+        <thead>
+            <tr><th>Name</th><th>URL</th><th>Events</th><th>Enabled</th><th></th></tr>
+        </thead>
+        <tbody>
+        {% for w in webhooks %}
+            <tr>
+                <td>{{ w.name }}</td>
+                <td style="font-family:monospace; word-break:break-all;">{{ w.url }}</td>
+                <td>{{ w.event_filter | join(', ') if w.event_filter else '(all)' }}</td>
+                <td>{{ 'yes' if w.enabled else 'no' }}</td>
+                <td>
+                    <a href="/admin/webhooks/{{ w.id }}/edit" class="btn btn-sm">Edit</a>
+                    <form method="post" action="/admin/webhooks/{{ w.id }}/test" style="display:inline;">
+                        {% include "partials/csrf.html" %}
+                        <button type="submit" class="btn btn-sm">Send Ping</button>
+                    </form>
+                    <form method="post" action="/admin/webhooks/{{ w.id }}/delete" style="display:inline;"
+                          onsubmit="return confirm('Delete this webhook?');">
+                        {% include "partials/csrf.html" %}
+                        <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                    </form>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color:#6b7280;">No webhooks configured yet.</p>
+    {% endif %}
+</div>
+
+<form method="post" action="/admin/webhooks" class="card" style="margin-top:1.5rem;">
+    {% include "partials/csrf.html" %}
+    <h3>Add Webhook</h3>
+    <div class="form-group">
+        <label for="name">Name</label>
+        <input type="text" id="name" name="name" required placeholder="Slack #security">
+    </div>
+    <div class="form-group">
+        <label for="url">Payload URL</label>
+        <input type="url" id="url" name="url" required placeholder="https://hooks.example.com/webhook">
+    </div>
+    <div class="form-group">
+        <label for="secret">Signing Secret (optional)</label>
+        <input type="password" id="secret" name="secret" placeholder="Random string — used for HMAC-SHA256">
+        <small>When set, requests include <code>X-GRCen-Signature: sha256=&lt;hex&gt;</code>.</small>
+    </div>
+    <div class="form-group">
+        <label for="event_filter">Event Filter (comma-separated)</label>
+        <input type="text" id="event_filter" name="event_filter" placeholder="alert.fired (leave blank for all)">
+        <small>Supported events today: <code>alert.fired</code>, <code>ping</code>.</small>
+    </div>
+    <div class="form-group">
+        <label><input type="checkbox" name="enabled" checked> Enabled</label>
+    </div>
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Create Webhook</button>
+    </div>
+</form>
+
+<div class="card" style="margin-top:1.5rem;">
+    <h3>Recent Deliveries</h3>
+    {% if deliveries %}
+    <table class="table">
+        <thead><tr><th>When</th><th>Event</th><th>URL</th><th>Status</th><th>Error</th></tr></thead>
+        <tbody>
+        {% for d in deliveries %}
+            <tr>
+                <td>{{ d.attempted_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                <td>{{ d.event }}</td>
+                <td style="font-family:monospace; word-break:break-all;">{{ d.url }}</td>
+                <td>{{ d.status_code or '-' }}</td>
+                <td>{{ d.error or '' }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color:#6b7280;">No delivery attempts yet.</p>
+    {% endif %}
+</div>
+{% endblock %}

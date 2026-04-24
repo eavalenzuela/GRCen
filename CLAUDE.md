@@ -35,7 +35,7 @@ GRCen (pronounced "gurken") is a free and open-source GRC (Governance, Risk, Com
 - Asset and relationship graph (recursive SQL CTE traversal in `services/graph.py`)
 - Visual node graphs (D3.js) at `/assets/{id}/graph`
 - Bulk CSV/JSON import of assets with preview; filterable column-selectable export (CSV/JSON)
-- Schedulable alerts and review reminders with in-app notifications and SMTP email delivery (admin SMTP config at `/admin/smtp-settings`, user opt-in at `/settings`, delivery log in `notification_deliveries`). Webhook delivery still pending.
+- Schedulable alerts and review reminders with three delivery channels: in-app notifications, SMTP email (admin config at `/admin/smtp-settings`, user opt-in at `/settings`, log in `notification_deliveries`), and outbound webhooks (manage at `/admin/webhooks`, HMAC-SHA256 signed, log in `webhook_deliveries`).
 - RBAC with four roles: Admin, Editor, Viewer, Auditor (`permissions.py`)
 - Audit trail with optional field-level diffs, PII sanitization, encryption support
 - SSO: OIDC and SAML 2.0, with admin UI config and role mapping
@@ -46,7 +46,6 @@ GRCen (pronounced "gurken") is a free and open-source GRC (Governance, Risk, Com
 
 ## Known Gaps (see `feature_roadmap.md` for the full list)
 
-- Webhook notification delivery (email is shipped)
 - Public REST API for assets/relationships (only token management exists today)
 - Compliance framework dashboards (data model supports framework→requirement→audit mapping; UI views are missing)
 - Relationship bulk import and attachments on relationships
