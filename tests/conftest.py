@@ -89,7 +89,7 @@ async def clean_tables(pool):
     from grcen.rate_limit import _reset as _reset_rate_limit
     _reset_rate_limit()
     yield
-    for table in ("sessions", "api_tokens", "app_settings", "audit_log", "data_access_log", "webhook_deliveries", "webhooks", "notification_deliveries", "notifications", "alerts", "attachments", "relationships", "risk_snapshots", "saved_searches", "assets", "users", "encryption_config"):
+    for table in ("sessions", "api_tokens", "app_settings", "audit_log", "data_access_log", "user_totp", "webhook_deliveries", "webhooks", "notification_deliveries", "notifications", "alerts", "attachments", "relationships", "risk_snapshots", "saved_searches", "assets", "users", "encryption_config"):
         await pool.execute(f"DELETE FROM {table}")
     # Reset audit config to defaults so tests start fresh
     await pool.execute("UPDATE audit_config SET enabled = true, field_level = true")

@@ -12,6 +12,12 @@
 </div>
 {% endif %}
 
+{% if flash %}
+<div class="alert" style="background:{% if flash.ok %}#dcfce7; color:#166534; border:1px solid #bbf7d0{% else %}#fee2e2; color:#991b1b; border:1px solid #fecaca{% endif %};">
+    {{ flash.message }}
+</div>
+{% endif %}
+
 <div class="card">
     <h3>Account</h3>
     <p><strong>Username:</strong> {{ user.username }}</p>
@@ -39,4 +45,50 @@
         <button type="submit" class="btn btn-primary">Save Preferences</button>
     </div>
 </form>
+
+<div class="card" style="margin-top:1.5rem;">
+    <h3>Two-Factor Authentication (TOTP)</h3>
+    {% if user.is_sso %}
+    <p style="color:#6b7280;">This account signs in via SSO, so MFA is enforced by your identity provider.</p>
+    {% elif mfa_enabled %}
+    <p><strong>✓ Enabled.</strong> Codes from your authenticator app are required on login.</p>
+    {% if recovery_remaining is not none %}
+    <p style="color:#6b7280;">Recovery codes remaining: {{ recovery_remaining }}.</p>
+    {% endif %}
+    <form method="post" action="/settings/mfa/disable"
+          onsubmit="return confirm('Turn off two-factor authentication on this account?');">
+        {% include "partials/csrf.html" %}
+        <button type="submit" class="btn btn-danger">Disable MFA</button>
+    </form>
+    {% elif mfa_pending %}
+    <p>Scan the QR code with your authenticator app, then enter a 6-digit code to finish enrolling.</p>
+    <div style="text-align:center;">
+        <img src="data:image/png;base64,{{ mfa_pending.qr_b64 }}" alt="TOTP QR" style="max-width:220px;">
+    </div>
+    <p style="text-align:center; font-family:monospace;">Secret: <code>{{ mfa_pending.secret }}</code></p>
+    {% if mfa_pending.recovery_codes %}
+    <div class="alert" style="background:#fef3c7; color:#92400e; border:1px solid #fde68a;">
+        <strong>Save these recovery codes now.</strong> They will not be shown again.
+        <ul style="font-family:monospace; margin:0.5rem 0 0 1rem;">
+            {% for c in mfa_pending.recovery_codes %}<li>{{ c }}</li>{% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+    <form method="post" action="/settings/mfa/confirm" style="margin-top:1rem;">
+        {% include "partials/csrf.html" %}
+        <div class="form-group">
+            <label for="mfa_code">Authenticator code</label>
+            <input type="text" id="mfa_code" name="code" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" style="max-width:8rem;">
+        </div>
+        <button type="submit" class="btn btn-primary">Verify &amp; enable</button>
+        <a href="/settings/mfa/cancel" class="btn">Cancel</a>
+    </form>
+    {% else %}
+    <p>Add a second factor to your sign-in: a 6-digit code from an authenticator app (Google Authenticator, 1Password, Authy, etc.).</p>
+    <form method="post" action="/settings/mfa/begin">
+        {% include "partials/csrf.html" %}
+        <button type="submit" class="btn btn-primary">Set up MFA</button>
+    </form>
+    {% endif %}
+</div>
 {% endblock %}

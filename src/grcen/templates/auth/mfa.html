@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Two-Factor Auth - GRCen{% endblock %}
+{% block content %}
+<div class="login-container">
+    <h1>Enter authentication code</h1>
+    <p style="color:#6b7280;">Open your authenticator app to retrieve the current 6-digit code for this account. If you lost access, enter a recovery code instead.</p>
+    {% if error %}
+    <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
+    <form method="post" action="/login/mfa">
+        {% include "partials/csrf.html" %}
+        <div class="form-group">
+            <label for="code">Code</label>
+            <input type="text" id="code" name="code" required autofocus autocomplete="one-time-code" inputmode="numeric" pattern="[0-9A-Z\- ]+">
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%">Verify</button>
+    </form>
+    <p style="margin-top:1rem; text-align:center;">
+        <a href="/login">← Back to login</a>
+    </p>
+</div>
+{% endblock %}

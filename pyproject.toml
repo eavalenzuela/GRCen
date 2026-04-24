@@ -28,6 +28,8 @@ dependencies = [
     "python3-saml>=1.16.0",
     "aiosmtplib>=3.0.0",
     "weasyprint>=63.0",
+    "pyotp>=2.9.0",
+    "qrcode>=7.4.0",
 ]
 
 [project.optional-dependencies]

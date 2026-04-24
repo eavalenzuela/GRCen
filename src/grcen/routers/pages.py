@@ -223,6 +223,14 @@ async def login_submit(request: Request, pool: asyncpg.Pool = Depends(get_db), _
 
     await auth_svc.record_successful_login(pool, user.id)
 
+    # If the user has TOTP enabled, the password step only established intent —
+    # redirect to the second factor step and park the user id in the session.
+    from grcen.services import totp_service
+    if await totp_service.is_enabled(pool, user.id):
+        request.session.clear()
+        request.session["mfa_pending_user_id"] = str(user.id)
+        return RedirectResponse("/login/mfa", status_code=302)
+
     # Session fixation prevention: clear old session, create server-side session
     request.session.clear()
     session_id = await session_service.create_session(
@@ -238,6 +246,62 @@ async def login_submit(request: Request, pool: asyncpg.Pool = Depends(get_db), _
         user_id=user.id,
         username=user.username,
         action="login",
+        entity_type="user",
+        entity_id=user.id,
+        entity_name=user.username,
+    )
+    return RedirectResponse("/", status_code=302)
+
+
+@router.get("/login/mfa", response_class=HTMLResponse)
+async def login_mfa_page(request: Request):
+    pending = request.session.get("mfa_pending_user_id")
+    if not pending:
+        return RedirectResponse("/login", status_code=302)
+    return templates.TemplateResponse(
+        request, "auth/mfa.html", context={"error": None}
+    )
+
+
+@router.post("/login/mfa")
+async def login_mfa_submit(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+):
+    from grcen.services import session_service, totp_service
+    pending = request.session.get("mfa_pending_user_id")
+    if not pending:
+        return RedirectResponse("/login", status_code=302)
+    user_id = UUID(pending)
+
+    form = await request.form()
+    code = str(form.get("code", "")).strip()
+
+    if not await totp_service.verify_login_code(pool, user_id, code):
+        return templates.TemplateResponse(
+            request, "auth/mfa.html",
+            context={"error": "Invalid code. Try again."},
+        )
+
+    user = await auth_svc.get_user_by_id(pool, user_id)
+    if not user or not user.is_active:
+        request.session.clear()
+        return RedirectResponse("/login", status_code=302)
+
+    request.session.clear()
+    session_id = await session_service.create_session(
+        pool,
+        user.id,
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+    )
+    request.session["session_id"] = session_id
+
+    await audit_svc.log_audit_event(
+        pool,
+        user_id=user.id,
+        username=user.username,
+        action="login_mfa",
         entity_type="user",
         entity_id=user.id,
         entity_name=user.username,
@@ -1895,9 +1959,37 @@ async def user_settings(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(get_current_user),
     saved: int = 0,
+    flash: str | None = None,
 ):
+    from grcen.services import totp_service
+
     smtp_cfg = await smtp_settings.get_settings(pool)
     notif_count = await alert_svc.count_unread_notifications(pool)
+
+    enrollment = await totp_service.get_enrollment(pool, user.id)
+    mfa_enabled = bool(enrollment and enrollment["enabled"])
+    mfa_pending_ctx = None
+    # Only show pending enrollment block when we've just begun enrolling
+    # (session holds plaintext recovery codes + secret from the begin step).
+    pending = request.session.get("mfa_pending")
+    if pending and not mfa_enabled:
+        mfa_pending_ctx = {
+            "secret": pending["secret"],
+            "qr_b64": totp_service.qr_png_b64(pending["secret"], user.username),
+            # Only show recovery codes on the first render after begin;
+            # clear afterward so a refresh doesn't leak them.
+            "recovery_codes": pending.pop("recovery_codes", []),
+        }
+        # Keep the secret around so Confirm can still find the QR if the page
+        # is rendered again without codes.
+        request.session["mfa_pending"] = pending
+
+    recovery_remaining = len(enrollment["recovery_codes"]) if enrollment else None
+    flash_ctx = None
+    if flash:
+        ok, _, message = flash.partition(":")
+        flash_ctx = {"ok": ok == "ok", "message": message or flash}
+
     return templates.TemplateResponse(
         request,
         "settings.html",
@@ -1906,6 +1998,10 @@ async def user_settings(
             "saved": bool(saved),
             "smtp_enabled": smtp_cfg.is_enabled,
             "notif_count": notif_count,
+            "mfa_enabled": mfa_enabled,
+            "mfa_pending": mfa_pending_ctx,
+            "recovery_remaining": recovery_remaining if mfa_enabled else None,
+            "flash": flash_ctx,
         },
     )
 
@@ -1923,6 +2019,83 @@ async def user_settings_submit(
         enabled = False
     await auth_svc.set_email_notifications_enabled(pool, user.id, enabled)
     return RedirectResponse("/settings?saved=1", status_code=302)
+
+
+@router.post("/settings/mfa/begin")
+async def mfa_begin(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    from grcen.services import totp_service
+    if user.is_sso:
+        return RedirectResponse(
+            "/settings?flash=fail:MFA is managed by your SSO provider", status_code=302,
+        )
+    secret, recovery_codes = await totp_service.begin_enrollment(pool, user.id)
+    request.session["mfa_pending"] = {
+        "secret": secret,
+        "recovery_codes": recovery_codes,
+    }
+    return RedirectResponse("/settings", status_code=302)
+
+
+@router.post("/settings/mfa/confirm")
+async def mfa_confirm(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    from grcen.services import totp_service
+    form = await request.form()
+    code = str(form.get("code", "")).strip()
+    ok = await totp_service.confirm_enrollment(pool, user.id, code)
+    if not ok:
+        return RedirectResponse(
+            "/settings?flash=fail:Code did not match. Try again.", status_code=302,
+        )
+    request.session.pop("mfa_pending", None)
+    await audit_svc.log_audit_event(
+        pool, user_id=user.id, username=user.username,
+        action="mfa_enable", entity_type="user",
+        entity_id=user.id, entity_name=user.username,
+    )
+    return RedirectResponse(
+        "/settings?flash=ok:Two-factor authentication is now required on login.",
+        status_code=302,
+    )
+
+
+@router.get("/settings/mfa/cancel")
+async def mfa_cancel(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    from grcen.services import totp_service
+    # Drop the pending row — enabled was never flipped so this clears the draft.
+    enrollment = await totp_service.get_enrollment(pool, user.id)
+    if enrollment and not enrollment["enabled"]:
+        await totp_service.disable(pool, user.id)
+    request.session.pop("mfa_pending", None)
+    return RedirectResponse("/settings", status_code=302)
+
+
+@router.post("/settings/mfa/disable")
+async def mfa_disable(
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    from grcen.services import totp_service
+    await totp_service.disable(pool, user.id)
+    await audit_svc.log_audit_event(
+        pool, user_id=user.id, username=user.username,
+        action="mfa_disable", entity_type="user",
+        entity_id=user.id, entity_name=user.username,
+    )
+    return RedirectResponse(
+        "/settings?flash=ok:MFA disabled.", status_code=302,
+    )
 
 
 # --- Token management pages ---

@@ -55,8 +55,8 @@ Assets are created and edited in place — no draft → pending → approved lif
 ### 15. Data-Access Logging — **SHIPPED**
 New `data_access_log` table captures reads (views, downloads, exports, PDF generations) separately from the existing `audit_log` (which stays focused on writes). `services/access_log_service.py.record()` is best-effort — a failed insert is logged but never blocks the user response. Instrumented routes: asset detail view, asset PDF, framework PDF, asset export (CSV/JSON), and attachment downloads (both asset- and relationship-owned). Admin + Auditor can browse `/admin/access-log` with filters (user, entity type, action) or hit `GET /api/access-log/` for programmatic queries. Remaining: list-endpoint sampling (currently skipped to keep volume sane), retention policy / TTL, and export of the access log itself.
 
-### 16. MFA for Local Auth
-OIDC/SAML are shipped, but local-auth users have password-only. Add TOTP (initially) and optional FIDO2/WebAuthn; enforceable per-role.
+### 16. MFA for Local Auth — **SHIPPED (TOTP)**
+Local users can enroll a TOTP second factor from `/settings` — the page shows a QR code + text secret, collects a verification code to enable, and displays eight single-use recovery codes once. Recovery codes are stored SHA-256 hashed; TOTP secrets in plaintext (candidate for a future `user_totp_secrets` encryption scope). Login flow gets a `/login/mfa` step when the user has MFA enabled: password succeeds → session gets `mfa_pending_user_id` → second form accepts either the TOTP or a recovery code (consumed on match). SSO users see a note that MFA is managed by their IdP. Remaining: per-role enforcement (e.g. require MFA for admins), FIDO2 / WebAuthn, optional encryption of TOTP secrets at rest.
 
 ## Tier 4 — Hardening & Operational
 

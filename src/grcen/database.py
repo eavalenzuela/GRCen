@@ -347,6 +347,16 @@ END $$;
 CREATE UNIQUE INDEX IF NOT EXISTS ix_users_saml_sub
     ON users (saml_sub) WHERE saml_sub IS NOT NULL;
 
+-- TOTP second factor for local auth
+CREATE TABLE IF NOT EXISTS user_totp (
+    user_id         UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    secret          VARCHAR(64) NOT NULL,
+    recovery_codes  TEXT[] NOT NULL DEFAULT '{}',
+    enabled         BOOLEAN NOT NULL DEFAULT false,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- Data access log (reads, not writes — audit_log covers writes)
 CREATE TABLE IF NOT EXISTS data_access_log (
     id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),

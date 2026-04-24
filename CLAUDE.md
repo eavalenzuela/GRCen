@@ -40,6 +40,7 @@ GRCen (pronounced "gurken") is a free and open-source GRC (Governance, Risk, Com
 - Audit trail with optional field-level diffs, PII sanitization, encryption support
 - Data access log at `/admin/access-log` records reads (views, downloads, exports, PDFs) separately from audit writes
 - SSO: OIDC and SAML 2.0, with admin UI config and role mapping
+- TOTP MFA for local auth (enroll at `/settings`, challenge at `/login/mfa`, hashed single-use recovery codes)
 - Optional application-level encryption at rest (AES-256-GCM, scope-based keys, zero-downtime rotation, blind indexes)
 - Risk register with 5x5 heatmap, filtering, overdue tracking, bulk-update actions (treatment/owner/review_date), daily severity snapshots + trend arrows, and a control-effectiveness rollup column that averages `mitigated_by` control edges
 - Org Views (hierarchical tree views with orthogonal connectors)
