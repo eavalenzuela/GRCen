@@ -65,7 +65,7 @@ def preview_asset_import(content: str, format: str) -> ImportPreview:
 
 
 async def execute_asset_import(
-    pool: asyncpg.Pool, content: str, format: str
+    pool: asyncpg.Pool, content: str, format: str, dry_run: bool = False
 ) -> ImportResult:
     rows = _parse_csv(content) if format == "csv" else _parse_json(content)
     result = ImportResult()
@@ -88,19 +88,20 @@ async def execute_asset_import(
                     )
                     if owner_row:
                         owner_id = owner_row["id"]
-                await conn.execute(
-                    """
-                    INSERT INTO assets (id, type, name, description, status, owner_id, metadata)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7)
-                    """,
-                    uuid.uuid4(),
-                    row["type"],
-                    row["name"],
-                    row.get("description", ""),
-                    row.get("status", "active"),
-                    owner_id,
-                    json.dumps(metadata),
-                )
+                if not dry_run:
+                    await conn.execute(
+                        """
+                        INSERT INTO assets (id, type, name, description, status, owner_id, metadata)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7)
+                        """,
+                        uuid.uuid4(),
+                        row["type"],
+                        row["name"],
+                        row.get("description", ""),
+                        row.get("status", "active"),
+                        owner_id,
+                        json.dumps(metadata),
+                    )
                 result.created += 1
 
     return result
@@ -135,8 +136,44 @@ def _validate_relationship_row(row: dict, idx: int) -> list[str]:
     return errors
 
 
-async def execute_relationship_import(
+async def preview_relationship_import(
     pool: asyncpg.Pool, content: str, format: str
+) -> ImportPreview:
+    """Validate relationship rows and confirm source/target assets exist."""
+    rows = _parse_csv(content) if format == "csv" else _parse_json(content)
+    preview = ImportPreview(total_rows=len(rows))
+    for idx, row in enumerate(rows, 1):
+        errs = _validate_relationship_row(row, idx)
+        if errs:
+            preview.errors.extend(errs)
+            continue
+        source = await pool.fetchrow(
+            "SELECT 1 FROM assets WHERE name = $1 AND type = $2",
+            row["source_name"],
+            row["source_type"],
+        )
+        if not source:
+            preview.errors.append(
+                f"Row {idx}: source '{row['source_name']}' ({row['source_type']}) not found"
+            )
+            continue
+        target = await pool.fetchrow(
+            "SELECT 1 FROM assets WHERE name = $1 AND type = $2",
+            row["target_name"],
+            row["target_type"],
+        )
+        if not target:
+            preview.errors.append(
+                f"Row {idx}: target '{row['target_name']}' ({row['target_type']}) not found"
+            )
+            continue
+        preview.valid_rows += 1
+    preview.sample = rows[:5]
+    return preview
+
+
+async def execute_relationship_import(
+    pool: asyncpg.Pool, content: str, format: str, dry_run: bool = False
 ) -> ImportResult:
     rows = _parse_csv(content) if format == "csv" else _parse_json(content)
     result = ImportResult()
@@ -176,18 +213,19 @@ async def execute_relationship_import(
                 if rel_type == "owns" and row.get("target_type") == "person":
                     rel_type = "manages"
 
-                await conn.execute(
-                    """
-                    INSERT INTO relationships
-                        (id, source_asset_id, target_asset_id, relationship_type, description)
-                    VALUES ($1, $2, $3, $4, $5)
-                    """,
-                    uuid.uuid4(),
-                    source["id"],
-                    target["id"],
-                    rel_type,
-                    row.get("description", ""),
-                )
+                if not dry_run:
+                    await conn.execute(
+                        """
+                        INSERT INTO relationships
+                            (id, source_asset_id, target_asset_id, relationship_type, description)
+                        VALUES ($1, $2, $3, $4, $5)
+                        """,
+                        uuid.uuid4(),
+                        source["id"],
+                        target["id"],
+                        rel_type,
+                        row.get("description", ""),
+                    )
                 result.created += 1
 
     return result

@@ -10,14 +10,14 @@ Admin configures SMTP at `/admin/smtp-settings`; users opt in at `/settings`; fi
 ### 2. Webhook Notification Delivery — **SHIPPED**
 Admins manage webhooks at `/admin/webhooks`; each endpoint gets HMAC-SHA256-signed JSON posts with `X-GRCen-Event`/`X-GRCen-Signature`/`X-GRCen-Delivery` headers. `fire_alert` dispatches `alert.fired`; admins can send a `ping` event from the UI. All attempts log to `webhook_deliveries`. Remaining work: retry/backoff policy for failed deliveries, digest/batch mode so bulk fires don't spam, and more event types beyond `alert.fired` (e.g. `asset.created`, `risk.review_due`).
 
-### 3. REST API for Assets & Relationships
-Token management exists at `/api/tokens`, but there are no authenticated REST endpoints for the core graph. Integrations (ticketing, SIEM, CI/CD) currently have to scrape HTML. Models and services already exist — mostly needs routers + OpenAPI annotations. Endpoints: `GET/POST/PATCH/DELETE /api/assets`, `/api/relationships`, `/api/assets/{id}/graph`, plus bulk variants.
+### 3. REST API for Assets & Relationships — **SHIPPED**
+(The initial review was wrong: per-asset/per-relationship CRUD + `/api/graph/{id}` + filtered list/search have existed. Bearer tokens work via `/api/tokens`. Auth + RBAC + per-token permission checks live in `routers/deps.py`.) Added in this pass: `POST /api/imports/assets/bulk` and `POST /api/imports/relationships/bulk` for JSON-body batch inserts with `dry_run=true` support, a `preview` endpoint for relationship files, and OpenAPI summaries on every route so `/docs` is self-describing.
 
 ### 4. Compliance Framework Dashboards
 Sample data (`sample_data/relationships.csv:367-387`) already models SOC2 / PCI DSS / GDPR / ISO27001 → requirements → audits. The UI is missing. Add `/frameworks` index and `/frameworks/{id}` detail pages showing: requirements, coverage (requirements with satisfying controls vs. unsatisfied), in-scope assets, audits, and gap highlights.
 
-### 5. Relationship Bulk Import
-Asset CSV/JSON import is complete. Relationship bulk import isn't surfaced through the import router. Extend `services/import_service.py` with a relationships CSV flow (source_id, target_id, type, description) and add a dry-run / preview mode to both asset and relationship imports.
+### 5. Relationship Bulk Import — **SHIPPED** (folded into #3)
+Relationship file upload was already wired to `/api/imports/relationships/execute`. This pass added the matching `/preview` endpoint, a `dry_run` flag on both asset and relationship execute routes, and the JSON-body `/bulk` endpoints covered in #3.
 
 ## Tier 2 — Deepen Existing Features
 

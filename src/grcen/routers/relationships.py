@@ -21,7 +21,11 @@ router = APIRouter(prefix="/api/relationships", tags=["relationships"])
 _REL_FIELDS = ["relationship_type", "description"]
 
 
-@router.get("/", response_model=list[RelationshipResponse])
+@router.get(
+    "/",
+    response_model=list[RelationshipResponse],
+    summary="List relationships touching a given asset",
+)
 async def list_relationships(
     asset_id: UUID,
     pool: asyncpg.Pool = Depends(get_db),
@@ -31,7 +35,12 @@ async def list_relationships(
     return [RelationshipResponse.model_validate(r, from_attributes=True) for r in rels]
 
 
-@router.post("/", response_model=RelationshipResponse, status_code=201)
+@router.post(
+    "/",
+    response_model=RelationshipResponse,
+    status_code=201,
+    summary="Create a relationship between two assets",
+)
 async def create_relationship(
     data: RelationshipCreate,
     pool: asyncpg.Pool = Depends(get_db),
@@ -64,7 +73,11 @@ async def create_relationship(
     return RelationshipResponse.model_validate(rel, from_attributes=True)
 
 
-@router.get("/{rel_id}", response_model=RelationshipResponse)
+@router.get(
+    "/{rel_id}",
+    response_model=RelationshipResponse,
+    summary="Fetch one relationship by id",
+)
 async def get_relationship(
     rel_id: UUID,
     pool: asyncpg.Pool = Depends(get_db),
@@ -76,7 +89,11 @@ async def get_relationship(
     return RelationshipResponse.model_validate(rel, from_attributes=True)
 
 
-@router.put("/{rel_id}", response_model=RelationshipResponse)
+@router.put(
+    "/{rel_id}",
+    response_model=RelationshipResponse,
+    summary="Update a relationship",
+)
 async def update_relationship(
     rel_id: UUID,
     data: RelationshipUpdate,
@@ -105,7 +122,7 @@ async def update_relationship(
     return RelationshipResponse.model_validate(rel, from_attributes=True)
 
 
-@router.delete("/{rel_id}", status_code=204)
+@router.delete("/{rel_id}", status_code=204, summary="Delete a relationship")
 async def delete_relationship(
     rel_id: UUID,
     pool: asyncpg.Pool = Depends(get_db),

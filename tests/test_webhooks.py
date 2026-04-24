@@ -1,5 +1,6 @@
 """Tests for webhook CRUD, HMAC signing, dispatch, and alert fan-out."""
 
+import contextlib
 import hashlib
 import hmac
 import json
@@ -14,6 +15,24 @@ from grcen.permissions import UserRole
 from grcen.services import alert_service, webhook_service
 from grcen.services import asset as asset_svc
 from grcen.services.auth import create_user
+
+
+_RealAsyncClient = httpx.AsyncClient
+
+
+def _patch_httpx_with_transport(transport: httpx.MockTransport):
+    """Return a patch() context that makes webhook_service use a MockTransport.
+
+    The service uses ``async with httpx.AsyncClient(timeout=...) as client: ...``
+    so we replace AsyncClient with a factory that ignores its args and builds a
+    real client (captured before patching) backed by ``transport``.
+    """
+    @contextlib.asynccontextmanager
+    async def factory(*args, **kwargs):
+        async with _RealAsyncClient(transport=transport) as client:
+            yield client
+
+    return patch("grcen.services.webhook_service.httpx.AsyncClient", factory)
 
 # ── CRUD ─────────────────────────────────────────────────────────────────
 
@@ -99,11 +118,7 @@ async def test_send_to_webhook_signs_and_logs(pool):
     )
     captured, transport = _capture_request()
 
-    with patch("grcen.services.webhook_service.httpx.AsyncClient") as mock_client:
-        mock_client.return_value.__aenter__.return_value = httpx.AsyncClient(
-            transport=transport
-        )
-        mock_client.return_value.__aexit__.return_value = None
+    with _patch_httpx_with_transport(transport):
         ok, status, err = await webhook_service.send_to_webhook(
             pool, hook, "ping", {"hello": "world"}
         )
@@ -138,11 +153,7 @@ async def test_send_to_webhook_without_secret_omits_signature(pool):
     )
     captured, transport = _capture_request()
 
-    with patch("grcen.services.webhook_service.httpx.AsyncClient") as mock_client:
-        mock_client.return_value.__aenter__.return_value = httpx.AsyncClient(
-            transport=transport
-        )
-        mock_client.return_value.__aexit__.return_value = None
+    with _patch_httpx_with_transport(transport):
         await webhook_service.send_to_webhook(pool, hook, "ping", {})
 
     assert "x-grcen-signature" not in captured["headers"]
@@ -158,11 +169,7 @@ async def test_send_to_webhook_logs_non_2xx_as_failure(pool):
         return httpx.Response(500, text="server boom")
 
     transport = httpx.MockTransport(handler)
-    with patch("grcen.services.webhook_service.httpx.AsyncClient") as mock_client:
-        mock_client.return_value.__aenter__.return_value = httpx.AsyncClient(
-            transport=transport
-        )
-        mock_client.return_value.__aexit__.return_value = None
+    with _patch_httpx_with_transport(transport):
         ok, status, err = await webhook_service.send_to_webhook(pool, hook, "ping", {})
 
     assert ok is False
@@ -186,11 +193,7 @@ async def test_send_to_webhook_logs_connection_error(pool):
         raise httpx.ConnectError("refused")
 
     transport = httpx.MockTransport(handler)
-    with patch("grcen.services.webhook_service.httpx.AsyncClient") as mock_client:
-        mock_client.return_value.__aenter__.return_value = httpx.AsyncClient(
-            transport=transport
-        )
-        mock_client.return_value.__aexit__.return_value = None
+    with _patch_httpx_with_transport(transport):
         ok, status, err = await webhook_service.send_to_webhook(pool, hook, "ping", {})
 
     assert ok is False
@@ -245,11 +248,7 @@ async def test_fire_alert_dispatches_webhook(pool):
     )
 
     captured, transport = _capture_request()
-    with patch("grcen.services.webhook_service.httpx.AsyncClient") as mock_client:
-        mock_client.return_value.__aenter__.return_value = httpx.AsyncClient(
-            transport=transport
-        )
-        mock_client.return_value.__aexit__.return_value = None
+    with _patch_httpx_with_transport(transport):
         await alert_service.fire_alert(pool, alert.id)
 
     assert captured["url"] == "https://e.com/hook"
@@ -286,11 +285,7 @@ async def test_fire_alert_webhook_failure_does_not_crash(pool):
         raise httpx.ConnectError("nope")
 
     transport = httpx.MockTransport(handler)
-    with patch("grcen.services.webhook_service.httpx.AsyncClient") as mock_client:
-        mock_client.return_value.__aenter__.return_value = httpx.AsyncClient(
-            transport=transport
-        )
-        mock_client.return_value.__aexit__.return_value = None
+    with _patch_httpx_with_transport(transport):
         # Must not raise
         await alert_service.fire_alert(pool, alert.id)
 

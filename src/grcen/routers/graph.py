@@ -12,7 +12,11 @@ from grcen.services.graph import get_asset_graph
 router = APIRouter(prefix="/api/graph", tags=["graph"])
 
 
-@router.get("/{asset_id}", response_model=GraphResponse)
+@router.get(
+    "/{asset_id}",
+    response_model=GraphResponse,
+    summary="Fetch the N-hop subgraph centered on an asset",
+)
 async def graph(
     asset_id: UUID,
     depth: int = 1,

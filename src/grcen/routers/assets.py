@@ -21,7 +21,11 @@ router = APIRouter(prefix="/api/assets", tags=["assets"])
 _ASSET_FIELDS = ["name", "description", "status", "owner", "metadata"]
 
 
-@router.get("/", response_model=AssetListResponse)
+@router.get(
+    "/",
+    response_model=AssetListResponse,
+    summary="List assets with filtering and pagination",
+)
 async def list_assets(
     type: AssetType | None = None,
     q: str | None = None,
@@ -47,7 +51,7 @@ async def list_assets(
     )
 
 
-@router.get("/search")
+@router.get("/search", summary="Full-text search across asset names and descriptions")
 async def search_assets(
     q: str = "",
     types: str = "",
@@ -61,7 +65,7 @@ async def search_assets(
     return [AssetResponse.model_validate(a, from_attributes=True) for a in results]
 
 
-@router.post("/", response_model=AssetResponse, status_code=201)
+@router.post("/", response_model=AssetResponse, status_code=201, summary="Create an asset")
 async def create_asset(
     data: AssetCreate,
     pool: asyncpg.Pool = Depends(get_db),
@@ -92,7 +96,7 @@ async def create_asset(
     return AssetResponse.model_validate(asset, from_attributes=True)
 
 
-@router.get("/{asset_id}", response_model=AssetResponse)
+@router.get("/{asset_id}", response_model=AssetResponse, summary="Fetch one asset by id")
 async def get_asset(
     asset_id: UUID,
     pool: asyncpg.Pool = Depends(get_db),
@@ -104,7 +108,7 @@ async def get_asset(
     return AssetResponse.model_validate(asset, from_attributes=True)
 
 
-@router.put("/{asset_id}", response_model=AssetResponse)
+@router.put("/{asset_id}", response_model=AssetResponse, summary="Update an asset")
 async def update_asset(
     asset_id: UUID,
     data: AssetUpdate,
@@ -135,7 +139,7 @@ async def update_asset(
     return AssetResponse.model_validate(asset, from_attributes=True)
 
 
-@router.delete("/{asset_id}", status_code=204)
+@router.delete("/{asset_id}", status_code=204, summary="Delete an asset")
 async def delete_asset(
     asset_id: UUID,
     pool: asyncpg.Pool = Depends(get_db),
