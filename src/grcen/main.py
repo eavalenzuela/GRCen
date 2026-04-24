@@ -96,6 +96,7 @@ def create_app() -> FastAPI:
     app.include_router(assets.router)
     app.include_router(relationships.router)
     app.include_router(attachments.router)
+    app.include_router(attachments.rel_router)
     app.include_router(graph.router)
     app.include_router(org_views.router)
     app.include_router(imports.router)

@@ -28,7 +28,7 @@ GRCen (pronounced "gurken") is a free and open-source GRC (Governance, Risk, Com
 
 ## Asset Model
 
-16 asset types are implemented: Person, Policy, Product, System, Device, Data Category, Audit, Requirement, Process, Intellectual Property, Risk, Organizational Unit, Vendor, Control, Incident, Framework. Any asset can link to any other via a `Relationship` with a type and free-text description. Per-type custom fields are supported (`src/grcen/custom_fields.py`). Assets support evidence/document/URL attachments (relationships do not, currently).
+16 asset types are implemented: Person, Policy, Product, System, Device, Data Category, Audit, Requirement, Process, Intellectual Property, Risk, Organizational Unit, Vendor, Control, Incident, Framework. Any asset can link to any other via a `Relationship` with a type and free-text description. Per-type custom fields are supported (`src/grcen/custom_fields.py`). Both assets AND relationships can have evidence/document/URL attachments (enforced by a CHECK constraint that an attachment has exactly one owner).
 
 ## Implemented Features
 
@@ -47,7 +47,6 @@ GRCen (pronounced "gurken") is a free and open-source GRC (Governance, Risk, Com
 
 ## Known Gaps (see `feature_roadmap.md` for the full list)
 
-- Attachments on relationships (asset-only today)
 - Multi-tenancy / multi-org
 - PDF report generation
 - Cross-cutting tag vocabulary (asset tags exist but are per-asset strings)

@@ -347,6 +347,27 @@ END $$;
 CREATE UNIQUE INDEX IF NOT EXISTS ix_users_saml_sub
     ON users (saml_sub) WHERE saml_sub IS NOT NULL;
 
+-- Allow attachments to hang off relationships as well as assets.
+DO $$ BEGIN
+    ALTER TABLE attachments ALTER COLUMN asset_id DROP NOT NULL;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+DO $$ BEGIN
+    ALTER TABLE attachments ADD COLUMN relationship_id UUID
+        REFERENCES relationships(id) ON DELETE CASCADE;
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+CREATE INDEX IF NOT EXISTS idx_attachments_relationship
+    ON attachments (relationship_id);
+DO $$ BEGIN
+    ALTER TABLE attachments ADD CONSTRAINT attachments_exactly_one_owner
+        CHECK (
+            (asset_id IS NOT NULL AND relationship_id IS NULL) OR
+            (asset_id IS NULL AND relationship_id IS NOT NULL)
+        );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
 -- SMTP configuration (key-value, mirrors oidc_config)
 CREATE TABLE IF NOT EXISTS smtp_config (
     key         VARCHAR(50) PRIMARY KEY,

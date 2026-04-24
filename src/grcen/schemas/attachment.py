@@ -14,7 +14,8 @@ class AttachmentCreate(BaseModel):
 
 class AttachmentResponse(BaseModel):
     id: UUID
-    asset_id: UUID
+    asset_id: UUID | None = None
+    relationship_id: UUID | None = None
     kind: AttachmentKind
     name: str
     url_or_path: str | None

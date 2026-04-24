@@ -103,7 +103,7 @@
 <div id="relationships">
     {% if relationships %}
     <table>
-        <thead><tr><th>Relationship</th><th>Related Asset</th><th>Description</th>{% if has_perm(user.role, Permission.DELETE) %}<th></th>{% endif %}</tr></thead>
+        <thead><tr><th>Relationship</th><th>Related Asset</th><th>Description</th><th>Evidence</th>{% if has_perm(user.role, Permission.DELETE) %}<th></th>{% endif %}</tr></thead>
         <tbody>
             {% for rel in relationships %}
             {% set is_outgoing = rel.source_asset_id == asset.id %}
@@ -117,6 +117,11 @@
                     {% endif %}
                 </td>
                 <td>{{ rel.description or '—' }}</td>
+                <td>
+                    <a href="/relationships/{{ rel.id }}/evidence">
+                        {% if rel.attachment_count %}{{ rel.attachment_count }} file{{ 's' if rel.attachment_count != 1 }}{% else %}+ add{% endif %}
+                    </a>
+                </td>
                 {% if has_perm(user.role, Permission.DELETE) %}
                 <td>
                     <button hx-delete="/api/relationships/{{ rel.id }}"

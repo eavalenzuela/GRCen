@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Relationship Evidence - GRCen{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Evidence</h1>
+    <p>
+        <a href="/assets/{{ rel.source_asset_id }}">← Back to asset</a>
+    </p>
+</div>
+
+<div class="card">
+    <h3>Relationship</h3>
+    <p>
+        <a href="/assets/{{ rel.source_asset_id }}">{{ source.name }}</a>
+        &nbsp;→&nbsp;<strong>{{ rel.relationship_type }}</strong>&nbsp;→&nbsp;
+        <a href="/assets/{{ rel.target_asset_id }}">{{ target.name }}</a>
+    </p>
+    {% if rel.description %}
+    <p style="color:#374151;">{{ rel.description }}</p>
+    {% endif %}
+</div>
+
+<div class="card" style="margin-top:1.5rem;">
+    <h3>Attached Evidence</h3>
+    {% if attachments %}
+    <table class="table">
+        <thead><tr><th>Kind</th><th>Name</th><th></th></tr></thead>
+        <tbody>
+        {% for att in attachments %}
+            <tr>
+                <td>{{ att.kind.value }}</td>
+                <td>
+                    {% if att.kind.value == 'file' %}
+                    <a href="/api/relationships/{{ rel.id }}/attachments/{{ att.id }}/download">{{ att.name }}</a>
+                    {% elif att.kind.value == 'url' %}
+                    <a href="{{ att.url_or_path }}" target="_blank" rel="noopener">{{ att.name }}</a>
+                    {% else %}
+                    {{ att.name }}
+                    {% endif %}
+                </td>
+                <td>
+                    {% if has_perm(user.role, Permission.DELETE) %}
+                    <form method="post"
+                          action="/relationships/{{ rel.id }}/evidence/{{ att.id }}/delete"
+                          onsubmit="return confirm('Delete this attachment?');">
+                        {% include "partials/csrf.html" %}
+                        <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color:#6b7280;">No evidence attached yet.</p>
+    {% endif %}
+</div>
+
+{% if has_perm(user.role, Permission.CREATE) %}
+<div class="card" style="margin-top:1.5rem;">
+    <h3>Add URL or Document Reference</h3>
+    <form method="post" action="/relationships/{{ rel.id }}/evidence">
+        {% include "partials/csrf.html" %}
+        <div class="form-group">
+            <label for="kind">Kind</label>
+            <select id="kind" name="kind" required>
+                <option value="url">URL</option>
+                <option value="document">Document Reference</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="name">Name / Title</label>
+            <input type="text" id="name" name="name" required>
+        </div>
+        <div class="form-group">
+            <label for="url_or_path">URL / Path</label>
+            <input type="text" id="url_or_path" name="url_or_path" required>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Add</button>
+        </div>
+    </form>
+</div>
+
+<div class="card" style="margin-top:1.5rem;">
+    <h3>Upload File</h3>
+    <form method="post" action="/relationships/{{ rel.id }}/evidence/upload"
+          enctype="multipart/form-data">
+        {% include "partials/csrf.html" %}
+        <div class="form-group">
+            <input type="file" name="file" required>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Upload</button>
+        </div>
+    </form>
+</div>
+{% endif %}
+{% endblock %}

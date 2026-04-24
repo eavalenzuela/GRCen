@@ -9,20 +9,27 @@ from grcen.models.attachment import Attachment, AttachmentKind
 async def create_attachment(
     pool: asyncpg.Pool,
     *,
-    asset_id: UUID,
+    asset_id: UUID | None = None,
+    relationship_id: UUID | None = None,
     kind: AttachmentKind,
     name: str,
     url_or_path: str | None = None,
     encrypted: bool = False,
 ) -> Attachment:
+    if (asset_id is None) == (relationship_id is None):
+        raise ValueError(
+            "Exactly one of asset_id or relationship_id must be provided"
+        )
     row = await pool.fetchrow(
         """
-        INSERT INTO attachments (id, asset_id, kind, name, url_or_path, encrypted)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO attachments
+            (id, asset_id, relationship_id, kind, name, url_or_path, encrypted)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING *
         """,
         uuid.uuid4(),
         asset_id,
+        relationship_id,
         kind.value,
         name,
         url_or_path,
@@ -35,6 +42,16 @@ async def list_attachments(pool: asyncpg.Pool, asset_id: UUID) -> list[Attachmen
     rows = await pool.fetch(
         "SELECT * FROM attachments WHERE asset_id = $1 ORDER BY created_at",
         asset_id,
+    )
+    return [Attachment.from_row(r) for r in rows]
+
+
+async def list_attachments_for_relationship(
+    pool: asyncpg.Pool, relationship_id: UUID
+) -> list[Attachment]:
+    rows = await pool.fetch(
+        "SELECT * FROM attachments WHERE relationship_id = $1 ORDER BY created_at",
+        relationship_id,
     )
     return [Attachment.from_row(r) for r in rows]
 

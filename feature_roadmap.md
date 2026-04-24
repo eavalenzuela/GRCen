@@ -21,8 +21,8 @@ Relationship file upload was already wired to `/api/imports/relationships/execut
 
 ## Tier 2 — Deepen Existing Features
 
-### 6. Attachments on Relationships
-Evidence/documents currently attach only to assets. GRC often needs "proof that this control satisfies that requirement" — add a nullable `relationship_id` to `attachments` (alongside the existing `asset_id`) and extend the UI.
+### 6. Attachments on Relationships — **SHIPPED**
+`attachments` now allows either `asset_id` OR `relationship_id` (enforced via CHECK constraint). Evidence can be attached to edges like "control satisfies requirement" from a dedicated `/relationships/{id}/evidence` page. Asset detail lists each relationship with a link showing its evidence count. Matching REST endpoints live under `/api/relationships/{id}/attachments/` mirroring the asset endpoints (list, create, upload, download, delete). Cascade-delete cleans up attachments when a relationship is removed.
 
 ### 7. Risk Management Polish
 Register, heatmap, and filters are in. Still missing:

@@ -13,7 +13,8 @@ class AttachmentKind(enum.StrEnum):
 @dataclass
 class Attachment:
     id: UUID
-    asset_id: UUID
+    asset_id: UUID | None
+    relationship_id: UUID | None
     kind: AttachmentKind
     name: str
     url_or_path: str | None
@@ -25,7 +26,8 @@ class Attachment:
     def from_row(cls, row) -> "Attachment":
         return cls(
             id=row["id"],
-            asset_id=row["asset_id"],
+            asset_id=row.get("asset_id"),
+            relationship_id=row.get("relationship_id"),
             kind=AttachmentKind(row["kind"]),
             name=row["name"],
             url_or_path=row["url_or_path"],
