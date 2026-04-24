@@ -10,11 +10,11 @@ def test_admin_has_all_permissions():
 
 def test_editor_permissions():
     allowed = {
-        Permission.VIEW, Permission.VIEW_GRAPH, Permission.CREATE,
-        Permission.EDIT, Permission.DELETE, Permission.IMPORT,
-        Permission.EXPORT, Permission.MANAGE_ALERTS,
+        Permission.VIEW, Permission.VIEW_GRAPH, Permission.VIEW_PII,
+        Permission.CREATE, Permission.EDIT, Permission.DELETE,
+        Permission.IMPORT, Permission.EXPORT, Permission.MANAGE_ALERTS,
     }
-    denied = {Permission.MANAGE_USERS}
+    denied = {Permission.MANAGE_USERS, Permission.VIEW_AUDIT}
 
     for perm in allowed:
         assert has_permission(UserRole.EDITOR, perm), f"Editor should have {perm}"
@@ -33,7 +33,10 @@ def test_viewer_permissions():
 
 
 def test_auditor_permissions():
-    allowed = {Permission.VIEW, Permission.VIEW_GRAPH, Permission.EXPORT, Permission.VIEW_AUDIT}
+    allowed = {
+        Permission.VIEW, Permission.VIEW_GRAPH, Permission.VIEW_PII,
+        Permission.EXPORT, Permission.VIEW_AUDIT,
+    }
     denied = set(Permission) - allowed
 
     for perm in allowed:

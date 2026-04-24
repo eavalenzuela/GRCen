@@ -15,11 +15,13 @@ import asyncpg
 from fastapi.templating import Jinja2Templates
 from weasyprint import HTML
 
+from grcen.models.user import User
 from grcen.services import (
     alert_service as alert_svc,
     asset as asset_svc,
     attachment as att_svc,
     framework_service,
+    redaction,
     relationship as rel_svc,
 )
 
@@ -49,7 +51,9 @@ async def render_framework_report(
     )
 
 
-async def render_asset_report(pool: asyncpg.Pool, asset_id: UUID) -> bytes | None:
+async def render_asset_report(
+    pool: asyncpg.Pool, asset_id: UUID, user: User | None = None
+) -> bytes | None:
     asset = await asset_svc.get_asset(pool, asset_id)
     if not asset:
         return None
@@ -85,6 +89,7 @@ async def render_asset_report(pool: asyncpg.Pool, asset_id: UUID) -> bytes | Non
     if isinstance(meta, str):
         meta = json.loads(meta or "{}")
     meta = meta or {}
+    meta = redaction.redact_metadata(meta, asset.type, user)
 
     return _render(
         "reports/asset.html",

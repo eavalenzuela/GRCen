@@ -49,8 +49,8 @@ Single-org only. Precludes SaaS / MSP deployment. Touches every model (add `orga
 ### 13. Workflow / Approval States
 Assets are created and edited in place — no draft → pending → approved lifecycle, no audit sign-offs. Add per-type workflow configuration, pending-state persistence, and approval events with audit trail.
 
-### 14. Field-Level Redaction by Role
-All four roles currently see all asset fields. Define sensitivity per field (or per custom field) and mask/blur for roles without view permission on that sensitivity level.
+### 14. Field-Level Redaction by Role — **SHIPPED**
+`FieldDef` now carries a `sensitive: bool` flag; Person fields `email`, `phone`, and `clearance_level` are marked sensitive and can serve as a template for other asset types. New `Permission.VIEW_PII` is granted to Admin / Editor / Auditor but denied to Viewer. `services/redaction.py` returns a masked copy of metadata for users lacking VIEW_PII and is applied at every egress point: asset detail HTML page, `/api/assets/` list + search + detail, CSV/JSON exports, and PDF asset reports. Secure default: if no user is passed to the export helper, redaction still fires. Remaining: admin UI to mark fields sensitive without code change, per-asset overrides, redaction on non-Person types as more candidates get identified.
 
 ### 15. Data-Access Logging
 `audit_log` captures *changes*. Compliance frameworks (HIPAA, several SOC2 CCs) also require *read* logs: who viewed which asset, who exported which dataset, when. Add a lightweight access-log table + middleware.

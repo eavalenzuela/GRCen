@@ -18,12 +18,13 @@ async def export(
     status: AssetStatus | None = None,
     columns: str | None = None,
     pool: asyncpg.Pool = Depends(get_db),
-    _user: User = Depends(require_permission(Permission.EXPORT)),
+    user: User = Depends(require_permission(Permission.EXPORT)),
 ):
     asset_types = [AssetType(t) for t in types.split(",")] if types else None
     cols = columns.split(",") if columns else None
     content = await export_assets(
-        pool, format=format, asset_types=asset_types, status=status, columns=cols
+        pool, format=format, asset_types=asset_types, status=status,
+        columns=cols, user=user,
     )
 
     if format == "json":

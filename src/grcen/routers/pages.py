@@ -30,6 +30,7 @@ from grcen.services import (
     framework_service,
     oidc_settings,
     pdf_service,
+    redaction,
     saml_settings,
     saved_search_service,
     smtp_settings,
@@ -477,6 +478,7 @@ async def asset_detail(
     asset = await asset_svc.get_asset(pool, asset_id)
     if not asset:
         return HTMLResponse("Not found", status_code=404)
+    asset.metadata_ = redaction.redact_metadata(asset.metadata_, asset.type, user)
     rels = await rel_svc.list_relationships_for_asset(pool, asset_id)
     if rels:
         rel_ids = [r.id for r in rels]
@@ -1804,9 +1806,9 @@ async def framework_report_pdf(
 async def asset_report_pdf(
     asset_id: UUID,
     pool: asyncpg.Pool = Depends(get_db),
-    _user: User = Depends(require_permission(Permission.VIEW)),
+    user: User = Depends(require_permission(Permission.VIEW)),
 ):
-    pdf = await pdf_service.render_asset_report(pool, asset_id)
+    pdf = await pdf_service.render_asset_report(pool, asset_id, user=user)
     if pdf is None:
         raise HTTPException(status_code=404, detail="Asset not found")
     return Response(

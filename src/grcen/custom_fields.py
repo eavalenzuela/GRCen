@@ -11,6 +11,10 @@ class FieldDef:
     required: bool = False
     choices: list[str] | None = None
     help_text: str = ""
+    # Fields flagged sensitive are redacted for users lacking VIEW_PII.
+    # Covers PII (email, phone), security posture (clearance_level), and
+    # similar categories that shouldn't default to universally visible.
+    sensitive: bool = False
 
 
 CUSTOM_FIELDS: dict[AssetType, list[FieldDef]] = {
@@ -18,7 +22,7 @@ CUSTOM_FIELDS: dict[AssetType, list[FieldDef]] = {
         FieldDef("manager", "Manager", "text"),
         FieldDef("title", "Job Title", "text"),
         FieldDef("department", "Department", "text"),
-        FieldDef("email", "Email", "text"),
+        FieldDef("email", "Email", "text", sensitive=True),
         FieldDef(
             "employment_type",
             "Employment Type",
@@ -27,12 +31,13 @@ CUSTOM_FIELDS: dict[AssetType, list[FieldDef]] = {
         ),
         FieldDef("start_date", "Start Date", "date"),
         FieldDef("end_date", "End Date", "date"),
-        FieldDef("phone", "Phone", "text"),
+        FieldDef("phone", "Phone", "text", sensitive=True),
         FieldDef(
             "clearance_level",
             "Clearance Level",
             "enum",
             choices=["none", "confidential", "secret", "top_secret"],
+            sensitive=True,
         ),
         FieldDef("last_reviewed", "Last Reviewed", "date"),
         FieldDef("next_review_due", "Next Review Due", "date"),

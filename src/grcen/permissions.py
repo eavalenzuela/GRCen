@@ -11,6 +11,7 @@ class UserRole(str, Enum):
 class Permission(str, Enum):
     VIEW = "view"
     VIEW_GRAPH = "view_graph"
+    VIEW_PII = "view_pii"  # See fields marked sensitive=True on their asset types
     CREATE = "create"
     EDIT = "edit"
     DELETE = "delete"
@@ -26,6 +27,7 @@ ROLE_PERMISSIONS: dict[UserRole, set[Permission]] = {
     UserRole.EDITOR: {
         Permission.VIEW,
         Permission.VIEW_GRAPH,
+        Permission.VIEW_PII,
         Permission.CREATE,
         Permission.EDIT,
         Permission.DELETE,
@@ -40,6 +42,7 @@ ROLE_PERMISSIONS: dict[UserRole, set[Permission]] = {
     UserRole.AUDITOR: {
         Permission.VIEW,
         Permission.VIEW_GRAPH,
+        Permission.VIEW_PII,
         Permission.EXPORT,
         Permission.VIEW_AUDIT,
     },

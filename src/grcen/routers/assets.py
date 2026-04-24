@@ -15,6 +15,7 @@ from grcen.schemas.asset import (
 )
 from grcen.services import asset as asset_svc
 from grcen.services import audit_service as audit_svc
+from grcen.services import redaction
 
 router = APIRouter(prefix="/api/assets", tags=["assets"])
 
@@ -37,7 +38,7 @@ async def list_assets(
     page: int = 1,
     page_size: int = 25,
     pool: asyncpg.Pool = Depends(get_db),
-    _user: User = Depends(require_permission(Permission.VIEW)),
+    user: User = Depends(require_permission(Permission.VIEW)),
 ):
     items, total = await asset_svc.list_assets(
         pool, asset_type=type, page=page, page_size=page_size,
@@ -45,6 +46,8 @@ async def list_assets(
         created_after=created_after, created_before=created_before,
         tag=tag,
     )
+    for a in items:
+        a.metadata_ = redaction.redact_metadata(a.metadata_, a.type, user)
     return AssetListResponse(
         items=[AssetResponse.model_validate(a, from_attributes=True) for a in items],
         total=total,
@@ -58,12 +61,14 @@ async def search_assets(
     q: str = "",
     types: str = "",
     pool: asyncpg.Pool = Depends(get_db),
-    _user: User = Depends(require_permission(Permission.VIEW)),
+    user: User = Depends(require_permission(Permission.VIEW)),
 ):
     type_list = None
     if types:
         type_list = [AssetType(t.strip()) for t in types.split(",") if t.strip()]
     results = await asset_svc.search_assets(pool, q, types=type_list)
+    for a in results:
+        a.metadata_ = redaction.redact_metadata(a.metadata_, a.type, user)
     return [AssetResponse.model_validate(a, from_attributes=True) for a in results]
 
 
@@ -102,11 +107,12 @@ async def create_asset(
 async def get_asset(
     asset_id: UUID,
     pool: asyncpg.Pool = Depends(get_db),
-    _user: User = Depends(require_permission(Permission.VIEW)),
+    user: User = Depends(require_permission(Permission.VIEW)),
 ):
     asset = await asset_svc.get_asset(pool, asset_id)
     if not asset:
         raise HTTPException(status_code=404, detail="Asset not found")
+    asset.metadata_ = redaction.redact_metadata(asset.metadata_, asset.type, user)
     return AssetResponse.model_validate(asset, from_attributes=True)
 
 

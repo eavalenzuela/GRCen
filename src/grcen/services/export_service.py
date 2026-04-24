@@ -6,6 +6,8 @@ import asyncpg
 
 from grcen.custom_fields import CUSTOM_FIELDS
 from grcen.models.asset import AssetStatus, AssetType
+from grcen.models.user import User
+from grcen.services import redaction
 
 
 async def export_assets(
@@ -14,6 +16,7 @@ async def export_assets(
     asset_types: list[AssetType] | None = None,
     status: AssetStatus | None = None,
     columns: list[str] | None = None,
+    user: User | None = None,
 ) -> str:
     conditions: list[str] = []
     params: list = []
@@ -56,6 +59,8 @@ async def export_assets(
         metadata = row.get("metadata") or {}
         if isinstance(metadata, str):
             metadata = json.loads(metadata)
+        # Mask sensitive custom fields for users without VIEW_PII.
+        metadata = redaction.redact_metadata(metadata, row.get("type"), user)
         for col in selected:
             if col in ("id", "type", "name", "description", "status", "created_at", "updated_at"):
                 val = row.get(col, "")

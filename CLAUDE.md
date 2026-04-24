@@ -36,7 +36,7 @@ GRCen (pronounced "gurken") is a free and open-source GRC (Governance, Risk, Com
 - Visual node graphs (Cytoscape.js) at `/assets/{id}/graph` with a drag-to-link mode for creating relationships inline
 - Bulk CSV/JSON import of assets with preview; filterable column-selectable export (CSV/JSON)
 - Schedulable alerts and review reminders with three delivery channels: in-app notifications, SMTP email (admin config at `/admin/smtp-settings`, user opt-in at `/settings`, log in `notification_deliveries`), and outbound webhooks (manage at `/admin/webhooks`, HMAC-SHA256 signed, log in `webhook_deliveries`).
-- RBAC with four roles: Admin, Editor, Viewer, Auditor (`permissions.py`)
+- RBAC with four roles: Admin, Editor, Viewer, Auditor (`permissions.py`), plus field-level redaction of fields marked `sensitive=True` in `custom_fields.py` for users without `VIEW_PII` permission
 - Audit trail with optional field-level diffs, PII sanitization, encryption support
 - SSO: OIDC and SAML 2.0, with admin UI config and role mapping
 - Optional application-level encryption at rest (AES-256-GCM, scope-based keys, zero-downtime rotation, blind indexes)
