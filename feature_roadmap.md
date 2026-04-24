@@ -35,8 +35,8 @@ Kept the existing `assets.tags TEXT[]` column (no schema change — the GIN inde
 ### 9. Saved / Bookmarked Searches — **SHIPPED**
 New `saved_searches` table stores per-user (path + query_string) bookmarks with an optional `shared` flag. A shared `partials/saved_searches.html` include renders a "Saved searches (N)" dropdown + "Save this search" button on `/assets` and `/risk-management`; saves capture the current filters and re-running is a single click. Owners and admins can delete; private searches return 404 to non-owners (no existence leak). Matching REST endpoints: `GET/POST /api/saved-searches/`, `DELETE /api/saved-searches/{id}`, plus a `?path=X` query filter to scope a list to one page.
 
-### 10. Drag-and-Drop Graph Relationship Creation
-The graph already supports click-to-link and bulk CSV/JSON import. Drag-and-drop creation directly in the D3 view would be a meaningful ergonomics upgrade.
+### 10. Drag-and-Drop Graph Relationship Creation — **SHIPPED**
+Graph view "Link Mode" is now drag-to-link: press on a source node, drag across the canvas (a dashed ghost edge follows the cursor), and drop on a target node — a prompt captures the relationship type and description. Hovered targets highlight green; dropping on empty space or back on the source cancels. Mode stays active across creations so you can wire many relationships in a row.
 
 ### 11. PDF / Report Generation
 Current exports are CSV/JSON only. Auditors often need a formatted compliance report for a given Audit or Requirement. Use WeasyPrint or ReportLab; template the scope-summary report first, then extend.

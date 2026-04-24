@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Graph: {{ asset.name }} - GRCen{% endblock %}
+{% block body_attrs %}data-asset-id="{{ asset.id }}"{% endblock %}
 {% block content %}
 <div class="page-header">
     <h1>Graph: {{ asset.name }}</h1>
