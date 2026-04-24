@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}GRCen Report{% endblock %}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 1.5cm;
+            @top-right {
+                content: "GRCen — {% block page_title %}Report{% endblock %}";
+                font-size: 9pt;
+                color: #6b7280;
+            }
+            @bottom-right {
+                content: "Page " counter(page) " of " counter(pages);
+                font-size: 9pt;
+                color: #6b7280;
+            }
+        }
+        body { font-family: "Helvetica", Arial, sans-serif; color: #111827; font-size: 10pt; line-height: 1.4; }
+        h1 { font-size: 20pt; margin: 0 0 0.5rem 0; color: #1e293b; }
+        h2 { font-size: 13pt; margin: 1.2rem 0 0.5rem 0; border-bottom: 1px solid #d1d5db; padding-bottom: 0.2rem; color: #374151; }
+        h3 { font-size: 11pt; margin: 0.8rem 0 0.3rem 0; color: #4b5563; }
+        table { width: 100%; border-collapse: collapse; margin: 0.4rem 0 0.8rem 0; }
+        th, td { text-align: left; padding: 0.3rem 0.4rem; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+        th { background: #f3f4f6; font-size: 9pt; text-transform: uppercase; color: #6b7280; letter-spacing: 0.02em; }
+        .meta-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.6rem 1rem; margin: 0.6rem 0 1rem 0; }
+        .meta-grid small { display: block; color: #6b7280; text-transform: uppercase; font-size: 8pt; letter-spacing: 0.03em; }
+        .pill { display: inline-block; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 8.5pt; }
+        .pill-ok { background: #dcfce7; color: #166534; }
+        .pill-warn { background: #fef3c7; color: #92400e; }
+        .pill-bad { background: #fee2e2; color: #991b1b; }
+        .muted { color: #6b7280; }
+        .header-strap { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 2px solid #1e293b; padding-bottom: 0.4rem; margin-bottom: 0.8rem; }
+        .header-strap small { color: #6b7280; }
+    </style>
+</head>
+<body>
+    <div class="header-strap">
+        <h1>{% block heading %}GRCen Report{% endblock %}</h1>
+        <small>Generated {{ generated_at.strftime('%Y-%m-%d %H:%M UTC') }}</small>
+    </div>
+    {% block content %}{% endblock %}
+</body>
+</html>

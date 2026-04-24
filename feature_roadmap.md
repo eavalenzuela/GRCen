@@ -38,8 +38,8 @@ New `saved_searches` table stores per-user (path + query_string) bookmarks with 
 ### 10. Drag-and-Drop Graph Relationship Creation — **SHIPPED**
 Graph view "Link Mode" is now drag-to-link: press on a source node, drag across the canvas (a dashed ghost edge follows the cursor), and drop on a target node — a prompt captures the relationship type and description. Hovered targets highlight green; dropping on empty space or back on the source cancels. Mode stays active across creations so you can wire many relationships in a row.
 
-### 11. PDF / Report Generation
-Current exports are CSV/JSON only. Auditors often need a formatted compliance report for a given Audit or Requirement. Use WeasyPrint or ReportLab; template the scope-summary report first, then extend.
+### 11. PDF / Report Generation — **SHIPPED**
+WeasyPrint-backed reports at `GET /frameworks/{id}/report.pdf` (compliance summary with coverage, requirement gap status, audits, vendors, and in-scope assets) and `GET /assets/{id}/report.pdf` (per-asset dossier with custom fields, relationships in both directions, attachments, and alerts). Shared print stylesheet (`templates/reports/_base.html`) gives both reports a consistent header, @page footer with page counter, and pill styles. "Download PDF" buttons on the framework and asset detail pages. Remaining: asset-list bulk exports, per-audit reports, branding / cover page.
 
 ## Tier 3 — Enterprise / Production Gaps
 

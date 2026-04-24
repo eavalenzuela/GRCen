@@ -6,7 +6,7 @@ import asyncpg
 
 from grcen.config import settings
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from grcen.custom_fields import CUSTOM_FIELDS, coerce_value
@@ -29,6 +29,7 @@ from grcen.services import (
     encryption_config,
     framework_service,
     oidc_settings,
+    pdf_service,
     saml_settings,
     saved_search_service,
     smtp_settings,
@@ -1778,6 +1779,42 @@ async def framework_detail(
         request,
         "frameworks/detail.html",
         context={"user": user, "detail": detail, "notif_count": notif_count},
+    )
+
+
+@router.get("/frameworks/{framework_id}/report.pdf")
+async def framework_report_pdf(
+    framework_id: UUID,
+    pool: asyncpg.Pool = Depends(get_db),
+    _user: User = Depends(require_permission(Permission.VIEW)),
+):
+    pdf = await pdf_service.render_framework_report(pool, framework_id)
+    if pdf is None:
+        raise HTTPException(status_code=404, detail="Framework not found")
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="framework-{framework_id}.pdf"',
+        },
+    )
+
+
+@router.get("/assets/{asset_id}/report.pdf")
+async def asset_report_pdf(
+    asset_id: UUID,
+    pool: asyncpg.Pool = Depends(get_db),
+    _user: User = Depends(require_permission(Permission.VIEW)),
+):
+    pdf = await pdf_service.render_asset_report(pool, asset_id)
+    if pdf is None:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="asset-{asset_id}.pdf"',
+        },
     )
 
 

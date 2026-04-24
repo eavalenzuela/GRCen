@@ -1,0 +1,92 @@
+{% extends "reports/_base.html" %}
+{% block title %}{{ detail.framework.name }} — Compliance Report{% endblock %}
+{% block page_title %}{{ detail.framework.name }}{% endblock %}
+{% block heading %}{{ detail.framework.name }} — Compliance Report{% endblock %}
+
+{% block content %}
+<div class="meta-grid">
+    <div><small>Version</small>{{ detail.framework.metadata.get('version', '—') }}</div>
+    <div><small>Governing Body</small>{{ detail.framework.metadata.get('governing_body', '—') }}</div>
+    <div><small>Status</small>
+        {% set cs = detail.framework.metadata.get('certification_status') %}
+        {% if cs == 'certified' %}<span class="pill pill-ok">{{ cs }}</span>
+        {% elif cs == 'in_progress' %}<span class="pill pill-warn">{{ cs }}</span>
+        {% elif cs == 'not_started' %}<span class="pill pill-bad">{{ cs }}</span>
+        {% else %}{{ cs or '—' }}{% endif %}
+    </div>
+    <div><small>Coverage</small>
+        <strong>{{ detail.coverage_percent }}%</strong>
+        <span class="muted">({{ detail.satisfied_count }} / {{ detail.requirements | length }})</span>
+    </div>
+</div>
+
+{% if detail.framework.description %}
+<p>{{ detail.framework.description }}</p>
+{% endif %}
+
+<h2>Requirements ({{ detail.requirements | length }} — {{ detail.gap_count }} gap{{ 's' if detail.gap_count != 1 }})</h2>
+{% if detail.requirements %}
+<table>
+    <thead><tr><th style="width:6rem;">Status</th><th>Requirement</th><th>Satisfied by</th></tr></thead>
+    <tbody>
+    {% for req in detail.requirements %}
+        <tr>
+            <td>
+                {% if req.satisfied %}<span class="pill pill-ok">satisfied</span>
+                {% else %}<span class="pill pill-bad">gap</span>{% endif %}
+            </td>
+            <td>{{ req.name }}</td>
+            <td>
+                {% if req.satisfiers %}
+                {% for s in req.satisfiers %}
+                    {{ s.name }}<span class="muted"> ({{ s.type }}, {{ s.via }})</span>{% if not loop.last %},{% endif %}
+                {% endfor %}
+                {% else %}
+                <span class="muted">—</span>
+                {% endif %}
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p class="muted">No requirements linked to this framework.</p>
+{% endif %}
+
+<h2>Audits</h2>
+{% if detail.audits %}
+<table>
+    <thead><tr><th>Audit</th><th>Status</th></tr></thead>
+    <tbody>
+    {% for a in detail.audits %}
+        <tr><td>{{ a.name }}</td><td>{{ a.status }}</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p class="muted">No audits linked via <code>certifies</code>.</p>
+{% endif %}
+
+<h2>Certified Vendors</h2>
+{% if detail.vendors %}
+<ul>
+{% for v in detail.vendors %}<li>{{ v.name }}</li>{% endfor %}
+</ul>
+{% else %}
+<p class="muted">No vendors linked via <code>certified_by</code>.</p>
+{% endif %}
+
+<h2>In-Scope Assets ({{ detail.in_scope_assets | length }})</h2>
+{% if detail.in_scope_assets %}
+<table>
+    <thead><tr><th>Type</th><th>Asset</th><th>Status</th></tr></thead>
+    <tbody>
+    {% for a in detail.in_scope_assets %}
+        <tr><td>{{ a.type }}</td><td>{{ a.name }}</td><td>{{ a.status }}</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p class="muted">No assets are currently linked to any requirement in this framework.</p>
+{% endif %}
+{% endblock %}

@@ -27,6 +27,7 @@ dependencies = [
     "cryptography>=44.0.0",
     "python3-saml>=1.16.0",
     "aiosmtplib>=3.0.0",
+    "weasyprint>=63.0",
 ]
 
 [project.optional-dependencies]

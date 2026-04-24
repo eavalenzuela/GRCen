@@ -1,0 +1,89 @@
+{% extends "reports/_base.html" %}
+{% block title %}{{ asset.name }} — Asset Report{% endblock %}
+{% block page_title %}{{ asset.name }}{% endblock %}
+{% block heading %}{{ asset.name }} — Asset Report{% endblock %}
+
+{% block content %}
+<div class="meta-grid">
+    <div><small>Type</small>{{ asset.type.value | replace('_', ' ') | title }}</div>
+    <div><small>Status</small>{{ asset.status }}</div>
+    <div><small>Owner</small>{{ asset.owner or '—' }}</div>
+    <div><small>Criticality</small>{{ asset.criticality or '—' }}</div>
+</div>
+
+{% if asset.description %}
+<p>{{ asset.description }}</p>
+{% endif %}
+
+{% if asset.tags %}
+<p><strong>Tags:</strong> {% for t in asset.tags %}<span class="pill pill-ok">{{ t }}</span> {% endfor %}</p>
+{% endif %}
+
+{% if meta %}
+<h2>Custom Fields</h2>
+<table>
+    <thead><tr><th style="width:40%;">Field</th><th>Value</th></tr></thead>
+    <tbody>
+    {% for key, value in meta.items() %}
+        <tr><td>{{ key | replace('_', ' ') | title }}</td><td>{{ value }}</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
+<h2>Relationships ({{ relationships | length }})</h2>
+{% if relationships %}
+<table>
+    <thead><tr><th>Direction</th><th>Type</th><th>Other Asset</th><th>Description</th></tr></thead>
+    <tbody>
+    {% for r in relationships %}
+        <tr>
+            <td>{{ r.direction }}</td>
+            <td>{{ r.type }}</td>
+            <td>{{ r.other_name }} <span class="muted">({{ r.other_type }})</span></td>
+            <td>{{ r.description }}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p class="muted">No relationships.</p>
+{% endif %}
+
+<h2>Attachments ({{ attachments | length }})</h2>
+{% if attachments %}
+<table>
+    <thead><tr><th>Kind</th><th>Name</th><th>Location</th></tr></thead>
+    <tbody>
+    {% for a in attachments %}
+        <tr>
+            <td>{{ a.kind.value }}</td>
+            <td>{{ a.name }}</td>
+            <td class="muted" style="word-break:break-all;">{{ a.url_or_path or '—' }}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p class="muted">No attachments.</p>
+{% endif %}
+
+<h2>Alerts ({{ alerts | length }})</h2>
+{% if alerts %}
+<table>
+    <thead><tr><th>Title</th><th>Schedule</th><th>Next Fire</th><th>Enabled</th></tr></thead>
+    <tbody>
+    {% for a in alerts %}
+        <tr>
+            <td>{{ a.title }}</td>
+            <td>{{ a.schedule_type }}{% if a.cron_expression %} ({{ a.cron_expression }}){% endif %}</td>
+            <td>{{ a.next_fire_at.strftime('%Y-%m-%d %H:%M UTC') if a.next_fire_at else '—' }}</td>
+            <td>{{ 'yes' if a.enabled else 'no' }}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p class="muted">No alerts configured.</p>
+{% endif %}
+{% endblock %}

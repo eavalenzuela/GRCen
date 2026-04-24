@@ -7,6 +7,7 @@
         {% if has_perm(user.role, Permission.VIEW_GRAPH) %}
         <a href="/graph/{{ asset.id }}" class="btn">View Graph</a>
         {% endif %}
+        <a href="/assets/{{ asset.id }}/report.pdf" class="btn">Download PDF</a>
         {% if has_perm(user.role, Permission.EDIT) %}
         <a href="/assets/{{ asset.id }}/edit" class="btn">Edit</a>
         {% endif %}
