@@ -1,10 +1,14 @@
+import logging
 import uuid
 from uuid import UUID
 
 import asyncpg
 
+from grcen.config import settings
 from grcen.models.alert import Alert
 from grcen.models.notification import Notification
+
+log = logging.getLogger(__name__)
 
 
 async def create_alert(
@@ -107,6 +111,49 @@ async def fire_alert(pool: asyncpg.Pool, alert_id: UUID) -> None:
         alert.title,
         alert.message,
     )
+    try:
+        await _deliver_email(pool, alert)
+    except Exception:
+        # Email delivery must never break alert firing or the scheduler.
+        log.exception("Email delivery failed for alert %s", alert.id)
+
+
+async def _deliver_email(pool: asyncpg.Pool, alert: Alert) -> None:
+    from grcen.services import email_service
+    from grcen.services import smtp_settings as smtp_svc
+
+    smtp = await smtp_svc.get_settings(pool)
+    if not smtp.is_enabled:
+        return
+
+    recipients = await email_service.resolve_alert_recipients(pool, alert.asset_id)
+    if not recipients:
+        return
+
+    asset_row = await pool.fetchrow(
+        "SELECT name FROM assets WHERE id = $1", alert.asset_id
+    )
+    asset_name = asset_row["name"] if asset_row else str(alert.asset_id)
+    link = f"{settings.APP_BASE_URL.rstrip('/')}/assets/{alert.asset_id}"
+    subject = f"[GRCen] {alert.title}"
+    body_lines = [alert.title]
+    if alert.message:
+        body_lines.append("")
+        body_lines.append(alert.message)
+    body_lines.append("")
+    body_lines.append(f"Asset: {asset_name}")
+    body_lines.append(f"Link:  {link}")
+    body = "\n".join(body_lines)
+
+    for user_id, email in recipients:
+        await email_service.send_email(
+            pool,
+            to=email,
+            subject=subject,
+            body=body,
+            alert_id=alert.id,
+            user_id=user_id,
+        )
 
 
 async def list_notifications(

@@ -346,6 +346,46 @@ EXCEPTION WHEN duplicate_column THEN NULL;
 END $$;
 CREATE UNIQUE INDEX IF NOT EXISTS ix_users_saml_sub
     ON users (saml_sub) WHERE saml_sub IS NOT NULL;
+
+-- SMTP configuration (key-value, mirrors oidc_config)
+CREATE TABLE IF NOT EXISTS smtp_config (
+    key         VARCHAR(50) PRIMARY KEY,
+    value       TEXT NOT NULL DEFAULT '',
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+INSERT INTO smtp_config (key, value) VALUES
+    ('host', ''),
+    ('port', '587'),
+    ('username', ''),
+    ('password', ''),
+    ('from_address', ''),
+    ('from_name', 'GRCen'),
+    ('use_starttls', 'true'),
+    ('use_ssl', 'false'),
+    ('enabled', 'false')
+ON CONFLICT (key) DO NOTHING;
+
+-- Per-user email notification opt-in
+DO $$ BEGIN
+    ALTER TABLE users ADD COLUMN email_notifications_enabled BOOLEAN NOT NULL DEFAULT false;
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+
+-- Email delivery log (one row per attempted send)
+CREATE TABLE IF NOT EXISTS notification_deliveries (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    alert_id      UUID REFERENCES alerts(id) ON DELETE SET NULL,
+    user_id       UUID REFERENCES users(id) ON DELETE SET NULL,
+    email         VARCHAR(255) NOT NULL,
+    status        VARCHAR(20) NOT NULL,
+    error         TEXT,
+    attempted_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_notification_deliveries_alert
+    ON notification_deliveries(alert_id);
+CREATE INDEX IF NOT EXISTS idx_notification_deliveries_attempted_at
+    ON notification_deliveries(attempted_at DESC);
 """
 
 

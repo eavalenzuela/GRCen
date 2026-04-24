@@ -21,6 +21,7 @@ class User:
     last_login: datetime | None = None
     failed_login_count: int = 0
     locked_until: datetime | None = None
+    email_notifications_enabled: bool = False
 
     @property
     def is_admin(self) -> bool:
@@ -47,4 +48,5 @@ class User:
             last_login=row.get("last_login"),
             failed_login_count=row.get("failed_login_count", 0),
             locked_until=row.get("locked_until"),
+            email_notifications_enabled=row.get("email_notifications_enabled", False),
         )

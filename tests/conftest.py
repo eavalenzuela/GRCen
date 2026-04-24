@@ -91,7 +91,7 @@ async def clean_tables(pool):
     from grcen.rate_limit import _reset as _reset_rate_limit
     _reset_rate_limit()
     yield
-    for table in ("sessions", "api_tokens", "app_settings", "audit_log", "notifications", "alerts", "attachments", "relationships", "assets", "users", "encryption_config"):
+    for table in ("sessions", "api_tokens", "app_settings", "audit_log", "notification_deliveries", "notifications", "alerts", "attachments", "relationships", "assets", "users", "encryption_config"):
         await pool.execute(f"DELETE FROM {table}")
     # Reset audit config to defaults so tests start fresh
     await pool.execute("UPDATE audit_config SET enabled = true, field_level = true")
@@ -123,6 +123,17 @@ async def clean_tables(pool):
     """)
     from grcen.services import saml_settings as _saml_settings
     _saml_settings._cache = None
+    # Reset SMTP config to defaults
+    await pool.execute("DELETE FROM smtp_config")
+    await pool.execute("""
+        INSERT INTO smtp_config (key, value) VALUES
+            ('host', ''), ('port', '587'), ('username', ''), ('password', ''),
+            ('from_address', ''), ('from_name', 'GRCen'),
+            ('use_starttls', 'true'), ('use_ssl', 'false'), ('enabled', 'false')
+        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+    """)
+    from grcen.services import smtp_settings as _smtp_settings
+    _smtp_settings._cache = None
     # Reset encryption config cache
     from grcen.services import encryption_config as _enc_cfg
     _enc_cfg._cache = None

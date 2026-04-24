@@ -21,7 +21,7 @@ from grcen.services import asset as asset_svc
 from grcen.services import attachment as att_svc
 from grcen.services import audit_service as audit_svc
 from grcen.services import auth as auth_svc
-from grcen.services import encryption_config, oidc_settings, saml_settings
+from grcen.services import encryption_config, oidc_settings, saml_settings, smtp_settings
 from grcen.services import relationship as rel_svc
 from grcen.services import review_service as review_svc
 from grcen.services import risk_service as risk_svc
@@ -1193,6 +1193,131 @@ async def admin_saml_settings_submit(
         want_name_id_encrypted="true" if "want_name_id_encrypted" in form else "false",
     )
     return RedirectResponse("/admin/saml-settings", status_code=302)
+
+
+# --- SMTP Settings ---
+
+
+@router.get("/admin/smtp-settings", response_class=HTMLResponse)
+async def admin_smtp_settings(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+    test_result: str | None = None,
+):
+    smtp_cfg = await smtp_settings.get_settings(pool)
+    notif_count = await alert_svc.count_unread_notifications(pool)
+    deliveries = await pool.fetch(
+        """SELECT email, status, error, attempted_at
+           FROM notification_deliveries
+           ORDER BY attempted_at DESC LIMIT 20"""
+    )
+    # Decode the compact test_result query param into a dict for the template.
+    test_ctx = None
+    if test_result:
+        ok, _, payload = test_result.partition(":")
+        test_ctx = {"ok": ok == "ok", "to": "", "error": ""}
+        if ok == "ok":
+            test_ctx["to"] = payload
+        else:
+            test_ctx["error"] = payload
+    return templates.TemplateResponse(
+        request,
+        "admin/smtp_settings.html",
+        context={
+            "user": user,
+            "smtp": smtp_cfg,
+            "deliveries": deliveries,
+            "test_result": test_ctx,
+            "notif_count": notif_count,
+        },
+    )
+
+
+@router.post("/admin/smtp-settings")
+async def admin_smtp_settings_submit(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+):
+    form = await request.form()
+
+    # Preserve existing password if the placeholder was submitted.
+    password = str(form.get("password", "")).strip()
+    if password == "********":
+        current = await smtp_settings.get_settings(pool)
+        password = current.password
+
+    await smtp_settings.update_settings(
+        pool,
+        host=str(form.get("host", "")).strip(),
+        port=str(form.get("port", "587")).strip() or "587",
+        username=str(form.get("username", "")).strip(),
+        password=password,
+        from_address=str(form.get("from_address", "")).strip(),
+        from_name=str(form.get("from_name", "GRCen")).strip(),
+        use_starttls="true" if "use_starttls" in form else "false",
+        use_ssl="true" if "use_ssl" in form else "false",
+        enabled="true" if "enabled" in form else "false",
+    )
+
+    if form.get("action") == "test":
+        from grcen.services import email_service
+        if not user.email:
+            return RedirectResponse(
+                "/admin/smtp-settings?test_result=fail:current user has no email address",
+                status_code=302,
+            )
+        ok, err = await email_service.send_email(
+            pool,
+            to=user.email,
+            subject="[GRCen] SMTP test message",
+            body="This is a test message from GRCen to verify SMTP configuration.",
+            user_id=user.id,
+        )
+        suffix = f"ok:{user.email}" if ok else f"fail:{err or 'unknown error'}"
+        return RedirectResponse(f"/admin/smtp-settings?test_result={suffix}", status_code=302)
+
+    return RedirectResponse("/admin/smtp-settings", status_code=302)
+
+
+# --- User self-service settings ---
+
+
+@router.get("/settings", response_class=HTMLResponse)
+async def user_settings(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(get_current_user),
+    saved: int = 0,
+):
+    smtp_cfg = await smtp_settings.get_settings(pool)
+    notif_count = await alert_svc.count_unread_notifications(pool)
+    return templates.TemplateResponse(
+        request,
+        "settings.html",
+        context={
+            "user": user,
+            "saved": bool(saved),
+            "smtp_enabled": smtp_cfg.is_enabled,
+            "notif_count": notif_count,
+        },
+    )
+
+
+@router.post("/settings")
+async def user_settings_submit(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    form = await request.form()
+    enabled = "email_notifications_enabled" in form
+    # Don't let users enable the flag if they have no email on file.
+    if enabled and not user.email:
+        enabled = False
+    await auth_svc.set_email_notifications_enabled(pool, user.id, enabled)
+    return RedirectResponse("/settings?saved=1", status_code=302)
 
 
 # --- Token management pages ---

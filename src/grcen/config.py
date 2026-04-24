@@ -38,5 +38,8 @@ class Settings(BaseSettings):
     ENCRYPTION_KEY: str = ""
     ENCRYPTION_KEY_RETIRED: str = ""  # previous key, decrypt-only, for rotation
 
+    # Public base URL used when building links in outbound emails.
+    APP_BASE_URL: str = "http://localhost:8000"
+
 
 settings = Settings()

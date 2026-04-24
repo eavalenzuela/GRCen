@@ -70,6 +70,20 @@ SCOPE_SSO_SECRETS = EncryptionScope(
     ),
 )
 
+SCOPE_SMTP_SECRETS = EncryptionScope(
+    name="smtp_secrets",
+    display_name="SMTP Password",
+    description="SMTP password for outbound email",
+    targets=(
+        FieldTarget(
+            table="smtp_config",
+            column="value",
+            filter_key_column="key",
+            filter_key_values=("password",),
+        ),
+    ),
+)
+
 SCOPE_USER_PII = EncryptionScope(
     name="user_pii",
     display_name="User PII",
@@ -120,6 +134,7 @@ ALL_SCOPES: dict[str, EncryptionScope] = {
     s.name: s
     for s in [
         SCOPE_SSO_SECRETS,
+        SCOPE_SMTP_SECRETS,
         SCOPE_USER_PII,
         SCOPE_SESSION_PII,
         SCOPE_AUDIT_PII,
@@ -133,8 +148,8 @@ ALL_SCOPES: dict[str, EncryptionScope] = {
 PROFILE_MINIMAL = EncryptionProfile(
     name="minimal",
     display_name="Minimal (Secrets Only)",
-    description="Encrypts SSO secrets.  No PII encryption.",
-    scope_names=("sso_secrets",),
+    description="Encrypts SSO and SMTP secrets.  No PII encryption.",
+    scope_names=("sso_secrets", "smtp_secrets"),
 )
 
 PROFILE_GDPR = EncryptionProfile(
@@ -144,7 +159,7 @@ PROFILE_GDPR = EncryptionProfile(
         "Encrypts all personal data: emails, IP addresses, audit snapshots.  "
         "Satisfies GDPR Art.\u00a032(1)(a) pseudonymisation and encryption."
     ),
-    scope_names=("sso_secrets", "user_pii", "session_pii", "audit_pii"),
+    scope_names=("sso_secrets", "smtp_secrets", "user_pii", "session_pii", "audit_pii"),
 )
 
 PROFILE_FULL = EncryptionProfile(
@@ -153,6 +168,7 @@ PROFILE_FULL = EncryptionProfile(
     description="Encrypts all supported fields and uploaded files.",
     scope_names=(
         "sso_secrets",
+        "smtp_secrets",
         "user_pii",
         "session_pii",
         "audit_pii",

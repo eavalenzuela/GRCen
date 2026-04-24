@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}My Settings - GRCen{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>My Settings</h1>
+</div>
+
+{% if saved %}
+<div class="alert" style="background:#dcfce7; color:#166534; border:1px solid #bbf7d0;">
+    Preferences saved.
+</div>
+{% endif %}
+
+<div class="card">
+    <h3>Account</h3>
+    <p><strong>Username:</strong> {{ user.username }}</p>
+    <p><strong>Email:</strong> {{ user.email or '(not set — ask an admin to configure one so you can receive email notifications)' }}</p>
+    <p><strong>Role:</strong> {{ user.role.value | title }}</p>
+</div>
+
+<form method="post" action="/settings" class="card" style="margin-top:1.5rem;">
+    {% include "partials/csrf.html" %}
+    <h3>Notifications</h3>
+    <div class="form-group">
+        <label>
+            <input type="checkbox" name="email_notifications_enabled"
+                   {% if user.email_notifications_enabled %}checked{% endif %}
+                   {% if not user.email %}disabled{% endif %}>
+            Send me an email when an alert fires for an asset I own
+        </label>
+        {% if not user.email %}
+        <small style="color:#92400e;">An email address must be set on your account before you can enable this.</small>
+        {% elif not smtp_enabled %}
+        <small style="color:#92400e;">SMTP is not currently configured, so no emails will be sent even if this is on.</small>
+        {% endif %}
+    </div>
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Save Preferences</button>
+    </div>
+</form>
+{% endblock %}

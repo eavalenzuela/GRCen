@@ -176,6 +176,18 @@ async def set_user_active(pool: asyncpg.Pool, user_id: UUID, active: bool) -> Us
     return _decrypt_user_email(User.from_row(row)) if row else None
 
 
+async def set_email_notifications_enabled(
+    pool: asyncpg.Pool, user_id: UUID, enabled: bool
+) -> User | None:
+    row = await pool.fetchrow(
+        """UPDATE users SET email_notifications_enabled = $1, updated_at = now()
+           WHERE id = $2 RETURNING *""",
+        enabled,
+        user_id,
+    )
+    return _decrypt_user_email(User.from_row(row)) if row else None
+
+
 async def delete_user(pool: asyncpg.Pool, user_id: UUID) -> bool:
     result = await pool.execute("DELETE FROM users WHERE id = $1", user_id)
     return result == "DELETE 1"
