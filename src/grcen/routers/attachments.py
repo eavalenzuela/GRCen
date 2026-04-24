@@ -4,7 +4,7 @@ import uuid as uuid_mod
 from uuid import UUID
 
 import asyncpg
-from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 from fastapi.responses import Response
 
 from grcen.config import settings
@@ -13,6 +13,7 @@ from grcen.models.user import User
 from grcen.permissions import Permission
 from grcen.routers.deps import get_db, require_permission
 from grcen.schemas.attachment import AttachmentCreate, AttachmentResponse
+from grcen.services import access_log_service
 from grcen.services import attachment as att_svc
 from grcen.services import audit_service as audit_svc
 from grcen.services import encryption_config
@@ -145,8 +146,9 @@ async def upload_file(
 async def download_file(
     asset_id: UUID,
     att_id: UUID,
+    request: Request,
     pool: asyncpg.Pool = Depends(get_db),
-    _user: User = Depends(require_permission(Permission.VIEW)),
+    user: User = Depends(require_permission(Permission.VIEW)),
 ):
     att = await att_svc.get_attachment(pool, att_id)
     if not att or att.asset_id != asset_id:
@@ -162,6 +164,12 @@ async def download_file(
     if att.encrypted:
         data = decrypt_bytes(data, "file_contents")
 
+    await access_log_service.record(
+        pool, user=user, action="download",
+        entity_type="attachment", entity_id=att.id, entity_name=att.name,
+        path=str(request.url.path),
+        ip_address=request.client.host if request.client else None,
+    )
     return Response(
         content=data,
         media_type="application/octet-stream",
@@ -285,8 +293,9 @@ async def upload_rel_file(
 async def download_rel_file(
     relationship_id: UUID,
     att_id: UUID,
+    request: Request,
     pool: asyncpg.Pool = Depends(get_db),
-    _user: User = Depends(require_permission(Permission.VIEW)),
+    user: User = Depends(require_permission(Permission.VIEW)),
 ):
     att = await att_svc.get_attachment(pool, att_id)
     if not att or att.relationship_id != relationship_id:
@@ -300,6 +309,12 @@ async def download_rel_file(
         data = f.read()
     if att.encrypted:
         data = decrypt_bytes(data, "file_contents")
+    await access_log_service.record(
+        pool, user=user, action="download",
+        entity_type="attachment", entity_id=att.id, entity_name=att.name,
+        path=str(request.url.path),
+        ip_address=request.client.host if request.client else None,
+    )
     return Response(
         content=data,
         media_type="application/octet-stream",

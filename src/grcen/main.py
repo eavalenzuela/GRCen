@@ -13,6 +13,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from grcen.config import settings
 from grcen.database import close_pool, get_pool, init_pool, init_schema
 from grcen.routers import (
+    access_log,
     alerts,
     assets,
     attachments,
@@ -120,6 +121,7 @@ def create_app() -> FastAPI:
     app.include_router(frameworks.router)
     app.include_router(tags.router)
     app.include_router(saved_searches.router)
+    app.include_router(access_log.router)
     app.include_router(auth.router)
     app.include_router(oidc.router)
     app.include_router(saml.router)

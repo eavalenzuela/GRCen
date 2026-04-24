@@ -52,8 +52,8 @@ Assets are created and edited in place — no draft → pending → approved lif
 ### 14. Field-Level Redaction by Role — **SHIPPED**
 `FieldDef` now carries a `sensitive: bool` flag; Person fields `email`, `phone`, and `clearance_level` are marked sensitive and can serve as a template for other asset types. New `Permission.VIEW_PII` is granted to Admin / Editor / Auditor but denied to Viewer. `services/redaction.py` returns a masked copy of metadata for users lacking VIEW_PII and is applied at every egress point: asset detail HTML page, `/api/assets/` list + search + detail, CSV/JSON exports, and PDF asset reports. Secure default: if no user is passed to the export helper, redaction still fires. Remaining: admin UI to mark fields sensitive without code change, per-asset overrides, redaction on non-Person types as more candidates get identified.
 
-### 15. Data-Access Logging
-`audit_log` captures *changes*. Compliance frameworks (HIPAA, several SOC2 CCs) also require *read* logs: who viewed which asset, who exported which dataset, when. Add a lightweight access-log table + middleware.
+### 15. Data-Access Logging — **SHIPPED**
+New `data_access_log` table captures reads (views, downloads, exports, PDF generations) separately from the existing `audit_log` (which stays focused on writes). `services/access_log_service.py.record()` is best-effort — a failed insert is logged but never blocks the user response. Instrumented routes: asset detail view, asset PDF, framework PDF, asset export (CSV/JSON), and attachment downloads (both asset- and relationship-owned). Admin + Auditor can browse `/admin/access-log` with filters (user, entity type, action) or hit `GET /api/access-log/` for programmatic queries. Remaining: list-endpoint sampling (currently skipped to keep volume sane), retention policy / TTL, and export of the access log itself.
 
 ### 16. MFA for Local Auth
 OIDC/SAML are shipped, but local-auth users have password-only. Add TOTP (initially) and optional FIDO2/WebAuthn; enforceable per-role.

@@ -38,6 +38,7 @@ GRCen (pronounced "gurken") is a free and open-source GRC (Governance, Risk, Com
 - Schedulable alerts and review reminders with three delivery channels: in-app notifications, SMTP email (admin config at `/admin/smtp-settings`, user opt-in at `/settings`, log in `notification_deliveries`), and outbound webhooks (manage at `/admin/webhooks`, HMAC-SHA256 signed, log in `webhook_deliveries`).
 - RBAC with four roles: Admin, Editor, Viewer, Auditor (`permissions.py`), plus field-level redaction of fields marked `sensitive=True` in `custom_fields.py` for users without `VIEW_PII` permission
 - Audit trail with optional field-level diffs, PII sanitization, encryption support
+- Data access log at `/admin/access-log` records reads (views, downloads, exports, PDFs) separately from audit writes
 - SSO: OIDC and SAML 2.0, with admin UI config and role mapping
 - Optional application-level encryption at rest (AES-256-GCM, scope-based keys, zero-downtime rotation, blind indexes)
 - Risk register with 5x5 heatmap, filtering, overdue tracking, bulk-update actions (treatment/owner/review_date), daily severity snapshots + trend arrows, and a control-effectiveness rollup column that averages `mitigated_by` control edges

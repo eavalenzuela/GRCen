@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Data Access Log - GRCen{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Data Access Log</h1>
+    <small style="color:#6b7280;">Views, exports, and downloads. Writes are in the separate <a href="/admin/audit">Audit Log</a>.</small>
+</div>
+
+<form method="get" action="/admin/access-log" class="card">
+    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:end;">
+        <div class="form-group" style="margin-bottom:0;">
+            <label>User</label>
+            <select name="user_id">
+                <option value="">All</option>
+                {% for u in users %}
+                <option value="{{ u.id }}" {% if filter_user_id == u.id|string %}selected{% endif %}>{{ u.username }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+            <label>Entity type</label>
+            <select name="entity_type">
+                <option value="">All</option>
+                {% for t in entity_types %}
+                <option value="{{ t }}" {% if filter_entity_type == t %}selected{% endif %}>{{ t }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+            <label>Action</label>
+            <select name="action">
+                <option value="">All</option>
+                {% for a in actions %}
+                <option value="{{ a }}" {% if filter_action == a %}selected{% endif %}>{{ a }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Filter</button>
+        <a href="/admin/access-log" class="btn">Clear</a>
+    </div>
+</form>
+
+<div class="card" style="margin-top:1.5rem;">
+    {% if entries %}
+    <table class="table">
+        <thead>
+            <tr><th>When (UTC)</th><th>User</th><th>Action</th><th>Entity</th><th>Target</th><th>IP</th></tr>
+        </thead>
+        <tbody>
+        {% for e in entries %}
+            <tr>
+                <td>{{ e.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                <td>{{ e.username }}</td>
+                <td>{{ e.action }}</td>
+                <td>{{ e.entity_type }}</td>
+                <td>
+                    {% if e.entity_id %}
+                    <a href="/assets/{{ e.entity_id }}">{{ e.entity_name or e.entity_id }}</a>
+                    {% else %}
+                    {{ e.entity_name or '—' }}
+                    {% endif %}
+                </td>
+                <td>{{ e.ip_address or '—' }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color:#6b7280;">No access events match these filters yet.</p>
+    {% endif %}
+</div>
+{% endblock %}

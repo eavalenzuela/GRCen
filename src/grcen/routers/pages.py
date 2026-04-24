@@ -26,6 +26,7 @@ from grcen.services import attachment as att_svc
 from grcen.services import audit_service as audit_svc
 from grcen.services import auth as auth_svc
 from grcen.services import (
+    access_log_service,
     encryption_config,
     framework_service,
     oidc_settings,
@@ -478,6 +479,16 @@ async def asset_detail(
     asset = await asset_svc.get_asset(pool, asset_id)
     if not asset:
         return HTMLResponse("Not found", status_code=404)
+    await access_log_service.record(
+        pool,
+        user=user,
+        action="view",
+        entity_type="asset",
+        entity_id=asset.id,
+        entity_name=asset.name,
+        path=str(request.url.path),
+        ip_address=request.client.host if request.client else None,
+    )
     asset.metadata_ = redaction.redact_metadata(asset.metadata_, asset.type, user)
     rels = await rel_svc.list_relationships_for_asset(pool, asset_id)
     if rels:
@@ -1671,6 +1682,47 @@ async def relationship_evidence_delete(
     return RedirectResponse(f"/relationships/{rel_id}/evidence", status_code=302)
 
 
+# --- Data access log ---
+
+
+@router.get("/admin/access-log", response_class=HTMLResponse)
+async def admin_access_log(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.VIEW_AUDIT)),
+    user_id: str | None = None,
+    entity_type: str | None = None,
+    action: str | None = None,
+):
+    filter_user_uuid = UUID(user_id) if user_id else None
+    entries = await access_log_service.query(
+        pool,
+        user_id=filter_user_uuid,
+        entity_type=entity_type or None,
+        action=action or None,
+        limit=200,
+    )
+    users_rows = await pool.fetch(
+        "SELECT id, username FROM users ORDER BY username"
+    )
+    notif_count = await alert_svc.count_unread_notifications(pool)
+    return templates.TemplateResponse(
+        request,
+        "admin/access_log.html",
+        context={
+            "user": user,
+            "entries": entries,
+            "users": users_rows,
+            "entity_types": ["asset", "attachment", "framework", "relationship"],
+            "actions": ["view", "download", "export", "pdf_export"],
+            "filter_user_id": user_id or "",
+            "filter_entity_type": entity_type or "",
+            "filter_action": action or "",
+            "notif_count": notif_count,
+        },
+    )
+
+
 # --- Tag vocabulary ---
 
 
@@ -1787,12 +1839,19 @@ async def framework_detail(
 @router.get("/frameworks/{framework_id}/report.pdf")
 async def framework_report_pdf(
     framework_id: UUID,
+    request: Request,
     pool: asyncpg.Pool = Depends(get_db),
-    _user: User = Depends(require_permission(Permission.VIEW)),
+    user: User = Depends(require_permission(Permission.VIEW)),
 ):
     pdf = await pdf_service.render_framework_report(pool, framework_id)
     if pdf is None:
         raise HTTPException(status_code=404, detail="Framework not found")
+    await access_log_service.record(
+        pool, user=user, action="pdf_export",
+        entity_type="framework", entity_id=framework_id,
+        path=str(request.url.path),
+        ip_address=request.client.host if request.client else None,
+    )
     return Response(
         content=pdf,
         media_type="application/pdf",
@@ -1805,12 +1864,19 @@ async def framework_report_pdf(
 @router.get("/assets/{asset_id}/report.pdf")
 async def asset_report_pdf(
     asset_id: UUID,
+    request: Request,
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.VIEW)),
 ):
     pdf = await pdf_service.render_asset_report(pool, asset_id, user=user)
     if pdf is None:
         raise HTTPException(status_code=404, detail="Asset not found")
+    await access_log_service.record(
+        pool, user=user, action="pdf_export",
+        entity_type="asset", entity_id=asset_id,
+        path=str(request.url.path),
+        ip_address=request.client.host if request.client else None,
+    )
     return Response(
         content=pdf,
         media_type="application/pdf",

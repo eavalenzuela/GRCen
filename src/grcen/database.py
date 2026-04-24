@@ -347,6 +347,23 @@ END $$;
 CREATE UNIQUE INDEX IF NOT EXISTS ix_users_saml_sub
     ON users (saml_sub) WHERE saml_sub IS NOT NULL;
 
+-- Data access log (reads, not writes — audit_log covers writes)
+CREATE TABLE IF NOT EXISTS data_access_log (
+    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id      UUID REFERENCES users(id) ON DELETE SET NULL,
+    username     VARCHAR(150) NOT NULL,
+    action       VARCHAR(32) NOT NULL,
+    entity_type  VARCHAR(32) NOT NULL,
+    entity_id    UUID,
+    entity_name  VARCHAR(255),
+    path         VARCHAR(400),
+    ip_address   VARCHAR(64),
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_data_access_log_created ON data_access_log(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_data_access_log_user ON data_access_log(user_id);
+CREATE INDEX IF NOT EXISTS idx_data_access_log_entity ON data_access_log(entity_type, entity_id);
+
 -- Saved searches (per-user, with optional sharing)
 CREATE TABLE IF NOT EXISTS saved_searches (
     id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
