@@ -3,6 +3,8 @@
 {% block content %}
 <h1>Risk Management</h1>
 
+{% include "partials/saved_searches.html" %}
+
 {# ── Summary stats ─────────────────────────────────────────────────── #}
 {% macro trend_arrow(key, reverse=false) %}
     {% if trend.deltas and trend.deltas.get(key) is not none %}

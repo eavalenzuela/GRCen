@@ -30,6 +30,7 @@ from grcen.services import (
     framework_service,
     oidc_settings,
     saml_settings,
+    saved_search_service,
     smtp_settings,
     tag_service,
 )
@@ -345,6 +346,7 @@ async def asset_list(
     )
     notif_count = await alert_svc.count_unread_notifications(pool)
     all_tags = await tag_service.list_tags_with_counts(pool)
+    saved_searches = await saved_search_service.list_visible(pool, user.id, path="/assets")
     # Build filter params string for pagination links
     filter_params = ""
     if asset_type:
@@ -385,6 +387,9 @@ async def asset_list(
             "filter_meta_value": meta_value or "",
             "filter_tag": tag or "",
             "all_tags": all_tags,
+            "saved_searches": saved_searches,
+            "current_path": "/assets",
+            "current_query": filter_params.lstrip("&"),
             "filter_params": filter_params,
             "statuses": ["active", "inactive", "draft", "archived"],
             "sort": sort,
@@ -786,6 +791,9 @@ async def risk_management_page(
            WHERE type IN ('person', 'organizational_unit') AND status = 'active'
            ORDER BY name"""
     )
+    saved_searches = await saved_search_service.list_visible(
+        pool, user.id, path="/risk-management"
+    )
 
     # Build filter_params for sort links
     filter_params = ""
@@ -825,6 +833,9 @@ async def risk_management_page(
             "filter_params": filter_params,
             "bulk_owners": bulk_owners,
             "trend": trend,
+            "saved_searches": saved_searches,
+            "current_path": "/risk-management",
+            "current_query": filter_params.lstrip("&"),
         },
     )
 

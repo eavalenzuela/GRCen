@@ -347,6 +347,20 @@ END $$;
 CREATE UNIQUE INDEX IF NOT EXISTS ix_users_saml_sub
     ON users (saml_sub) WHERE saml_sub IS NOT NULL;
 
+-- Saved searches (per-user, with optional sharing)
+CREATE TABLE IF NOT EXISTS saved_searches (
+    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id      UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name         VARCHAR(150) NOT NULL,
+    path         VARCHAR(200) NOT NULL,
+    query_string TEXT NOT NULL DEFAULT '',
+    shared       BOOLEAN NOT NULL DEFAULT false,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_saved_searches_user ON saved_searches(user_id);
+CREATE INDEX IF NOT EXISTS idx_saved_searches_shared ON saved_searches(shared)
+    WHERE shared = true;
+
 -- Daily risk severity snapshots for trend indicators
 CREATE TABLE IF NOT EXISTS risk_snapshots (
     snapshot_date DATE PRIMARY KEY,

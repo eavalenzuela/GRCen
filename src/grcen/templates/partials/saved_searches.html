@@ -1,0 +1,37 @@
+{# Renders the saved-searches dropdown + "save current" button. Expects:
+     - saved_searches: list[SavedSearch] visible at the current page
+     - current_path: the current URL path (e.g. /assets)
+     - current_query: the current query string (no leading ?)
+   Both the admin and the owning user may delete; the form checks server-side.
+#}
+<div class="saved-searches" style="display:flex; gap:0.5rem; align-items:center; margin-bottom:0.75rem;">
+    {% if saved_searches %}
+    <details style="position:relative;">
+        <summary style="cursor:pointer; padding:0.25rem 0.6rem; border:1px solid #d1d5db; border-radius:4px; display:inline-block; font-size:0.9rem;">
+            Saved searches ({{ saved_searches | length }})
+        </summary>
+        <div style="position:absolute; z-index:20; background:white; border:1px solid #d1d5db; border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,.08); padding:0.5rem; min-width:20rem; margin-top:0.25rem;">
+            <ul style="list-style:none; margin:0; padding:0;">
+            {% for s in saved_searches %}
+                <li style="padding:0.25rem 0; display:flex; justify-content:space-between; gap:0.5rem;">
+                    <a href="{{ s.href }}" style="flex:1;">
+                        {{ s.name }}
+                        {% if s.shared %}<small style="color:#6b7280;">shared</small>{% endif %}
+                    </a>
+                    {% if s.user_id == user.id or user.is_admin %}
+                    <button type="button" class="btn btn-xs btn-danger"
+                            onclick="(async function(id,el){if(!confirm('Delete saved search?'))return;const r=await fetch('/api/saved-searches/'+id,{method:'DELETE',credentials:'same-origin'});if(r.ok){el.closest('li').remove();}else{alert('Failed to delete');}})('{{ s.id }}', this)"
+                            style="font-size:0.75rem;">✕</button>
+                    {% endif %}
+                </li>
+            {% endfor %}
+            </ul>
+        </div>
+    </details>
+    {% endif %}
+
+    <button type="button" class="btn btn-sm"
+            onclick="(async function(){const name=prompt('Name this search');if(!name)return;const shared=confirm('Make this search visible to everyone?\\nOK = shared, Cancel = just for me');const r=await fetch('/api/saved-searches/',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,path:'{{ current_path }}',query_string:'{{ current_query }}',shared:shared})});if(r.ok){location.reload();}else{alert('Failed to save');}})()">
+        Save this search
+    </button>
+</div>

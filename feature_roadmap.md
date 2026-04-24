@@ -32,8 +32,8 @@ Relationship file upload was already wired to `/api/imports/relationships/execut
 ### 8. Cross-Cutting Tag Vocabulary — **SHIPPED**
 Kept the existing `assets.tags TEXT[]` column (no schema change — the GIN index already powers efficient lookups) and added an aggregation layer on top. `/tags` lists every distinct tag with asset counts and links into the filtered asset list. Admins can rename a tag across every asset in one UPDATE (with automatic dedup if the target name already existed on an asset) or remove it entirely. Asset list + `/api/assets/` accept `?tag=X` to filter cross-type. Asset create/edit forms surface existing tags as click-to-add chips so users converge on shared names. Matching JSON API at `GET /api/tags/`.
 
-### 9. Saved / Bookmarked Searches
-Advanced filtering is implemented, but nothing persists. Add a `saved_searches` table scoped per user + optional sharing.
+### 9. Saved / Bookmarked Searches — **SHIPPED**
+New `saved_searches` table stores per-user (path + query_string) bookmarks with an optional `shared` flag. A shared `partials/saved_searches.html` include renders a "Saved searches (N)" dropdown + "Save this search" button on `/assets` and `/risk-management`; saves capture the current filters and re-running is a single click. Owners and admins can delete; private searches return 404 to non-owners (no existence leak). Matching REST endpoints: `GET/POST /api/saved-searches/`, `DELETE /api/saved-searches/{id}`, plus a `?path=X` query filter to scope a list to one page.
 
 ### 10. Drag-and-Drop Graph Relationship Creation
 The graph already supports click-to-link and bulk CSV/JSON import. Drag-and-drop creation directly in the D3 view would be a meaningful ergonomics upgrade.
