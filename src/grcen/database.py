@@ -347,6 +347,19 @@ END $$;
 CREATE UNIQUE INDEX IF NOT EXISTS ix_users_saml_sub
     ON users (saml_sub) WHERE saml_sub IS NOT NULL;
 
+-- Daily risk severity snapshots for trend indicators
+CREATE TABLE IF NOT EXISTS risk_snapshots (
+    snapshot_date DATE PRIMARY KEY,
+    total         INTEGER NOT NULL DEFAULT 0,
+    critical      INTEGER NOT NULL DEFAULT 0,
+    high          INTEGER NOT NULL DEFAULT 0,
+    medium        INTEGER NOT NULL DEFAULT 0,
+    low           INTEGER NOT NULL DEFAULT 0,
+    overdue       INTEGER NOT NULL DEFAULT 0,
+    no_treatment  INTEGER NOT NULL DEFAULT 0,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- Allow attachments to hang off relationships as well as assets.
 DO $$ BEGIN
     ALTER TABLE attachments ALTER COLUMN asset_id DROP NOT NULL;

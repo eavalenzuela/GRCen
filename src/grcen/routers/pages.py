@@ -767,7 +767,13 @@ async def risk_management_page(
     )
     summary = await risk_svc.get_risk_summary(pool)
     heatmap = await risk_svc.get_risk_heatmap(pool)
+    trend = await risk_svc.get_severity_trend(pool)
     notif_count = await alert_svc.count_unread_notifications(pool)
+    bulk_owners = await pool.fetch(
+        """SELECT id, name FROM assets
+           WHERE type IN ('person', 'organizational_unit') AND status = 'active'
+           ORDER BY name"""
+    )
 
     # Build filter_params for sort links
     filter_params = ""
@@ -805,7 +811,58 @@ async def risk_management_page(
             "current_sort": sort,
             "current_order": order,
             "filter_params": filter_params,
+            "bulk_owners": bulk_owners,
+            "trend": trend,
         },
+    )
+
+
+@router.post("/risk-management/bulk-update")
+async def risk_bulk_update(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.EDIT)),
+):
+    form = await request.form()
+    raw_ids = form.getlist("risk_ids")
+    risk_ids: list[UUID] = []
+    for v in raw_ids:
+        try:
+            risk_ids.append(UUID(v))
+        except (ValueError, TypeError):
+            continue
+    treatment = (str(form.get("treatment", "")).strip() or None)
+    owner_raw = str(form.get("owner_id", "")).strip()
+    owner_id = UUID(owner_raw) if owner_raw else None
+    review_date = (str(form.get("review_date", "")).strip() or None)
+
+    updated = await risk_svc.bulk_update_risks(
+        pool,
+        risk_ids,
+        treatment=treatment,
+        owner_id=owner_id,
+        review_date=review_date,
+        updated_by=user.id,
+    )
+    for rid in updated:
+        await audit_svc.log_audit_event(
+            pool,
+            user_id=user.id,
+            username=user.username,
+            action="bulk_update",
+            entity_type="asset",
+            entity_id=rid,
+            entity_name="risk",
+            changes={
+                "treatment": {"new": treatment} if treatment else {},
+                "owner_id": {"new": str(owner_id)} if owner_id else {},
+                "review_date": {"new": review_date} if review_date else {},
+            },
+        )
+    # Preserve filters when redirecting
+    qs = request.url.query
+    return RedirectResponse(
+        f"/risk-management{'?' + qs if qs else ''}", status_code=302
     )
 
 

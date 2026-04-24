@@ -121,6 +121,84 @@ def _parse_meta(row) -> dict:
     return meta or {}
 
 
+# Weight each control effectiveness level into a 0–1 score.
+_EFFECTIVENESS_WEIGHT = {
+    "effective": 1.0,
+    "partially_effective": 0.5,
+    "ineffective": 0.0,
+    "not_tested": 0.25,
+}
+
+
+def _effectiveness_label(score: float | None, control_count: int) -> str:
+    if control_count == 0:
+        return "none"
+    if score is None:
+        return "unknown"
+    if score >= 0.8:
+        return "strong"
+    if score >= 0.5:
+        return "adequate"
+    if score >= 0.25:
+        return "weak"
+    return "none"
+
+
+async def get_risk_control_rollup(
+    pool: asyncpg.Pool, risk_ids: list[UUID]
+) -> dict[UUID, dict]:
+    """Return {risk_id: {control_count, effectiveness_label, score}}.
+
+    Looks at outbound ``mitigated_by`` edges from each risk, keeps only
+    targets whose asset type is ``control``, and averages their
+    ``metadata.effectiveness`` weight.  Non-control mitigators (policies,
+    processes, etc.) are counted in ``mitigator_count`` but not scored.
+    """
+    if not risk_ids:
+        return {}
+    rows = await pool.fetch(
+        """SELECT r.source_asset_id AS risk_id,
+                  a.type::text       AS target_type,
+                  a.metadata         AS target_meta
+           FROM relationships r
+           JOIN assets a ON a.id = r.target_asset_id
+           WHERE r.source_asset_id = ANY($1::uuid[])
+             AND r.relationship_type = 'mitigated_by'""",
+        risk_ids,
+    )
+
+    by_risk: dict[UUID, dict] = {
+        rid: {"control_count": 0, "mitigator_count": 0, "score_sum": 0.0}
+        for rid in risk_ids
+    }
+    for row in rows:
+        bucket = by_risk[row["risk_id"]]
+        bucket["mitigator_count"] += 1
+        if row["target_type"] != "control":
+            continue
+        meta = row["target_meta"]
+        if isinstance(meta, str):
+            meta = json.loads(meta or "{}") or {}
+        elif not meta:
+            meta = {}
+        eff = meta.get("effectiveness")
+        if eff not in _EFFECTIVENESS_WEIGHT:
+            continue
+        bucket["control_count"] += 1
+        bucket["score_sum"] += _EFFECTIVENESS_WEIGHT[eff]
+
+    result: dict[UUID, dict] = {}
+    for rid, b in by_risk.items():
+        score = (b["score_sum"] / b["control_count"]) if b["control_count"] else None
+        result[rid] = {
+            "control_count": b["control_count"],
+            "mitigator_count": b["mitigator_count"],
+            "score": round(score, 2) if score is not None else None,
+            "effectiveness_label": _effectiveness_label(score, b["control_count"]),
+        }
+    return result
+
+
 async def get_risk_register(
     pool: asyncpg.Pool,
     *,
@@ -201,12 +279,172 @@ async def get_risk_register(
 
         risks.append(risk)
 
+    # Control-effectiveness rollup across all mitigated_by edges.
+    rollup = await get_risk_control_rollup(pool, [r["id"] for r in risks])
+    for r in risks:
+        r["control_rollup"] = rollup.get(r["id"], {
+            "control_count": 0,
+            "mitigator_count": 0,
+            "score": None,
+            "effectiveness_label": "none",
+        })
+
     # Sort
     sort_key = sort if sort in ("score", "name", "risk_category", "treatment", "owner") else "score"
     reverse = order == "desc"
     risks.sort(key=lambda r: (r.get(sort_key) or ""), reverse=reverse)
 
     return risks
+
+
+async def capture_risk_snapshot(pool: asyncpg.Pool, for_date=None) -> dict:
+    """Write today's risk counts to risk_snapshots (idempotent: one row per date).
+
+    Returns the snapshot row that's now in the table.
+    """
+    from datetime import date as date_type
+    snap_date = for_date or date_type.today()
+    summary = await get_risk_summary(pool)
+    by_sev = summary["by_severity"]
+    await pool.execute(
+        """INSERT INTO risk_snapshots
+               (snapshot_date, total, critical, high, medium, low, overdue, no_treatment)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+           ON CONFLICT (snapshot_date) DO UPDATE SET
+               total = EXCLUDED.total,
+               critical = EXCLUDED.critical,
+               high = EXCLUDED.high,
+               medium = EXCLUDED.medium,
+               low = EXCLUDED.low,
+               overdue = EXCLUDED.overdue,
+               no_treatment = EXCLUDED.no_treatment,
+               created_at = now()""",
+        snap_date,
+        summary["total"],
+        by_sev["critical"],
+        by_sev["high"],
+        by_sev["medium"],
+        by_sev["low"],
+        summary["overdue"],
+        summary["no_treatment"],
+    )
+    return {
+        "snapshot_date": snap_date,
+        "total": summary["total"],
+        **by_sev,
+        "overdue": summary["overdue"],
+        "no_treatment": summary["no_treatment"],
+    }
+
+
+async def get_severity_trend(pool: asyncpg.Pool) -> dict:
+    """Return current counts plus deltas vs. the previous snapshot (if any).
+
+    Shape: {"current": {..}, "prior": {..}|None, "deltas": {critical: int, ...}}.
+    The 'current' counts come from live data so they stay fresh between
+    nightly captures; deltas compare against the most recent snapshot row
+    with a date < today.
+    """
+    from datetime import date as date_type
+    summary = await get_risk_summary(pool)
+    by_sev = summary["by_severity"]
+    current = {
+        "total": summary["total"],
+        "critical": by_sev["critical"],
+        "high": by_sev["high"],
+        "medium": by_sev["medium"],
+        "low": by_sev["low"],
+    }
+    prior_row = await pool.fetchrow(
+        """SELECT * FROM risk_snapshots
+           WHERE snapshot_date < $1
+           ORDER BY snapshot_date DESC LIMIT 1""",
+        date_type.today(),
+    )
+    if not prior_row:
+        return {"current": current, "prior": None, "deltas": {}}
+    prior = {
+        k: prior_row[k]
+        for k in ("total", "critical", "high", "medium", "low")
+    }
+    deltas = {k: current[k] - prior[k] for k in current}
+    return {
+        "current": current,
+        "prior": {**prior, "snapshot_date": prior_row["snapshot_date"]},
+        "deltas": deltas,
+    }
+
+
+async def bulk_update_risks(
+    pool: asyncpg.Pool,
+    risk_ids: list[UUID],
+    *,
+    treatment: str | None = None,
+    owner_id: UUID | None = None,
+    review_date: str | None = None,
+    updated_by: UUID | None = None,
+) -> list[UUID]:
+    """Update non-empty fields on the given risks. Returns ids actually updated.
+
+    ``treatment`` and ``review_date`` live in metadata JSON; ``owner_id`` is
+    a column on assets.  Each updated asset keeps its other metadata keys
+    intact.
+    """
+    if not risk_ids:
+        return []
+    if treatment is None and owner_id is None and review_date is None:
+        return []
+
+    updated: list[UUID] = []
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            for rid in risk_ids:
+                row = await conn.fetchrow(
+                    "SELECT metadata FROM assets WHERE id = $1 AND type = 'risk'",
+                    rid,
+                )
+                if not row:
+                    continue
+                meta = row["metadata"]
+                if isinstance(meta, str):
+                    meta = json.loads(meta) or {}
+                elif meta is None:
+                    meta = {}
+                else:
+                    meta = dict(meta)
+
+                changed = False
+                if treatment is not None:
+                    meta["treatment"] = treatment
+                    changed = True
+                if review_date is not None:
+                    meta["review_date"] = review_date
+                    changed = True
+
+                if changed:
+                    await conn.execute(
+                        """UPDATE assets
+                             SET metadata = $1::jsonb, updated_at = now(),
+                                 updated_by = COALESCE($2, updated_by)
+                             WHERE id = $3""",
+                        json.dumps(meta),
+                        updated_by,
+                        rid,
+                    )
+                if owner_id is not None:
+                    await conn.execute(
+                        """UPDATE assets
+                             SET owner_id = $1, updated_at = now(),
+                                 updated_by = COALESCE($2, updated_by)
+                             WHERE id = $3""",
+                        owner_id,
+                        updated_by,
+                        rid,
+                    )
+                    changed = True
+                if changed:
+                    updated.append(rid)
+    return updated
 
 
 async def get_risk_summary(pool: asyncpg.Pool) -> dict:

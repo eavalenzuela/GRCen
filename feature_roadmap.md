@@ -24,11 +24,10 @@ Relationship file upload was already wired to `/api/imports/relationships/execut
 ### 6. Attachments on Relationships — **SHIPPED**
 `attachments` now allows either `asset_id` OR `relationship_id` (enforced via CHECK constraint). Evidence can be attached to edges like "control satisfies requirement" from a dedicated `/relationships/{id}/evidence` page. Asset detail lists each relationship with a link showing its evidence count. Matching REST endpoints live under `/api/relationships/{id}/attachments/` mirroring the asset endpoints (list, create, upload, download, delete). Cascade-delete cleans up attachments when a relationship is removed.
 
-### 7. Risk Management Polish
-Register, heatmap, and filters are in. Still missing:
-- Bulk actions: bulk-update treatment, reassign owner, set review dates across selected risks
-- Trend indicators: count per severity band vs. last review cycle
-- Risk → control effectiveness scoring beyond raw links
+### 7. Risk Management Polish — **SHIPPED**
+- **Bulk actions:** checkbox column on the register + "Bulk Apply to Selected" fieldset lets editors update treatment, review date, and owner across many risks in one transaction. Each change is audit-logged.
+- **Trend indicators:** `risk_snapshots` table captures daily severity counts (nightly APScheduler cron job at 00:05 UTC); the dashboard shows ▲/▼ arrows per severity card vs. the most recent prior snapshot, coloring increases red for severity bands (green for total), decreases opposite, and grey if unchanged.
+- **Control effectiveness rollup:** new `get_risk_control_rollup()` service walks each risk's outbound `mitigated_by` edges, keeps only targets of type `control`, averages their `metadata.effectiveness` into a 0–1 score (effective=1, partially=0.5, not_tested=0.25, ineffective=0), and labels it strong/adequate/weak/none. Surfaced as a new "Controls" column in the register.
 
 ### 8. Cross-Cutting Tag Vocabulary
 Asset tags exist as free-text strings per asset. A proper vocabulary would allow filtered views across types (e.g., "all SOC2-in-scope assets"). Add a `tags` table with a many-to-many to assets, an admin tag manager, and a tag-filter widget in search.

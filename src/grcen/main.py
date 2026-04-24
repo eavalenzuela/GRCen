@@ -55,11 +55,24 @@ async def _tick_alerts():
             )
 
 
+async def _nightly_risk_snapshot():
+    from grcen.services.risk_service import capture_risk_snapshot
+
+    pool = await get_pool()
+    await capture_risk_snapshot(pool)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_pool()
     await init_schema()
     scheduler.add_job(_tick_alerts, "interval", minutes=1, id="alert_ticker")
+    # Daily at 00:05 UTC — captures yesterday's-end state for trend indicators.
+    scheduler.add_job(
+        _nightly_risk_snapshot,
+        CronTrigger(hour=0, minute=5),
+        id="risk_snapshot_daily",
+    )
     scheduler.start()
     yield
     scheduler.shutdown()

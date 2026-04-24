@@ -4,25 +4,37 @@
 <h1>Risk Management</h1>
 
 {# ── Summary stats ─────────────────────────────────────────────────── #}
+{% macro trend_arrow(key, reverse=false) %}
+    {% if trend.deltas and trend.deltas.get(key) is not none %}
+        {% set d = trend.deltas[key] %}
+        {% if d > 0 %}
+            <span title="Since {{ trend.prior.snapshot_date }}" style="color:{% if reverse %}#166534{% else %}#991b1b{% endif %};font-size:0.85rem;">▲ {{ d }}</span>
+        {% elif d < 0 %}
+            <span title="Since {{ trend.prior.snapshot_date }}" style="color:{% if reverse %}#991b1b{% else %}#166534{% endif %};font-size:0.85rem;">▼ {{ d|abs }}</span>
+        {% else %}
+            <span title="Unchanged since {{ trend.prior.snapshot_date }}" style="color:#6b7280;font-size:0.85rem;">—</span>
+        {% endif %}
+    {% endif %}
+{% endmacro %}
 <div class="risk-summary-row">
     <div class="risk-stat-card">
-        <div class="risk-stat-value">{{ summary.total }}</div>
+        <div class="risk-stat-value">{{ summary.total }} {{ trend_arrow('total', reverse=true) }}</div>
         <div class="risk-stat-label">Total Risks</div>
     </div>
     <div class="risk-stat-card risk-stat-critical">
-        <div class="risk-stat-value">{{ summary.by_severity.critical }}</div>
+        <div class="risk-stat-value">{{ summary.by_severity.critical }} {{ trend_arrow('critical') }}</div>
         <div class="risk-stat-label">Critical</div>
     </div>
     <div class="risk-stat-card risk-stat-high">
-        <div class="risk-stat-value">{{ summary.by_severity.high }}</div>
+        <div class="risk-stat-value">{{ summary.by_severity.high }} {{ trend_arrow('high') }}</div>
         <div class="risk-stat-label">High</div>
     </div>
     <div class="risk-stat-card risk-stat-medium">
-        <div class="risk-stat-value">{{ summary.by_severity.medium }}</div>
+        <div class="risk-stat-value">{{ summary.by_severity.medium }} {{ trend_arrow('medium') }}</div>
         <div class="risk-stat-label">Medium</div>
     </div>
     <div class="risk-stat-card risk-stat-low">
-        <div class="risk-stat-value">{{ summary.by_severity.low }}</div>
+        <div class="risk-stat-value">{{ summary.by_severity.low }} {{ trend_arrow('low') }}</div>
         <div class="risk-stat-label">Low</div>
     </div>
     <div class="risk-stat-card {% if summary.overdue > 0 %}risk-stat-warn{% endif %}">
@@ -158,9 +170,18 @@
 {# ── Risk register table ───────────────────────────────────────────── #}
 <div class="card">
     <h2>Risk Register ({{ risks | length }})</h2>
+
+    {% if has_perm(user.role, Permission.EDIT) and risks %}
+    <form method="post" action="/risk-management/bulk-update?{{ filter_params.lstrip('&') }}">
+        {% include "partials/csrf.html" %}
+    {% endif %}
+
     <table>
         <thead>
             <tr>
+                {% if has_perm(user.role, Permission.EDIT) and risks %}
+                <th><input type="checkbox" id="risk-select-all" onclick="document.querySelectorAll('.risk-row-check').forEach(c => c.checked = this.checked)"></th>
+                {% endif %}
                 {% macro sort_link(field, label) %}
                 {% set new_order = "asc" if current_sort == field and current_order == "desc" else "desc" %}
                 <th><a href="/risk-management?sort={{ field }}&order={{ new_order }}{{ filter_params }}" class="sort-link">
@@ -177,6 +198,7 @@
                 {{ sort_link("risk_category", "Category") }}
                 {{ sort_link("treatment", "Treatment") }}
                 <th>Effectiveness</th>
+                <th title="Aggregate effectiveness of controls linked via mitigated_by">Controls</th>
                 {{ sort_link("owner", "Owner") }}
                 <th>Review</th>
             </tr>
@@ -184,6 +206,9 @@
         <tbody>
             {% for risk in risks %}
             <tr>
+                {% if has_perm(user.role, Permission.EDIT) and risks %}
+                <td><input type="checkbox" class="risk-row-check" name="risk_ids" value="{{ risk.id }}"></td>
+                {% endif %}
                 <td><a href="/assets/{{ risk.id }}">{{ risk.name }}</a></td>
                 <td><span class="badge risk-{{ risk.color }}">{{ risk.score }}</span></td>
                 <td>{{ risk.likelihood | replace('_', ' ') | title if risk.likelihood else '-' }}</td>
@@ -191,6 +216,19 @@
                 <td>{{ risk.risk_category | replace('_', ' ') | title if risk.risk_category else '-' }}</td>
                 <td>{{ risk.treatment | replace('_', ' ') | title if risk.treatment else '-' }}</td>
                 <td>{{ risk.control_effectiveness | replace('_', ' ') | title if risk.control_effectiveness else '-' }}</td>
+                <td>
+                    {% set cr = risk.control_rollup %}
+                    {% if cr.control_count %}
+                    <span title="{{ cr.control_count }} control{{ 's' if cr.control_count != 1 }} tracked, avg score {{ cr.score }}">
+                        {{ cr.effectiveness_label | title }}
+                        <small style="color:#6b7280;">({{ cr.control_count }})</small>
+                    </span>
+                    {% elif cr.mitigator_count %}
+                    <small style="color:#6b7280;" title="{{ cr.mitigator_count }} non-control mitigator(s) linked">{{ cr.mitigator_count }} mitigator{{ 's' if cr.mitigator_count != 1 }}</small>
+                    {% else %}
+                    <small style="color:#991b1b;">—</small>
+                    {% endif %}
+                </td>
                 <td>{{ risk.owner or '-' }}</td>
                 <td>
                     {% if risk.is_overdue %}
@@ -204,9 +242,43 @@
             </tr>
             {% endfor %}
             {% if not risks %}
-            <tr><td colspan="9" style="text-align:center;color:var(--text-muted);">No risks match the current filters.</td></tr>
+            <tr><td colspan="11" style="text-align:center;color:var(--text-muted);">No risks match the current filters.</td></tr>
             {% endif %}
         </tbody>
     </table>
+
+    {% if has_perm(user.role, Permission.EDIT) and risks %}
+    <fieldset style="margin-top:1rem; border:1px solid #e5e7eb; padding:0.75rem; border-radius:6px;">
+        <legend style="padding:0 0.5rem; font-weight:600;">Bulk Apply to Selected</legend>
+        <div style="display:flex; gap:0.75rem; flex-wrap:wrap; align-items:center;">
+            <label>
+                Treatment
+                <select name="treatment">
+                    <option value="">— no change —</option>
+                    <option value="mitigate">Mitigate</option>
+                    <option value="accept">Accept</option>
+                    <option value="transfer">Transfer</option>
+                    <option value="avoid">Avoid</option>
+                </select>
+            </label>
+            <label>
+                Review date
+                <input type="date" name="review_date">
+            </label>
+            <label>
+                Owner
+                <select name="owner_id">
+                    <option value="">— no change —</option>
+                    {% for p in bulk_owners %}
+                    <option value="{{ p.id }}">{{ p.name }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <button type="submit" class="btn btn-primary"
+                    onclick="return confirm('Apply to all selected risks?');">Apply</button>
+        </div>
+    </fieldset>
+    </form>
+    {% endif %}
 </div>
 {% endblock %}
