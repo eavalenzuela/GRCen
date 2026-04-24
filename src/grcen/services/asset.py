@@ -74,6 +74,7 @@ async def list_assets(
     created_after: str | None = None,
     created_before: str | None = None,
     metadata_filters: dict[str, str] | None = None,
+    tag: str | None = None,
     sort: str = "name",
     order: str = "asc",
 ) -> tuple[list[Asset], int]:
@@ -116,6 +117,11 @@ async def list_assets(
     if created_before:
         where_parts.append(f"a.created_at < ${idx}")
         vals.append(date.fromisoformat(created_before) + timedelta(days=1))
+        idx += 1
+
+    if tag:
+        where_parts.append(f"${idx} = ANY(a.tags)")
+        vals.append(tag)
         idx += 1
 
     if metadata_filters:

@@ -72,6 +72,17 @@
         <input type="text" id="tags" name="tags"
                value="{{ (asset.tags or []) | join(', ') if asset else '' }}"
                placeholder="e.g. SOC2, GDPR, critical-path">
+        {% if known_tags %}
+        <small style="color:#6b7280;">
+            Existing:
+            {% for t in known_tags[:12] %}
+            <button type="button" class="btn btn-xs"
+                    style="padding:0 0.4rem; font-size:0.75rem; margin:0 0.15rem;"
+                    onclick="(function(i,v){var cur=i.value.trim();var parts=cur?cur.split(','):[];var names=parts.map(s=>s.trim());if(!names.includes(v)){names.push(v);}i.value=names.filter(Boolean).join(', ');})(document.getElementById('tags'),'{{ t.name }}');">{{ t.name }}</button>
+            {% endfor %}
+            {% if known_tags | length > 12 %}…{% endif %}
+        </small>
+        {% endif %}
     </div>
 
     <div id="custom-fields">

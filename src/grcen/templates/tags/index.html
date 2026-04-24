@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Tags - GRCen{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Tags</h1>
+</div>
+
+{% if flash %}
+<div class="alert" style="background:{% if flash.ok %}#dcfce7; color:#166534; border:1px solid #bbf7d0{% else %}#fee2e2; color:#991b1b; border:1px solid #fecaca{% endif %};">
+    {{ flash.message }}
+</div>
+{% endif %}
+
+<div class="card">
+    {% if tags %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Tag</th>
+                <th style="text-align:right;">Assets</th>
+                <th></th>
+                {% if has_perm(user.role, Permission.EDIT) %}<th>Rename</th>{% endif %}
+                {% if has_perm(user.role, Permission.DELETE) %}<th></th>{% endif %}
+            </tr>
+        </thead>
+        <tbody>
+        {% for t in tags %}
+            <tr>
+                <td><a href="/assets?tag={{ t.name | urlencode }}">{{ t.name }}</a></td>
+                <td style="text-align:right;">{{ t.asset_count }}</td>
+                <td>
+                    <a href="/assets?tag={{ t.name | urlencode }}" class="btn btn-sm">View assets →</a>
+                </td>
+                {% if has_perm(user.role, Permission.EDIT) %}
+                <td>
+                    <form method="post" action="/tags/{{ t.name | urlencode }}/rename" style="display:flex; gap:0.25rem;">
+                        {% include "partials/csrf.html" %}
+                        <input type="text" name="new_name" required placeholder="new name" style="width:10rem;">
+                        <button type="submit" class="btn btn-sm">Rename</button>
+                    </form>
+                </td>
+                {% endif %}
+                {% if has_perm(user.role, Permission.DELETE) %}
+                <td>
+                    <form method="post" action="/tags/{{ t.name | urlencode }}/delete"
+                          onsubmit="return confirm('Remove tag {{ t.name }} from all {{ t.asset_count }} assets?');">
+                        {% include "partials/csrf.html" %}
+                        <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                    </form>
+                </td>
+                {% endif %}
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color:#6b7280;">No tags yet. Add tags to assets from the asset detail or edit page.</p>
+    {% endif %}
+</div>
+{% endblock %}

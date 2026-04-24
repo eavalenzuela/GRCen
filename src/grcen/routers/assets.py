@@ -33,6 +33,7 @@ async def list_assets(
     owner: str | None = None,
     created_after: str | None = None,
     created_before: str | None = None,
+    tag: str | None = None,
     page: int = 1,
     page_size: int = 25,
     pool: asyncpg.Pool = Depends(get_db),
@@ -42,6 +43,7 @@ async def list_assets(
         pool, asset_type=type, page=page, page_size=page_size,
         q=q, status=status, owner=owner,
         created_after=created_after, created_before=created_before,
+        tag=tag,
     )
     return AssetListResponse(
         items=[AssetResponse.model_validate(a, from_attributes=True) for a in items],

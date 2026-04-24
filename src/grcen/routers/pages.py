@@ -31,6 +31,7 @@ from grcen.services import (
     oidc_settings,
     saml_settings,
     smtp_settings,
+    tag_service,
 )
 from grcen.services import relationship as rel_svc
 from grcen.services import review_service as review_svc
@@ -316,6 +317,7 @@ async def asset_list(
     created_before: str | None = None,
     meta_key: str | None = None,
     meta_value: str | None = None,
+    tag: str | None = None,
     sort: str = "name",
     order: str = "asc",
     page: int = 1,
@@ -337,10 +339,12 @@ async def asset_list(
         created_after=created_after,
         created_before=created_before,
         metadata_filters=metadata_filters,
+        tag=tag,
         sort=sort,
         order=order,
     )
     notif_count = await alert_svc.count_unread_notifications(pool)
+    all_tags = await tag_service.list_tags_with_counts(pool)
     # Build filter params string for pagination links
     filter_params = ""
     if asset_type:
@@ -357,6 +361,8 @@ async def asset_list(
         filter_params += f"&created_before={created_before}"
     if meta_key and meta_value:
         filter_params += f"&meta_key={meta_key}&meta_value={meta_value}"
+    if tag:
+        filter_params += f"&tag={tag}"
     if sort != "name":
         filter_params += f"&sort={sort}"
     if order != "asc":
@@ -377,6 +383,8 @@ async def asset_list(
             "filter_created_before": created_before or "",
             "filter_meta_key": meta_key or "",
             "filter_meta_value": meta_value or "",
+            "filter_tag": tag or "",
+            "all_tags": all_tags,
             "filter_params": filter_params,
             "statuses": ["active", "inactive", "draft", "archived"],
             "sort": sort,
@@ -392,12 +400,14 @@ async def asset_new(
     pool: asyncpg.Pool = Depends(get_db),
 ):
     notif_count = await alert_svc.count_unread_notifications(pool)
+    known_tags = await tag_service.list_tags_with_counts(pool)
     return templates.TemplateResponse(request, "assets/form.html", context={
             "user": user,
             "asset": None,
             "asset_types": sorted(AssetType, key=lambda t: t.value),
             "notif_count": notif_count,
             "custom_fields": CUSTOM_FIELDS,
+            "known_tags": known_tags,
         },
     )
 
@@ -511,6 +521,7 @@ async def asset_edit(
     if not asset:
         return HTMLResponse("Not found", status_code=404)
     notif_count = await alert_svc.count_unread_notifications(pool)
+    known_tags = await tag_service.list_tags_with_counts(pool)
     return templates.TemplateResponse(request, "assets/form.html", context={
             "user": user,
             "asset": asset,
@@ -518,6 +529,7 @@ async def asset_edit(
             "notif_count": notif_count,
             "custom_fields": CUSTOM_FIELDS,
             "asset_custom_fields": CUSTOM_FIELDS.get(asset.type, []),
+            "known_tags": known_tags,
         },
     )
 
@@ -1643,6 +1655,83 @@ async def relationship_evidence_delete(
         changes=audit_svc.delete_snapshot(att.__dict__, ["name", "kind", "url_or_path"]),
     )
     return RedirectResponse(f"/relationships/{rel_id}/evidence", status_code=302)
+
+
+# --- Tag vocabulary ---
+
+
+@router.get("/tags", response_class=HTMLResponse)
+async def tags_index(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.VIEW)),
+    flash: str | None = None,
+):
+    tags = await tag_service.list_tags_with_counts(pool)
+    notif_count = await alert_svc.count_unread_notifications(pool)
+    flash_ctx = None
+    if flash:
+        ok, _, message = flash.partition(":")
+        flash_ctx = {"ok": ok == "ok", "message": message or flash}
+    return templates.TemplateResponse(
+        request,
+        "tags/index.html",
+        context={
+            "user": user,
+            "tags": tags,
+            "flash": flash_ctx,
+            "notif_count": notif_count,
+        },
+    )
+
+
+@router.post("/tags/{old}/rename")
+async def tag_rename(
+    old: str,
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.EDIT)),
+):
+    form = await request.form()
+    new = str(form.get("new_name", "")).strip()
+    if not new:
+        return RedirectResponse("/tags?flash=fail:New name required", status_code=302)
+    affected = await tag_service.rename_tag(pool, old, new)
+    await audit_svc.log_audit_event(
+        pool,
+        user_id=user.id,
+        username=user.username,
+        action="tag_rename",
+        entity_type="tag",
+        entity_name=old,
+        changes={"old": {"old": old}, "new": {"new": new}, "assets_updated": {"new": affected}},
+    )
+    return RedirectResponse(
+        f"/tags?flash=ok:Renamed '{old}' → '{new}' on {affected} asset(s)",
+        status_code=302,
+    )
+
+
+@router.post("/tags/{name}/delete")
+async def tag_delete(
+    name: str,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.DELETE)),
+):
+    affected = await tag_service.delete_tag(pool, name)
+    await audit_svc.log_audit_event(
+        pool,
+        user_id=user.id,
+        username=user.username,
+        action="tag_delete",
+        entity_type="tag",
+        entity_name=name,
+        changes={"assets_updated": {"new": affected}},
+    )
+    return RedirectResponse(
+        f"/tags?flash=ok:Removed '{name}' from {affected} asset(s)",
+        status_code=302,
+    )
 
 
 # --- Compliance Framework dashboards ---

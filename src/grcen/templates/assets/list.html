@@ -64,8 +64,21 @@
                 <label>Metadata value</label>
                 <input type="text" name="meta_value" value="{{ filter_meta_value }}" placeholder="e.g. critical">
             </div>
+            <div class="form-group" style="margin-bottom:0;min-width:160px;">
+                <label>Tag</label>
+                <input type="text" name="tag" value="{{ filter_tag }}" list="all-tags" placeholder="e.g. SOC2">
+                <datalist id="all-tags">
+                    {% for t in all_tags %}<option value="{{ t.name }}"></option>{% endfor %}
+                </datalist>
+            </div>
         </div>
     </div>
+    {% if filter_tag %}
+    <div style="margin-bottom:0.5rem;">
+        Filtering by tag: <span class="badge">{{ filter_tag }}</span>
+        <a href="/assets" style="margin-left:0.5rem; font-size:0.85rem;">Clear</a>
+    </div>
+    {% endif %}
     {# Persist sort in form submission #}
     <input type="hidden" name="sort" value="{{ sort }}">
     <input type="hidden" name="order" value="{{ order }}">
@@ -129,7 +142,7 @@ function toggleAdvanced() {
 }
 // Auto-show advanced filters if any filter is active
 (function() {
-    var hasFilter = {{ 'true' if (current_type or filter_status or filter_owner or filter_created_after or filter_created_before or filter_meta_key) else 'false' }};
+    var hasFilter = {{ 'true' if (current_type or filter_status or filter_owner or filter_created_after or filter_created_before or filter_meta_key or filter_tag) else 'false' }};
     if (hasFilter) {
         document.getElementById('advanced-filters').style.display = '';
     }

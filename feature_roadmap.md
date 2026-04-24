@@ -29,8 +29,8 @@ Relationship file upload was already wired to `/api/imports/relationships/execut
 - **Trend indicators:** `risk_snapshots` table captures daily severity counts (nightly APScheduler cron job at 00:05 UTC); the dashboard shows ▲/▼ arrows per severity card vs. the most recent prior snapshot, coloring increases red for severity bands (green for total), decreases opposite, and grey if unchanged.
 - **Control effectiveness rollup:** new `get_risk_control_rollup()` service walks each risk's outbound `mitigated_by` edges, keeps only targets of type `control`, averages their `metadata.effectiveness` into a 0–1 score (effective=1, partially=0.5, not_tested=0.25, ineffective=0), and labels it strong/adequate/weak/none. Surfaced as a new "Controls" column in the register.
 
-### 8. Cross-Cutting Tag Vocabulary
-Asset tags exist as free-text strings per asset. A proper vocabulary would allow filtered views across types (e.g., "all SOC2-in-scope assets"). Add a `tags` table with a many-to-many to assets, an admin tag manager, and a tag-filter widget in search.
+### 8. Cross-Cutting Tag Vocabulary — **SHIPPED**
+Kept the existing `assets.tags TEXT[]` column (no schema change — the GIN index already powers efficient lookups) and added an aggregation layer on top. `/tags` lists every distinct tag with asset counts and links into the filtered asset list. Admins can rename a tag across every asset in one UPDATE (with automatic dedup if the target name already existed on an asset) or remove it entirely. Asset list + `/api/assets/` accept `?tag=X` to filter cross-type. Asset create/edit forms surface existing tags as click-to-add chips so users converge on shared names. Matching JSON API at `GET /api/tags/`.
 
 ### 9. Saved / Bookmarked Searches
 Advanced filtering is implemented, but nothing persists. Add a `saved_searches` table scoped per user + optional sharing.
