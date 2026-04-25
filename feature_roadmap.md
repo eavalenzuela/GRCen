@@ -60,8 +60,8 @@ Local users can enroll a TOTP second factor from `/settings` — the page shows 
 
 ## Tier 4 — Hardening & Operational
 
-### 17. General API Rate Limiting
-Login spray protection exists (~1 req / 2s). No general per-endpoint or per-token throttle. Unauthenticated bulk ops can hammer the DB.
+### 17. General API Rate Limiting — **SHIPPED**
+`RateLimitMiddleware` runs in front of every non-exempt request. Sliding-window-per-minute counters live in `rate_limit._api_window`, keyed by (caller, bucket): caller is the API token (most specific) → session id → client IP, and bucket is `read` (GET/HEAD/OPTIONS) vs `write` (everything else) — separate budgets so a write spammer can't drown out reads. Default budgets are 600 read / 120 write per minute, both configurable via `settings.RATE_LIMIT_READ_PER_MINUTE` / `_WRITE_PER_MINUTE` and switchable globally via `settings.RATE_LIMIT_ENABLED`. `/health`, `/static/*`, `/login`, `/logout` are exempt; the existing per-IP login debounce still covers `/login`. 429 responses include `Retry-After` plus `X-RateLimit-Limit` / `X-RateLimit-Remaining`. Remaining: shared backend (Redis) so multi-worker deployments don't undercount, per-route overrides for cheap vs expensive endpoints, and admin-config UI for the budgets.
 
 ### 18. Concurrent Session Limits
 Noted in `security_features_and_requirements.md:89` as unimplemented. An admin can have unbounded parallel sessions.

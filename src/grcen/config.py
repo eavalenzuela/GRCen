@@ -30,6 +30,13 @@ class Settings(BaseSettings):
     # Login rate limiting (per-IP spraying protection)
     LOGIN_RATE_LIMIT_SECONDS: float = 2.0
 
+    # General API rate limit. Sliding window per (key, bucket) pair.
+    # Key is the API token id, then session id, then client IP, in that order.
+    # Two buckets: 'read' (GET/HEAD/OPTIONS) and 'write' (everything else).
+    RATE_LIMIT_ENABLED: bool = True
+    RATE_LIMIT_READ_PER_MINUTE: int = 600
+    RATE_LIMIT_WRITE_PER_MINUTE: int = 120
+
     # SSL/TLS — set both to enable direct HTTPS termination
     SSL_CERTFILE: str | None = None
     SSL_KEYFILE: str | None = None

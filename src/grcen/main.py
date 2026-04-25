@@ -92,7 +92,7 @@ def create_app() -> FastAPI:
         redoc_url=None,
     )
 
-    from grcen.middleware import SecurityHeadersMiddleware
+    from grcen.middleware import RateLimitMiddleware, SecurityHeadersMiddleware
 
     # When TLS is configured (directly or behind a proxy), redirect HTTP→HTTPS and set HSTS
     if settings.SSL_CERTFILE or not settings.DEBUG:
@@ -100,6 +100,7 @@ def create_app() -> FastAPI:
         app.add_middleware(HTTPSRedirectMiddleware)
 
     app.add_middleware(SecurityHeadersMiddleware)
+    app.add_middleware(RateLimitMiddleware)
     app.add_middleware(
         SessionMiddleware,
         secret_key=settings.SECRET_KEY,

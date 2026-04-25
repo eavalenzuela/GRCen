@@ -5,7 +5,9 @@ import secrets
 
 from fastapi import HTTPException, Request
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
-from starlette.responses import RedirectResponse, Response
+from starlette.responses import JSONResponse, RedirectResponse, Response
+
+from grcen.rate_limit import check_api_rate_limit
 
 # ---------------------------------------------------------------------------
 # Security headers middleware
@@ -88,6 +90,43 @@ async def verify_csrf_token(request: Request) -> None:
 # ---------------------------------------------------------------------------
 # HTTPS redirect middleware
 # ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# General API rate-limit middleware
+# ---------------------------------------------------------------------------
+
+
+# Paths exempt from the general limiter. Health is for monitors; static is
+# served from disk and the login limiter already covers /login.
+_RATE_LIMIT_EXEMPT_PREFIXES = (
+    "/health",
+    "/static/",
+    "/login",
+    "/logout",
+)
+
+
+class RateLimitMiddleware(BaseHTTPMiddleware):
+    """Apply :func:`check_api_rate_limit` to every non-exempt request."""
+
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+        path = request.url.path
+        if any(path == p or path.startswith(p) for p in _RATE_LIMIT_EXEMPT_PREFIXES):
+            return await call_next(request)
+        result = check_api_rate_limit(request)
+        if result is not None:
+            _, limit, retry_after = result
+            return JSONResponse(
+                {"detail": "Rate limit exceeded. Please slow down."},
+                status_code=429,
+                headers={
+                    "Retry-After": str(int(retry_after) + 1),
+                    "X-RateLimit-Limit": str(limit),
+                    "X-RateLimit-Remaining": "0",
+                },
+            )
+        return await call_next(request)
 
 
 class HTTPSRedirectMiddleware(BaseHTTPMiddleware):
