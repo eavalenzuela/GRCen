@@ -2083,6 +2083,9 @@ async def user_settings(
     smtp_cfg = await smtp_settings.get_settings(pool)
     notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
 
+    from grcen.services import session_service
+    sessions = await session_service.list_sessions_for_user(pool, user.id)
+    current_sid = request.session.get("session_id")
     enrollment = await totp_service.get_enrollment(pool, user.id)
     mfa_enabled = bool(enrollment and enrollment["enabled"])
     mfa_pending_ctx = None
@@ -2119,8 +2122,34 @@ async def user_settings(
             "mfa_pending": mfa_pending_ctx,
             "recovery_remaining": recovery_remaining if mfa_enabled else None,
             "flash": flash_ctx,
+            "sessions": sessions,
+            "current_session_id": current_sid,
         },
     )
+
+
+@router.post("/settings/sessions/{session_id}/revoke")
+async def user_session_revoke(
+    session_id: str,
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Let a user revoke one of their own sessions.
+
+    The DELETE only fires when the session also belongs to the requesting user
+    so cookie-bearing strangers can't terminate someone else's session by
+    guessing an id.
+    """
+    from grcen.services import session_service
+    await pool.execute(
+        "DELETE FROM sessions WHERE session_id = $1 AND user_id = $2",
+        session_id, user.id,
+    )
+    if request.session.get("session_id") == session_id:
+        request.session.clear()
+        return RedirectResponse("/login", status_code=302)
+    return RedirectResponse("/settings?flash=ok:Session revoked", status_code=302)
 
 
 @router.post("/settings")

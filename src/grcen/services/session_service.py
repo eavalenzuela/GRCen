@@ -6,8 +6,35 @@ from uuid import UUID
 
 import asyncpg
 
+from grcen.config import settings
 from grcen.services import encryption_config
 from grcen.services.encryption import encrypt_field
+
+
+async def _enforce_concurrent_cap(pool: asyncpg.Pool, user_id: UUID) -> None:
+    """Evict the user's oldest sessions when above the cap.
+
+    Runs *before* the new session is inserted, so the post-insert count never
+    exceeds the configured cap. ``SESSION_MAX_CONCURRENT == 0`` disables the
+    check entirely (unlimited).
+    """
+    cap = settings.SESSION_MAX_CONCURRENT
+    if cap <= 0:
+        return
+    # Keep cap-1 of the most recently active sessions so the new one fills the
+    # last slot. last_active is the right ordering key — a brand-new login
+    # should bump out a long-idle one, not a freshly active parallel session.
+    await pool.execute(
+        """DELETE FROM sessions
+           WHERE session_id IN (
+               SELECT session_id FROM sessions
+               WHERE user_id = $1
+               ORDER BY last_active DESC
+               OFFSET $2
+           )""",
+        user_id,
+        cap - 1,
+    )
 
 
 async def create_session(
@@ -17,6 +44,7 @@ async def create_session(
     user_agent: str | None = None,
 ) -> str:
     """Create a new server-side session and return the session ID."""
+    await _enforce_concurrent_cap(pool, user_id)
     session_id = secrets.token_urlsafe(32)
     stored_ip = ip_address
     if ip_address and await encryption_config.is_scope_active(pool, "session_pii"):
@@ -30,6 +58,17 @@ async def create_session(
         (user_agent or "")[:512],  # truncate long user-agent strings
     )
     return session_id
+
+
+async def list_sessions_for_user(pool: asyncpg.Pool, user_id: UUID) -> list[dict]:
+    """Return active sessions for a user, newest-active first."""
+    rows = await pool.fetch(
+        """SELECT session_id, created_at, last_active, ip_address, user_agent
+           FROM sessions WHERE user_id = $1
+           ORDER BY last_active DESC""",
+        user_id,
+    )
+    return [dict(r) for r in rows]
 
 
 async def validate_session(

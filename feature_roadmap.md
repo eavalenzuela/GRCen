@@ -63,8 +63,8 @@ Local users can enroll a TOTP second factor from `/settings` — the page shows 
 ### 17. General API Rate Limiting — **SHIPPED**
 `RateLimitMiddleware` runs in front of every non-exempt request. Sliding-window-per-minute counters live in `rate_limit._api_window`, keyed by (caller, bucket): caller is the API token (most specific) → session id → client IP, and bucket is `read` (GET/HEAD/OPTIONS) vs `write` (everything else) — separate budgets so a write spammer can't drown out reads. Default budgets are 600 read / 120 write per minute, both configurable via `settings.RATE_LIMIT_READ_PER_MINUTE` / `_WRITE_PER_MINUTE` and switchable globally via `settings.RATE_LIMIT_ENABLED`. `/health`, `/static/*`, `/login`, `/logout` are exempt; the existing per-IP login debounce still covers `/login`. 429 responses include `Retry-After` plus `X-RateLimit-Limit` / `X-RateLimit-Remaining`. Remaining: shared backend (Redis) so multi-worker deployments don't undercount, per-route overrides for cheap vs expensive endpoints, and admin-config UI for the budgets.
 
-### 18. Concurrent Session Limits
-Noted in `security_features_and_requirements.md:89` as unimplemented. An admin can have unbounded parallel sessions.
+### 18. Concurrent Session Limits — **SHIPPED**
+`session_service.create_session` enforces `settings.SESSION_MAX_CONCURRENT` (default 5; 0 disables) by deleting the user's oldest sessions ordered by `last_active` *before* inserting the new one — the post-insert count never exceeds the cap. `/settings` lists the current user's active sessions with timestamps and user-agent string and offers a per-row "Revoke" button; revoking the current session redirects to `/login`. Foreign-session revocation is blocked by scoping the DELETE to `user_id = $current_user`. Remaining: per-role caps (e.g. admins capped lower than viewers), an admin-wide active-sessions audit page that spans all users, and notifications when a session is evicted by the cap.
 
 ### 19. Backup Encryption & Secrets Management
 `security_features_and_requirements.md:44`: backup encryption at rest not implemented. Also: no OAuth 2.0 client-credentials flow or IP allowlisting for API access.

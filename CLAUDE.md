@@ -39,6 +39,7 @@ GRCen (pronounced "gurken") is a free and open-source GRC (Governance, Risk, Com
 - RBAC with four roles: Admin, Editor, Viewer, Auditor (`permissions.py`), plus field-level redaction of fields marked `sensitive=True` in `custom_fields.py` for users without `VIEW_PII` permission
 - Workflow / approval gating per asset type (`/admin/workflow`): when a create/update/delete is gated, the write becomes a `pending_changes` row and is applied only after an approver (Admin role / `Permission.APPROVE`) acts. Queue at `/approvals`, REST at `/api/approvals/`, REST mutate routes return 202 with `pending_change_id` when gated. Self-approval blocked.
 - General API rate limiting via `RateLimitMiddleware` (default 600 reads / 120 writes per minute, separate buckets), keyed by token → session → IP. Configurable via `settings.RATE_LIMIT_*`. 429 responses include `Retry-After`.
+- Concurrent session cap per user (default 5, configurable via `SESSION_MAX_CONCURRENT`). Oldest sessions evicted on new login. Users can view/revoke their own sessions at `/settings`.
 - **Multi-tenancy:** every data table carries `organization_id`; users belong to exactly one org. Reads filter and writes inject via `user.organization_id` (or `routers.deps.get_current_organization_id`). Cross-org references rejected at the service layer (asset.owner_id, relationship endpoints, attachments, alerts). Org management is CLI-only: `grcen createorg`, `grcen listorgs`, `grcen createadmin` (prompts for org slug). Admin info at `/admin/organization`.
 - Audit trail with optional field-level diffs, PII sanitization, encryption support
 - Data access log at `/admin/access-log` records reads (views, downloads, exports, PDFs) separately from audit writes
@@ -55,7 +56,7 @@ GRCen (pronounced "gurken") is a free and open-source GRC (Governance, Risk, Com
 
 ## Known Gaps (see `feature_roadmap.md` for the full list)
 
-- Tier 4 hardening: concurrent session limits, backup encryption, HTML email templates
+- Tier 4 hardening: backup encryption, HTML email templates
 - Multi-org follow-ups: in-app org creation + switcher, multi-org membership, superadmin role, per-org SSO/SMTP/webhook/encryption overrides
 
 ## Design Philosophy

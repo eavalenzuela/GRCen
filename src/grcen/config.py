@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     # Session management
     SESSION_IDLE_TIMEOUT_MINUTES: int = 30
     SESSION_ABSOLUTE_TIMEOUT_MINUTES: int = 480  # 8 hours
+    # Cap concurrent sessions per user. 0 = unlimited. When the cap is hit,
+    # the oldest session(s) are evicted to make room for the new one.
+    SESSION_MAX_CONCURRENT: int = 5
 
     # Login lockout
     LOGIN_MAX_FAILED_ATTEMPTS: int = 5

@@ -91,4 +91,43 @@
     </form>
     {% endif %}
 </div>
+
+<div class="card" style="margin-top:1.5rem;">
+    <h3>Active sessions</h3>
+    <p style="color:#6b7280;">Each browser sign-in creates a session. Revoke any you don't recognize.</p>
+    {% if sessions %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Started</th>
+                <th>Last active</th>
+                <th>User agent</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for s in sessions %}
+            <tr>
+                <td>{{ s.created_at.strftime('%Y-%m-%d %H:%M UTC') }}</td>
+                <td>{{ s.last_active.strftime('%Y-%m-%d %H:%M UTC') }}</td>
+                <td style="font-size:0.85em;color:#6b7280;">
+                    {{ (s.user_agent or '')[:80] }}
+                    {% if s.session_id == current_session_id %}
+                    <strong>(this session)</strong>
+                    {% endif %}
+                </td>
+                <td>
+                    <form method="post" action="/settings/sessions/{{ s.session_id }}/revoke" style="display:inline;">
+                        {% include "partials/csrf.html" %}
+                        <button type="submit" class="btn">Revoke</button>
+                    </form>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>No active sessions.</p>
+    {% endif %}
+</div>
 {% endblock %}
