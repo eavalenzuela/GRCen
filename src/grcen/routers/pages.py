@@ -40,6 +40,7 @@ from grcen.services import (
 from grcen.services import relationship as rel_svc
 from grcen.services import review_service as review_svc
 from grcen.services import risk_service as risk_svc
+from grcen.services import workflow_service
 from grcen.services.encryption import is_encryption_enabled
 from grcen.services.encryption_scopes import ALL_PROFILES, ALL_SCOPES
 
@@ -508,12 +509,30 @@ async def asset_create_submit(
     tags_raw = str(form.get("tags", "")).strip()
     tags = [t.strip() for t in tags_raw.split(",") if t.strip()] if tags_raw else []
     criticality = str(form.get("criticality", "")).strip() or None
+    name = str(form["name"])
+    description = str(form.get("description", ""))
+    status = str(form.get("status", "active"))
+    if await workflow_service.requires_approval(pool, asset_type, "create"):
+        change = await workflow_service.submit(
+            pool,
+            action="create",
+            asset_type=asset_type,
+            target_asset_id=None,
+            title=name,
+            payload=workflow_service.asset_create_payload(
+                name=name, description=description, status=status,
+                owner_id=owner_id, metadata=metadata, tags=tags,
+                criticality=criticality,
+            ),
+            user=user,
+        )
+        return RedirectResponse(f"/approvals/{change.id}?submitted=1", status_code=302)
     asset = await asset_svc.create_asset(
         pool,
         type=asset_type,
-        name=str(form["name"]),
-        description=str(form.get("description", "")),
-        status=str(form.get("status", "active")),
+        name=name,
+        description=description,
+        status=status,
         owner_id=owner_id,
         metadata_=metadata,
         updated_by=user.id,
@@ -579,6 +598,9 @@ async def asset_detail(
         )
         if row:
             linked_user = dict(row)
+    pending_changes = await workflow_service.list_changes(
+        pool, status="pending", target_asset_id=asset_id
+    )
     return templates.TemplateResponse(request, "assets/detail.html", context={
             "user": user,
             "asset": asset,
@@ -589,6 +611,7 @@ async def asset_detail(
             "notif_count": notif_count,
             "asset_custom_fields": CUSTOM_FIELDS.get(asset.type, []),
             "linked_user": linked_user,
+            "pending_changes": pending_changes,
         },
     )
 
@@ -642,6 +665,28 @@ async def asset_update_submit(
     tags_raw = str(form.get("tags", "")).strip()
     tags = [t.strip() for t in tags_raw.split(",") if t.strip()] if tags_raw else []
     criticality = str(form.get("criticality", "")).strip() or None
+    if old and await workflow_service.requires_approval(pool, old.type, "update"):
+        try:
+            change = await workflow_service.submit(
+                pool,
+                action="update",
+                asset_type=old.type,
+                target_asset_id=asset_id,
+                title=str(form["name"]),
+                payload=workflow_service.asset_update_payload({
+                    "name": str(form["name"]),
+                    "description": str(form.get("description", "")),
+                    "status": str(form.get("status", "active")),
+                    "owner_id": owner_id,
+                    "metadata_": metadata,
+                    "tags": tags,
+                    "criticality": criticality,
+                }),
+                user=user,
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=409, detail=str(e))
+        return RedirectResponse(f"/approvals/{change.id}?submitted=1", status_code=302)
     updated = await asset_svc.update_asset(
         pool,
         asset_id,
@@ -677,6 +722,20 @@ async def asset_delete_submit(
     user: User = Depends(require_permission(Permission.DELETE)),
 ):
     old = await asset_svc.get_asset(pool, asset_id)
+    if old and await workflow_service.requires_approval(pool, old.type, "delete"):
+        try:
+            change = await workflow_service.submit(
+                pool,
+                action="delete",
+                asset_type=old.type,
+                target_asset_id=asset_id,
+                title=old.name,
+                payload={},
+                user=user,
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=409, detail=str(e))
+        return RedirectResponse(f"/approvals/{change.id}?submitted=1", status_code=302)
     await asset_svc.delete_asset(pool, asset_id)
     if old:
         await audit_svc.log_audit_event(

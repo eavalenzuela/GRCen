@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Workflow Settings - GRCen{% endblock %}
+
+{% block content %}
+<h1>Workflow Settings</h1>
+<p>
+    Toggle approval gates per asset type. When a gate is on, users with edit/create/delete
+    permission submit changes to the <a href="/approvals">approval queue</a> instead of writing
+    directly. An approver (Admin role by default) reviews and applies the change.
+</p>
+
+<form method="post" action="/admin/workflow">
+    {% include "partials/csrf.html" %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Asset Type</th>
+                <th>Require approval to create</th>
+                <th>Require approval to update</th>
+                <th>Require approval to delete</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cfg in rows %}
+            <tr>
+                <td>{{ cfg.asset_type | replace('_', ' ') | title }}</td>
+                <td>
+                    <input type="checkbox" name="create_{{ cfg.asset_type }}"
+                        {% if cfg.require_approval_create %}checked{% endif %}>
+                </td>
+                <td>
+                    <input type="checkbox" name="update_{{ cfg.asset_type }}"
+                        {% if cfg.require_approval_update %}checked{% endif %}>
+                </td>
+                <td>
+                    <input type="checkbox" name="delete_{{ cfg.asset_type }}"
+                        {% if cfg.require_approval_delete %}checked{% endif %}>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <button type="submit" class="btn" style="margin-top:1rem;">Save</button>
+</form>
+{% endblock %}

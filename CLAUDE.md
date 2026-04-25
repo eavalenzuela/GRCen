@@ -37,6 +37,7 @@ GRCen (pronounced "gurken") is a free and open-source GRC (Governance, Risk, Com
 - Bulk CSV/JSON import of assets with preview; filterable column-selectable export (CSV/JSON)
 - Schedulable alerts and review reminders with three delivery channels: in-app notifications, SMTP email (admin config at `/admin/smtp-settings`, user opt-in at `/settings`, log in `notification_deliveries`), and outbound webhooks (manage at `/admin/webhooks`, HMAC-SHA256 signed, log in `webhook_deliveries`).
 - RBAC with four roles: Admin, Editor, Viewer, Auditor (`permissions.py`), plus field-level redaction of fields marked `sensitive=True` in `custom_fields.py` for users without `VIEW_PII` permission
+- Workflow / approval gating per asset type (`/admin/workflow`): when a create/update/delete is gated, the write becomes a `pending_changes` row and is applied only after an approver (Admin role / `Permission.APPROVE`) acts. Queue at `/approvals`, REST at `/api/approvals/`, REST mutate routes return 202 with `pending_change_id` when gated. Self-approval blocked.
 - Audit trail with optional field-level diffs, PII sanitization, encryption support
 - Data access log at `/admin/access-log` records reads (views, downloads, exports, PDFs) separately from audit writes
 - SSO: OIDC and SAML 2.0, with admin UI config and role mapping
@@ -53,9 +54,7 @@ GRCen (pronounced "gurken") is a free and open-source GRC (Governance, Risk, Com
 ## Known Gaps (see `feature_roadmap.md` for the full list)
 
 - Multi-tenancy / multi-org
-- PDF report generation
-- Cross-cutting tag vocabulary (asset tags exist but are per-asset strings)
-- MFA for local auth; field-level redaction by role; data-access (read) logging
+- Tier 4 hardening: API rate limiting, concurrent session limits, backup encryption, HTML email templates
 
 ## Design Philosophy
 

@@ -489,6 +489,57 @@ CREATE INDEX IF NOT EXISTS idx_notification_deliveries_alert
     ON notification_deliveries(alert_id);
 CREATE INDEX IF NOT EXISTS idx_notification_deliveries_attempted_at
     ON notification_deliveries(attempted_at DESC);
+
+-- Workflow / approval gating per asset type
+CREATE TABLE IF NOT EXISTS workflow_config (
+    asset_type               VARCHAR(64) PRIMARY KEY,
+    require_approval_create  BOOLEAN NOT NULL DEFAULT false,
+    require_approval_update  BOOLEAN NOT NULL DEFAULT false,
+    require_approval_delete  BOOLEAN NOT NULL DEFAULT false,
+    updated_at               TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Pending changes (proposed creates / updates / deletes awaiting approval)
+DO $$ BEGIN
+    CREATE TYPE pending_change_status AS ENUM ('pending', 'approved', 'rejected', 'withdrawn');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+    CREATE TYPE pending_change_action AS ENUM ('create', 'update', 'delete');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS pending_changes (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    action          pending_change_action NOT NULL,
+    asset_type      VARCHAR(64) NOT NULL,
+    target_asset_id UUID REFERENCES assets(id) ON DELETE SET NULL,
+    title           VARCHAR(255) NOT NULL,
+    payload         JSONB NOT NULL DEFAULT '{}'::jsonb,
+    status          pending_change_status NOT NULL DEFAULT 'pending',
+    submitted_by    UUID REFERENCES users(id) ON DELETE SET NULL,
+    submitted_by_username VARCHAR(150) NOT NULL,
+    submitted_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    decided_by      UUID REFERENCES users(id) ON DELETE SET NULL,
+    decided_by_username VARCHAR(150),
+    decided_at      TIMESTAMPTZ,
+    decision_note   TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_pending_changes_status
+    ON pending_changes(status);
+CREATE INDEX IF NOT EXISTS idx_pending_changes_target
+    ON pending_changes(target_asset_id) WHERE target_asset_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_pending_changes_submitted
+    ON pending_changes(submitted_at DESC);
+
+-- If an older table created the FK as ON DELETE CASCADE, swap it for SET NULL
+-- so that an approved DELETE preserves the historical pending_change row.
+DO $$ BEGIN
+    ALTER TABLE pending_changes DROP CONSTRAINT pending_changes_target_asset_id_fkey;
+    ALTER TABLE pending_changes
+        ADD CONSTRAINT pending_changes_target_asset_id_fkey
+        FOREIGN KEY (target_asset_id) REFERENCES assets(id) ON DELETE SET NULL;
+EXCEPTION WHEN undefined_object THEN NULL; WHEN duplicate_object THEN NULL;
+END $$;
 """
 
 

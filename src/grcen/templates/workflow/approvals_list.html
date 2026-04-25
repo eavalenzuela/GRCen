@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Approvals - GRCen{% endblock %}
+
+{% block content %}
+<h1>Approvals</h1>
+
+<nav class="filter-tabs" style="margin-bottom:1rem;">
+    {% for s in ['pending', 'approved', 'rejected', 'withdrawn', 'all'] %}
+        {% if s == current_status %}
+            <strong>{{ s|capitalize }}</strong>
+        {% else %}
+            <a href="/approvals?status={{ s }}">{{ s|capitalize }}</a>
+        {% endif %}
+        {% if not loop.last %} | {% endif %}
+    {% endfor %}
+</nav>
+
+{% if not items %}
+<p>No {{ current_status }} changes.</p>
+{% else %}
+<table class="table">
+    <thead>
+        <tr>
+            <th>Action</th>
+            <th>Type</th>
+            <th>Title</th>
+            <th>Submitted by</th>
+            <th>Submitted at</th>
+            <th>Status</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for c in items %}
+        <tr>
+            <td>{{ c.action }}</td>
+            <td>{{ c.asset_type }}</td>
+            <td>{{ c.title }}</td>
+            <td>{{ c.submitted_by_username }}</td>
+            <td>{{ c.submitted_at.strftime('%Y-%m-%d %H:%M UTC') }}</td>
+            <td>{{ c.status }}</td>
+            <td><a href="/approvals/{{ c.id }}">Review</a></td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+{% endblock %}

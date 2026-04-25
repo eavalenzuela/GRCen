@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Pending Change - GRCen{% endblock %}
+
+{% block content %}
+<p><a href="/approvals">&larr; Back to approvals</a></p>
+
+{% if just_submitted %}
+<div class="callout" style="background:#eef;padding:0.75rem;margin-bottom:1rem;border-left:4px solid #66f;">
+    Submitted for approval. An approver must review before the change takes effect.
+</div>
+{% endif %}
+
+<h1>{{ change.action|capitalize }}: {{ change.title }}</h1>
+<p>
+    <strong>Asset type:</strong> {{ change.asset_type }} &middot;
+    <strong>Status:</strong> {{ change.status }} &middot;
+    <strong>Submitted by:</strong> {{ change.submitted_by_username }}
+    on {{ change.submitted_at.strftime('%Y-%m-%d %H:%M UTC') }}
+</p>
+
+{% if change.target_asset_id %}
+<p>
+    <strong>Target asset:</strong>
+    {% if target %}
+        <a href="/assets/{{ target.id }}">{{ target.name }}</a>
+    {% else %}
+        <em>(asset no longer exists)</em>
+    {% endif %}
+</p>
+{% endif %}
+
+<h2>Proposed payload</h2>
+<pre style="background:#f5f5f5;padding:1rem;overflow:auto;">{{ change.payload|tojson(indent=2) }}</pre>
+
+{% if change.status != 'pending' %}
+<h2>Decision</h2>
+<p>
+    <strong>{{ change.status|capitalize }}</strong> by
+    {{ change.decided_by_username or '-' }}
+    {% if change.decided_at %} on {{ change.decided_at.strftime('%Y-%m-%d %H:%M UTC') }}{% endif %}
+</p>
+{% if change.decision_note %}
+<p><em>Note:</em> {{ change.decision_note }}</p>
+{% endif %}
+{% else %}
+
+<h2>Take action</h2>
+{% if has_perm(user.role, Permission.APPROVE) and user.id != change.submitted_by %}
+<form method="post" action="/approvals/{{ change.id }}/approve" style="display:inline-block;margin-right:1rem;">
+    {% include "partials/csrf.html" %}
+    <label>Note (optional): <input type="text" name="note" size="40"></label>
+    <button type="submit" class="btn">Approve</button>
+</form>
+<form method="post" action="/approvals/{{ change.id }}/reject" style="display:inline-block;">
+    {% include "partials/csrf.html" %}
+    <button type="submit" class="btn">Reject</button>
+</form>
+{% elif user.id == change.submitted_by %}
+<p><em>You submitted this change. Another approver must act on it.</em></p>
+<form method="post" action="/approvals/{{ change.id }}/withdraw">
+    {% include "partials/csrf.html" %}
+    <button type="submit" class="btn">Withdraw</button>
+</form>
+{% else %}
+<p><em>You do not have approval permission for this queue.</em></p>
+{% endif %}
+{% endif %}
+{% endblock %}

@@ -27,6 +27,9 @@
             {% if has_perm(user.role, Permission.EXPORT) %}
             <a href="/exports">Export</a>
             {% endif %}
+            {% if has_perm(user.role, Permission.APPROVE) or has_perm(user.role, Permission.EDIT) %}
+            <a href="/approvals">Approvals</a>
+            {% endif %}
             <a href="/notifications" class="notif-link">
                 Notifications
                 <span id="notif-badge"
@@ -53,6 +56,7 @@
         <a href="/admin/webhooks">Webhooks</a>
         <a href="/admin/encryption">Encryption</a>
         <a href="/admin/audit/settings">Audit Settings</a>
+        <a href="/admin/workflow">Workflow</a>
         {% endif %}
         {% if has_perm(user.role, Permission.VIEW_AUDIT) %}
         <a href="/admin/audit">Audit Log</a>

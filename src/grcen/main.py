@@ -30,6 +30,7 @@ from grcen.routers import (
     saved_searches,
     tags,
     tokens,
+    workflow,
 )
 
 scheduler = AsyncIOScheduler()
@@ -126,9 +127,11 @@ def create_app() -> FastAPI:
     app.include_router(oidc.router)
     app.include_router(saml.router)
     app.include_router(tokens.router)
+    app.include_router(workflow.api_router)
 
     # Page routers
     app.include_router(pages.router)
+    app.include_router(workflow.router)
 
     # --- Authenticated OpenAPI docs ---
     from grcen.routers.deps import get_current_user, get_db

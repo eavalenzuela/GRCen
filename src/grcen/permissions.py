@@ -20,6 +20,7 @@ class Permission(str, Enum):
     MANAGE_ALERTS = "manage_alerts"
     MANAGE_USERS = "manage_users"
     VIEW_AUDIT = "view_audit"
+    APPROVE = "approve"  # Approve or reject pending workflow changes
 
 
 ROLE_PERMISSIONS: dict[UserRole, set[Permission]] = {

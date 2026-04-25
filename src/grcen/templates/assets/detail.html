@@ -30,6 +30,17 @@
     </div>
 </div>
 
+{% if pending_changes %}
+<div class="callout" style="background:#fffbe6;padding:0.75rem;margin-bottom:1rem;border-left:4px solid #d4a017;">
+    <strong>{{ pending_changes|length }} pending change{{ '' if pending_changes|length == 1 else 's' }}</strong> on this asset:
+    <ul style="margin:0.25rem 0 0 1.5rem;">
+    {% for c in pending_changes %}
+        <li><a href="/approvals/{{ c.id }}">{{ c.action }} by {{ c.submitted_by_username }} at {{ c.submitted_at.strftime('%Y-%m-%d %H:%M UTC') }}</a></li>
+    {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
 <div class="detail-grid">
     <div class="detail-field"><strong>Type:</strong> {{ asset.type.value | replace('_', ' ') | title }}</div>
     <div class="detail-field"><strong>Status:</strong> <span class="badge badge-{{ asset.status.value }}">{{ asset.status.value | title }}</span></div>
