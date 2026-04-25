@@ -1,4 +1,6 @@
 import hashlib
+import ipaddress
+import logging
 import secrets
 import string
 from datetime import UTC, datetime, timedelta
@@ -7,6 +9,40 @@ from uuid import UUID
 import asyncpg
 
 from grcen.models.api_token import ApiToken
+
+log = logging.getLogger(__name__)
+
+
+def _ip_matches_allowlist(client_ip: str | None, allowlist: list[str]) -> bool:
+    """Return True when ``client_ip`` matches any entry in ``allowlist``.
+
+    Entries are evaluated as CIDR networks first (`10.0.0.0/24`) then as exact
+    addresses (`10.0.0.5`). Mixed v4/v6 is fine — `ip_network` handles either
+    family. Malformed entries are skipped and logged so a typo'd allowlist
+    can't accidentally lock everyone out without a trace.
+    """
+    if not allowlist:
+        return True
+    if client_ip is None:
+        return False
+    try:
+        client = ipaddress.ip_address(client_ip)
+    except ValueError:
+        return False
+    for entry in allowlist:
+        entry = entry.strip()
+        if not entry:
+            continue
+        try:
+            network = ipaddress.ip_network(entry, strict=False)
+        except ValueError:
+            log.warning("Skipping malformed token allowlist entry: %r", entry)
+            continue
+        if client.version != network.version:
+            continue
+        if client in network:
+            return True
+    return False
 
 _PREFIX = "grcen_"
 _TOKEN_BYTES = 48
@@ -118,7 +154,7 @@ async def validate_token(
         return None
     if token.expires_at and token.expires_at < datetime.now(UTC):
         return None
-    if token.allowed_ips and (client_ip is None or client_ip not in token.allowed_ips):
+    if not _ip_matches_allowlist(client_ip, token.allowed_ips):
         return None
 
     await pool.execute(

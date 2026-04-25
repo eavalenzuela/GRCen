@@ -41,9 +41,9 @@ GRCen (pronounced "gurken") is a free and open-source GRC (Governance, Risk, Com
 - General API rate limiting via `RateLimitMiddleware` (default 600 reads / 120 writes per minute, separate buckets), keyed by token → session → IP. Configurable via `settings.RATE_LIMIT_*`. 429 responses include `Retry-After`.
 - Concurrent session cap per user (default 5, configurable via `SESSION_MAX_CONCURRENT`). Oldest sessions evicted on new login. Users can view/revoke their own sessions at `/settings`.
 - Encrypted backup CLI: `grcen backup <out>` / `grcen restore <in>`. AES-256-GCM keyed off `ENCRYPTION_KEY` (HKDF salt `backup-salt`); pipes pg_dump/psql.
-- API tokens carry an optional `allowed_ips` allowlist. `validate_token` rejects when caller IP isn't in the list. Empty list = unrestricted.
-- Alert emails are sent as `multipart/alternative` (text + HTML, `templates/emails/`) with a `List-Unsubscribe` header pointing at `/settings`.
-- **Multi-tenancy:** every data table carries `organization_id`; users belong to exactly one org. Reads filter and writes inject via `user.organization_id` (or `routers.deps.get_current_organization_id`). Cross-org references rejected at the service layer (asset.owner_id, relationship endpoints, attachments, alerts). Org management is CLI-only: `grcen createorg`, `grcen listorgs`, `grcen createadmin` (prompts for org slug). Admin info at `/admin/organization`.
+- API tokens carry an optional `allowed_ips` allowlist (exact addresses + CIDR ranges, IPv4 + IPv6).
+- Alert emails are `multipart/alternative` (text + HTML in `templates/emails/`) with `List-Unsubscribe` headers. Per-org branding via `organizations.email_from_name` / `email_brand_color` / `email_logo_url`. Users can opt into hourly digest mode at `/settings`; queue lives in `pending_email_digest`, flushed by an APScheduler job at `:15` past the hour.
+- **Multi-tenancy:** every data table carries `organization_id`. Users belong to one or more orgs via `user_organizations`; the active org is stored in `request.session['active_org_id']` and applied as an overlay in `get_current_user`. Per-org role swaps in on switch. Switch UI on `/settings`, REST at `POST /switch-org`. Cross-org admin: `users.is_superadmin` + `Permission.MANAGE_ORGS` drive `/admin/orgs`. CLI: `grcen createorg`, `grcen createsuperadmin`, `grcen createadmin` (prompts for org slug).
 - Audit trail with optional field-level diffs, PII sanitization, encryption support
 - Data access log at `/admin/access-log` records reads (views, downloads, exports, PDFs) separately from audit writes
 - SSO: OIDC and SAML 2.0, with admin UI config and role mapping
@@ -59,7 +59,7 @@ GRCen (pronounced "gurken") is a free and open-source GRC (Governance, Risk, Com
 
 ## Known Gaps (see `feature_roadmap.md` for the full list)
 
-- Multi-org follow-ups: in-app org creation + switcher, multi-org membership, superadmin role, per-org SSO/SMTP/webhook/encryption overrides
+- WebAuthn / FIDO2 for MFA, Redis-backed rate limiter, OAuth 2.0 client-credentials flow, per-org SSO/SMTP/webhook/encryption overrides, tenancy-aware Postgres RLS policy
 - Tail items inside shipped roadmap sections — see `feature_roadmap.md` "Remaining:" lines for each
 
 ## Design Philosophy

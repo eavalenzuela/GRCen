@@ -1,0 +1,11 @@
+{{ count }} pending notification{{ '' if count == 1 else 's' }} from {{ app_name }}.
+{% for item in items %}
+- {{ item.title }}
+{% if item.asset_name %}  Asset: {{ item.asset_name }}{% endif %}
+{% if item.link %}  Link:  {{ item.link }}{% endif %}
+{% if item.message %}  {{ item.message }}{% endif %}
+{% endfor %}
+
+---
+You are receiving this because notifications are enabled on your {{ app_name }}
+account. Manage your preferences at {{ unsubscribe_url }}.

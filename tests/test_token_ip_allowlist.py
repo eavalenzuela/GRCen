@@ -70,6 +70,55 @@ async def test_validate_token_returns_none_on_ip_mismatch(pool, auth_client):
 
 
 @pytest.mark.asyncio
+async def test_cidr_v4_range_allows_in_subnet(pool, auth_client):
+    user = await pool.fetchrow("SELECT id FROM users LIMIT 1")
+    _, raw = await token_service.create_token(
+        pool, user["id"], "cidr-v4", [Permission.VIEW.value],
+        allowed_ips=["10.0.0.0/24"],
+    )
+    inside = await token_service.validate_token(pool, raw, client_ip="10.0.0.42")
+    outside = await token_service.validate_token(pool, raw, client_ip="10.0.1.1")
+    assert inside is not None
+    assert outside is None
+
+
+@pytest.mark.asyncio
+async def test_cidr_v6_range_allows_in_subnet(pool, auth_client):
+    user = await pool.fetchrow("SELECT id FROM users LIMIT 1")
+    _, raw = await token_service.create_token(
+        pool, user["id"], "cidr-v6", [Permission.VIEW.value],
+        allowed_ips=["2001:db8::/32"],
+    )
+    inside = await token_service.validate_token(pool, raw, client_ip="2001:db8::1")
+    outside = await token_service.validate_token(pool, raw, client_ip="2001:dead::1")
+    assert inside is not None
+    assert outside is None
+
+
+@pytest.mark.asyncio
+async def test_mixed_exact_and_cidr_entries(pool, auth_client):
+    user = await pool.fetchrow("SELECT id FROM users LIMIT 1")
+    _, raw = await token_service.create_token(
+        pool, user["id"], "mixed", [Permission.VIEW.value],
+        allowed_ips=["192.168.1.5", "10.0.0.0/8"],
+    )
+    assert (await token_service.validate_token(pool, raw, client_ip="192.168.1.5")) is not None
+    assert (await token_service.validate_token(pool, raw, client_ip="10.5.5.5")) is not None
+    assert (await token_service.validate_token(pool, raw, client_ip="172.16.0.1")) is None
+
+
+@pytest.mark.asyncio
+async def test_malformed_entry_is_skipped_not_fatal(pool, auth_client):
+    """A typo in the allowlist must not lock the entire token out."""
+    user = await pool.fetchrow("SELECT id FROM users LIMIT 1")
+    _, raw = await token_service.create_token(
+        pool, user["id"], "typo", [Permission.VIEW.value],
+        allowed_ips=["not-an-ip", "10.0.0.0/24"],
+    )
+    assert (await token_service.validate_token(pool, raw, client_ip="10.0.0.5")) is not None
+
+
+@pytest.mark.asyncio
 async def test_update_allowed_ips(pool, auth_client):
     user = await pool.fetchrow("SELECT id FROM users LIMIT 1")
     token, raw = await token_service.create_token(

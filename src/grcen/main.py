@@ -66,6 +66,13 @@ async def _nightly_risk_snapshot():
     await capture_all_org_snapshots(pool)
 
 
+async def _flush_email_digests():
+    from grcen.services.digest_service import flush_digests
+
+    pool = await get_pool()
+    await flush_digests(pool)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_pool()
@@ -76,6 +83,13 @@ async def lifespan(app: FastAPI):
         _nightly_risk_snapshot,
         CronTrigger(hour=0, minute=5),
         id="risk_snapshot_daily",
+    )
+    # Hourly at :15 — flush queued digest emails. Off-cycle from the alert
+    # ticker so a fresh batch can accumulate before each flush.
+    scheduler.add_job(
+        _flush_email_digests,
+        CronTrigger(minute=15),
+        id="email_digest_hourly",
     )
     scheduler.start()
     yield
@@ -201,13 +215,15 @@ def cli():
     """CLI entrypoint for management commands."""
     if len(sys.argv) < 2:
         print("Usage: grcen <command>")
-        print("Commands: createadmin, createorg, listorgs, runserver, generate-key, rotate-keys, backup, restore")
+        print("Commands: createadmin, createsuperadmin, createorg, listorgs, runserver, generate-key, rotate-keys, backup, restore")
         sys.exit(1)
 
     command = sys.argv[1]
 
     if command == "createadmin":
         asyncio.run(_create_admin())
+    elif command == "createsuperadmin":
+        asyncio.run(_create_superadmin())
     elif command == "createorg":
         asyncio.run(_create_org())
     elif command == "listorgs":
@@ -278,6 +294,31 @@ async def _create_org():
         return
     org = await organization_service.create_organization(pool, slug=slug, name=name)
     print(f"Created organization '{org.slug}' (id={org.id}).")
+    await close_pool()
+
+
+async def _create_superadmin():
+    """Promote an existing admin to superadmin (cross-org), or create one."""
+    from grcen.permissions import UserRole
+    from grcen.services.auth import create_user
+
+    pool = await init_pool()
+    await init_schema()
+    username = input("Username: ")
+    existing = await pool.fetchrow("SELECT id FROM users WHERE username = $1", username)
+    if existing:
+        await pool.execute(
+            "UPDATE users SET is_superadmin = true, updated_at = now() WHERE id = $1",
+            existing["id"],
+        )
+        print(f"Promoted '{username}' to superadmin.")
+    else:
+        password = input("Password: ")
+        user = await create_user(pool, username, password, role=UserRole.ADMIN)
+        await pool.execute(
+            "UPDATE users SET is_superadmin = true WHERE id = $1", user.id
+        )
+        print(f"Created superadmin '{username}'.")
     await close_pool()
 
 

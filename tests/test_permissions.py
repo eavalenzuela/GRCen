@@ -3,9 +3,17 @@
 from grcen.permissions import ROLE_PERMISSIONS, Permission, UserRole, has_permission
 
 
-def test_admin_has_all_permissions():
+def test_admin_has_all_per_org_permissions():
+    """Admin holds every permission EXCEPT MANAGE_ORGS, which is superadmin-only."""
     for perm in Permission:
+        if perm is Permission.MANAGE_ORGS:
+            continue
         assert has_permission(UserRole.ADMIN, perm), f"Admin missing {perm}"
+
+
+def test_admin_does_not_have_manage_orgs():
+    """Per-org admins must not get cross-org powers automatically."""
+    assert not has_permission(UserRole.ADMIN, Permission.MANAGE_ORGS)
 
 
 def test_editor_permissions():

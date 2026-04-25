@@ -179,10 +179,37 @@ async def _deliver_email(
     if not recipients:
         return
 
-    subject = f"[GRCen] {alert.title}"
-    text_body, html_body = email_service.render_alert_email(alert, asset_name, link)
+    # Resolve the alert's owning org so the email gets that tenant's branding.
+    from grcen.services import organization_service
+    org_row = await pool.fetchrow(
+        "SELECT organization_id FROM alerts WHERE id = $1", alert.id
+    )
+    org = None
+    if org_row:
+        org = await organization_service.get_by_id(pool, org_row["organization_id"])
+    brand_name = (
+        org.email_from_name if org and org.email_from_name else "GRCen"
+    )
+    subject = f"[{brand_name}] {alert.title}"
+    text_body, html_body = email_service.render_alert_email(
+        alert, asset_name, link, org=org,
+    )
 
-    for user_id, email in recipients:
+    from grcen.services import digest_service
+    for user_id, email, mode in recipients:
+        if mode == "digest":
+            await digest_service.queue_for_digest(
+                pool,
+                user_id=user_id,
+                organization_id=org.id if org else org_row["organization_id"],
+                alert_id=alert.id,
+                asset_id=alert.asset_id,
+                asset_name=asset_name,
+                title=alert.title,
+                message=alert.message,
+                link=link,
+            )
+            continue
         await email_service.send_email(
             pool,
             to=email,

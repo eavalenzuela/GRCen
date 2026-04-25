@@ -1329,11 +1329,125 @@ async def admin_audit_log(
     )
 
 
+@router.post("/switch-org")
+async def switch_organization(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Switch the active org for the current session.
+
+    Membership is checked here in addition to the dep so we can reject early
+    with a clear flash on /settings instead of silently falling back.
+    """
+    form = await request.form()
+    target_id = str(form.get("organization_id", "")).strip()
+    if not target_id:
+        return RedirectResponse("/settings", status_code=302)
+    try:
+        target_uuid = UUID(target_id)
+    except ValueError:
+        return RedirectResponse("/settings?flash=fail:Invalid organization id", status_code=302)
+    is_member, _ = await organization_service.is_member(pool, user.id, target_uuid)
+    if not is_member and not user.is_superadmin:
+        return RedirectResponse("/settings?flash=fail:You are not a member of that org", status_code=302)
+    request.session["active_org_id"] = str(target_uuid)
+    return RedirectResponse("/?", status_code=302)
+
+
+@router.get("/admin/orgs", response_class=HTMLResponse)
+async def admin_orgs_index(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_ORGS)),
+    flash: str | None = None,
+):
+    rows = await organization_service.stats_for_orgs(pool)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    flash_ctx = None
+    if flash:
+        ok, _, message = flash.partition(":")
+        flash_ctx = {"ok": ok == "ok", "message": message or flash}
+    return templates.TemplateResponse(request, "admin/orgs.html", context={
+        "user": user, "orgs": rows, "notif_count": notif_count, "flash": flash_ctx,
+    })
+
+
+@router.post("/admin/orgs")
+async def admin_orgs_create(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_ORGS)),
+):
+    form = await request.form()
+    slug = str(form.get("slug", "")).strip().lower()
+    name = str(form.get("name", "")).strip()
+    if not slug or not name:
+        return RedirectResponse(
+            "/admin/orgs?flash=fail:Slug and name are required.", status_code=302
+        )
+    existing = await organization_service.get_by_slug(pool, slug)
+    if existing:
+        return RedirectResponse(
+            f"/admin/orgs?flash=fail:Organization '{slug}' already exists.",
+            status_code=302,
+        )
+    org = await organization_service.create_organization(pool, slug=slug, name=name)
+    await audit_svc.log_audit_event(
+        pool, user_id=user.id, username=user.username,
+        action="create", entity_type="organization",
+        entity_id=org.id, entity_name=org.name,
+        organization_id=user.organization_id,
+    )
+    return RedirectResponse(
+        f"/admin/orgs?flash=ok:Created organization '{slug}'.", status_code=302
+    )
+
+
+@router.post("/admin/orgs/{org_id}/delete")
+async def admin_orgs_delete(
+    org_id: UUID,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_ORGS)),
+):
+    try:
+        deleted = await organization_service.delete_organization(pool, org_id)
+    except ValueError as e:
+        return RedirectResponse(f"/admin/orgs?flash=fail:{e}", status_code=302)
+    if deleted:
+        await audit_svc.log_audit_event(
+            pool, user_id=user.id, username=user.username,
+            action="delete", entity_type="organization",
+            entity_id=org_id, entity_name=str(org_id),
+            organization_id=user.organization_id,
+        )
+        return RedirectResponse("/admin/orgs?flash=ok:Organization deleted.", status_code=302)
+    return RedirectResponse("/admin/orgs?flash=fail:Not found.", status_code=302)
+
+
+@router.post("/admin/organization/branding")
+async def admin_organization_branding(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+):
+    form = await request.form()
+    await organization_service.update_branding(
+        pool,
+        user.organization_id,
+        email_from_name=str(form.get("email_from_name", "")).strip()[:120],
+        email_brand_color=str(form.get("email_brand_color", "")).strip()[:20],
+        email_logo_url=str(form.get("email_logo_url", "")).strip()[:500],
+    )
+    return RedirectResponse("/admin/organization?flash=ok:Branding saved.", status_code=302)
+
+
 @router.get("/admin/organization", response_class=HTMLResponse)
 async def admin_organization(
     request: Request,
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+    flash: str | None = None,
 ):
     org = await organization_service.get_by_id(pool, user.organization_id)
     user_count = await pool.fetchval(
@@ -1343,12 +1457,17 @@ async def admin_organization(
         "SELECT count(*) FROM assets WHERE organization_id = $1", user.organization_id
     )
     notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    flash_ctx = None
+    if flash:
+        ok, _, message = flash.partition(":")
+        flash_ctx = {"ok": ok == "ok", "message": message or flash}
     return templates.TemplateResponse(request, "admin/organization.html", context={
         "user": user,
         "org": org,
         "user_count": user_count,
         "asset_count": asset_count,
         "notif_count": notif_count,
+        "flash": flash_ctx,
     })
 
 
@@ -2086,6 +2205,7 @@ async def user_settings(
     from grcen.services import session_service
     sessions = await session_service.list_sessions_for_user(pool, user.id)
     current_sid = request.session.get("session_id")
+    memberships = await organization_service.list_memberships(pool, user.id)
     enrollment = await totp_service.get_enrollment(pool, user.id)
     mfa_enabled = bool(enrollment and enrollment["enabled"])
     mfa_pending_ctx = None
@@ -2124,6 +2244,7 @@ async def user_settings(
             "flash": flash_ctx,
             "sessions": sessions,
             "current_session_id": current_sid,
+            "memberships": memberships,
         },
     )
 
@@ -2164,6 +2285,9 @@ async def user_settings_submit(
     if enabled and not user.email:
         enabled = False
     await auth_svc.set_email_notifications_enabled(pool, user.id, enabled)
+    mode = str(form.get("email_notification_mode", "immediate")).strip()
+    if mode in ("immediate", "digest"):
+        await auth_svc.set_email_notification_mode(pool, user.id, mode)
     return RedirectResponse("/settings?saved=1", status_code=302)
 
 

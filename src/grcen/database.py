@@ -629,6 +629,72 @@ DO $$ BEGIN
         REFERENCES organizations(id) ON DELETE CASCADE;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
+-- Email digest mode: 'immediate' (per-event) or 'digest' (queued + batched
+-- by an hourly job). Per-user toggle that overlays the existing
+-- email_notifications_enabled flag — disabled trumps either mode.
+DO $$ BEGIN
+    ALTER TABLE users
+        ADD COLUMN email_notification_mode VARCHAR(16) NOT NULL DEFAULT 'immediate';
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS pending_email_digest (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    alert_id        UUID REFERENCES alerts(id) ON DELETE SET NULL,
+    asset_id        UUID,
+    asset_name      VARCHAR(255),
+    title           VARCHAR(255) NOT NULL,
+    message         TEXT,
+    link            TEXT,
+    queued_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    sent_at         TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_digest_pending_user
+    ON pending_email_digest(user_id) WHERE sent_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_digest_queued_at
+    ON pending_email_digest(queued_at) WHERE sent_at IS NULL;
+
+-- Per-org email branding. Empty string means fall back to defaults at render
+-- time; we don't NULL these because the templates can't conditionally elide
+-- a missing column without an extra branch.
+DO $$ BEGIN
+    ALTER TABLE organizations ADD COLUMN email_from_name VARCHAR(120) NOT NULL DEFAULT '';
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN
+    ALTER TABLE organizations ADD COLUMN email_brand_color VARCHAR(20) NOT NULL DEFAULT '';
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN
+    ALTER TABLE organizations ADD COLUMN email_logo_url VARCHAR(500) NOT NULL DEFAULT '';
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+
+-- Multi-org membership: a user can belong to several orgs with a per-org role.
+-- users.organization_id remains the *default* org (used at create time and for
+-- audit-derived events); the active-tenant resolution happens at request time
+-- against this table.
+CREATE TABLE IF NOT EXISTS user_organizations (
+    user_id          UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    organization_id  UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    role             user_role NOT NULL DEFAULT 'viewer',
+    is_default       BOOLEAN NOT NULL DEFAULT false,
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (user_id, organization_id)
+);
+CREATE INDEX IF NOT EXISTS idx_user_orgs_user ON user_organizations(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_orgs_org ON user_organizations(organization_id);
+
+-- Backfill: every existing user gets a membership row for their current org.
+INSERT INTO user_organizations (user_id, organization_id, role, is_default)
+SELECT u.id, u.organization_id, u.role, true
+FROM users u
+ON CONFLICT (user_id, organization_id) DO NOTHING;
+
+-- Superadmin flag — cross-org admin (org CRUD, viewing every org's data).
+-- Distinct from is_admin (which is per-org).
+DO $$ BEGIN
+    ALTER TABLE users ADD COLUMN is_superadmin BOOLEAN NOT NULL DEFAULT false;
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+
 -- IP allowlist on API tokens. Empty array = no restriction.
 DO $$ BEGIN
     ALTER TABLE api_tokens ADD COLUMN allowed_ips TEXT[] NOT NULL DEFAULT '{}';

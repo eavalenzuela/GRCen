@@ -45,7 +45,7 @@
             <a href="/logout">Logout ({{ user.username }})</a>
         </div>
     </nav>
-    {% if has_perm(user.role, Permission.MANAGE_USERS) or has_perm(user.role, Permission.VIEW_AUDIT) %}
+    {% if user.is_superadmin or has_perm(user.role, Permission.MANAGE_USERS) or has_perm(user.role, Permission.VIEW_AUDIT) %}
     <nav class="admin-bar">
         <span class="admin-bar-label">Admin</span>
         {% if has_perm(user.role, Permission.MANAGE_USERS) %}
@@ -58,6 +58,9 @@
         <a href="/admin/audit/settings">Audit Settings</a>
         <a href="/admin/workflow">Workflow</a>
         <a href="/admin/organization">Organization</a>
+        {% endif %}
+        {% if user.is_superadmin %}
+        <a href="/admin/orgs">All Organizations</a>
         {% endif %}
         {% if has_perm(user.role, Permission.VIEW_AUDIT) %}
         <a href="/admin/audit">Audit Log</a>

@@ -41,6 +41,14 @@
         <small style="color:#92400e;">SMTP is not currently configured, so no emails will be sent even if this is on.</small>
         {% endif %}
     </div>
+    <div class="form-group">
+        <label>Delivery mode
+            <select name="email_notification_mode">
+                <option value="immediate" {% if user.email_notification_mode == 'immediate' %}selected{% endif %}>Immediate (one email per alert)</option>
+                <option value="digest" {% if user.email_notification_mode == 'digest' %}selected{% endif %}>Hourly digest (one batched email per hour)</option>
+            </select>
+        </label>
+    </div>
     <div class="form-actions">
         <button type="submit" class="btn btn-primary">Save Preferences</button>
     </div>
@@ -91,6 +99,24 @@
     </form>
     {% endif %}
 </div>
+
+{% if memberships and memberships|length > 1 %}
+<div class="card" style="margin-top:1.5rem;">
+    <h3>Switch organization</h3>
+    <p style="color:#6b7280;">You belong to {{ memberships|length }} organizations. The active one is shown in bold.</p>
+    <form method="post" action="/switch-org">
+        {% include "partials/csrf.html" %}
+        <select name="organization_id">
+            {% for m in memberships %}
+            <option value="{{ m.id }}" {% if m.id == user.organization_id %}selected{% endif %}>
+                {{ m.name }} ({{ m.role }})
+            </option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn">Switch</button>
+    </form>
+</div>
+{% endif %}
 
 <div class="card" style="margin-top:1.5rem;">
     <h3>Active sessions</h3>

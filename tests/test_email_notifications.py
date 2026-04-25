@@ -123,7 +123,7 @@ async def test_resolve_recipients_prefers_asset_owner(pool):
     )
 
     recipients = await email_service.resolve_alert_recipients(pool, system.id)
-    assert recipients == [(owner.id, "owner@test")]
+    assert recipients == [(owner.id, "owner@test", "immediate")]
 
 
 @pytest.mark.asyncio
@@ -141,7 +141,7 @@ async def test_resolve_recipients_falls_back_to_admins(pool):
     )
 
     recipients = await email_service.resolve_alert_recipients(pool, system.id)
-    assert recipients == [(admin.id, "admin@test")]
+    assert recipients == [(admin.id, "admin@test", "immediate")]
 
 
 @pytest.mark.asyncio

@@ -15,6 +15,7 @@ class User:
     created_at: datetime
     updated_at: datetime
     organization_id: UUID
+    is_superadmin: bool = False
     oidc_sub: str | None = None
     saml_sub: str | None = None
     person_asset_id: UUID | None = None
@@ -23,6 +24,7 @@ class User:
     failed_login_count: int = 0
     locked_until: datetime | None = None
     email_notifications_enabled: bool = False
+    email_notification_mode: str = "immediate"  # 'immediate' | 'digest'
 
     @property
     def is_admin(self) -> bool:
@@ -50,5 +52,7 @@ class User:
             failed_login_count=row.get("failed_login_count", 0),
             locked_until=row.get("locked_until"),
             email_notifications_enabled=row.get("email_notifications_enabled", False),
+            email_notification_mode=row.get("email_notification_mode") or "immediate",
             organization_id=row["organization_id"],
+            is_superadmin=row.get("is_superadmin", False),
         )

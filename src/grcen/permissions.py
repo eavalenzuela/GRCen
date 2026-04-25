@@ -21,10 +21,16 @@ class Permission(str, Enum):
     MANAGE_USERS = "manage_users"
     VIEW_AUDIT = "view_audit"
     APPROVE = "approve"  # Approve or reject pending workflow changes
+    MANAGE_ORGS = "manage_orgs"  # Cross-org admin: create/delete orgs, view all tenants
 
+
+# MANAGE_ORGS is NOT granted by any role — only the is_superadmin user flag
+# unlocks it. Keeping it out of every role keeps a per-org admin from quietly
+# spawning new tenants.
+_NON_ROLE_PERMISSIONS = {Permission.MANAGE_ORGS}
 
 ROLE_PERMISSIONS: dict[UserRole, set[Permission]] = {
-    UserRole.ADMIN: set(Permission),
+    UserRole.ADMIN: set(Permission) - _NON_ROLE_PERMISSIONS,
     UserRole.EDITOR: {
         Permission.VIEW,
         Permission.VIEW_GRAPH,

@@ -87,7 +87,14 @@ async def create_user(
         role.value,
         organization_id,
     )
-    return _decrypt_user_email(User.from_row(row))
+    user = User.from_row(row)
+    # Mirror the create into user_organizations so the multi-org membership
+    # table stays the source of truth — saves callers from having to remember
+    # both writes.
+    await organization_service.add_membership(
+        pool, user.id, organization_id, role.value, is_default=True
+    )
+    return _decrypt_user_email(user)
 
 
 async def check_lockout(pool: asyncpg.Pool, username: str) -> bool:
@@ -196,6 +203,20 @@ async def set_email_notifications_enabled(
         """UPDATE users SET email_notifications_enabled = $1, updated_at = now()
            WHERE id = $2 RETURNING *""",
         enabled,
+        user_id,
+    )
+    return _decrypt_user_email(User.from_row(row)) if row else None
+
+
+async def set_email_notification_mode(
+    pool: asyncpg.Pool, user_id: UUID, mode: str
+) -> User | None:
+    if mode not in ("immediate", "digest"):
+        raise ValueError("mode must be 'immediate' or 'digest'")
+    row = await pool.fetchrow(
+        """UPDATE users SET email_notification_mode = $1, updated_at = now()
+           WHERE id = $2 RETURNING *""",
+        mode,
         user_id,
     )
     return _decrypt_user_email(User.from_row(row)) if row else None

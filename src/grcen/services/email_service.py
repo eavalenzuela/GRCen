@@ -32,16 +32,30 @@ _email_env = Environment(
 )
 
 
-def render_alert_email(alert, asset_name: str, link: str) -> tuple[str, str]:
-    """Render the (text, html) bodies for an alert notification."""
+def render_alert_email(
+    alert,
+    asset_name: str,
+    link: str,
+    *,
+    org=None,
+) -> tuple[str, str]:
+    """Render the (text, html) bodies for an alert notification.
+
+    If ``org`` is supplied, its branding (display name, accent color, logo)
+    overrides the global defaults. Empty branding fields fall back per-field
+    so a partial override is fine.
+    """
     base_url = app_settings.APP_BASE_URL.rstrip("/")
+    brand_name = (org.email_from_name if org and org.email_from_name else app_settings.APP_NAME)
     ctx = {
         "alert": alert,
         "asset_name": asset_name,
         "link": link,
-        "app_name": app_settings.APP_NAME,
-        "subject": f"[{app_settings.APP_NAME}] {alert.title}",
+        "app_name": brand_name,
+        "subject": f"[{brand_name}] {alert.title}",
         "unsubscribe_url": f"{base_url}/settings",
+        "brand_color": (org.email_brand_color if org and org.email_brand_color else "#1f2937"),
+        "logo_url": (org.email_logo_url if org and org.email_logo_url else ""),
     }
     text = _email_env.get_template("emails/alert.txt").render(**ctx)
     html = _email_env.get_template("emails/alert.html").render(**ctx)
@@ -145,8 +159,11 @@ async def _log_delivery(
 
 async def resolve_alert_recipients(
     pool: asyncpg.Pool, asset_id: UUID
-) -> list[tuple[UUID, str]]:
-    """Return [(user_id, email)] who should receive email for an alert on this asset.
+) -> list[tuple[UUID, str, str]]:
+    """Return [(user_id, email, mode)] who should receive email for this asset.
+
+    ``mode`` is the user's ``email_notification_mode`` ('immediate' or 'digest')
+    so callers can route to either send_email or queue_for_digest.
 
     Rules: the asset owner if owner_id links to a Person asset whose user has
     email_notifications_enabled=true. Otherwise all admins with opt-in on.
@@ -155,17 +172,17 @@ async def resolve_alert_recipients(
     pii_encrypted = await encryption_config.is_scope_active(pool, "user_pii")
 
     def _decrypt(rows):
-        out: list[tuple[UUID, str]] = []
+        out: list[tuple[UUID, str, str]] = []
         for r in rows:
             email = r["email"]
             if pii_encrypted and email:
                 email = decrypt_field(email, "user_pii")
             if email:
-                out.append((r["id"], email))
+                out.append((r["id"], email, r.get("email_notification_mode") or "immediate"))
         return out
 
     owner_rows = await pool.fetch(
-        """SELECT u.id, u.email
+        """SELECT u.id, u.email, u.email_notification_mode
            FROM assets a
            JOIN users u ON u.person_asset_id = a.owner_id
            WHERE a.id = $1
@@ -179,7 +196,7 @@ async def resolve_alert_recipients(
         return recipients
 
     admin_rows = await pool.fetch(
-        """SELECT id, email FROM users
+        """SELECT id, email, email_notification_mode FROM users
            WHERE role = 'admin'
              AND is_active = true
              AND email_notifications_enabled = true
