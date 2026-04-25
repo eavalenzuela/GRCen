@@ -36,13 +36,56 @@ async def check_login_rate_limit(request: Request) -> None:
 
 
 # General API limiter state: (key, bucket) -> deque[timestamps within last 60s]
-_api_window: dict[tuple[str, str], deque[float]] = defaultdict(deque)
+_api_window: dict[tuple[str, str, str], deque[float]] = defaultdict(deque)
 _WINDOW_SECONDS = 60.0
 _READ_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
 
 def _classify(method: str) -> str:
     return "read" if method.upper() in _READ_METHODS else "write"
+
+
+def _parse_route_overrides(raw: str) -> list[tuple[str, int, int]]:
+    """Parse the RATE_LIMIT_ROUTE_OVERRIDES setting.
+
+    Returns ``(prefix, read_limit, write_limit)`` triples sorted longest-prefix
+    first so the most specific match wins.
+    """
+    if not raw:
+        return []
+    out: list[tuple[str, int, int]] = []
+    for entry in raw.split(","):
+        parts = entry.strip().split(":")
+        if len(parts) != 3:
+            continue
+        prefix, read_s, write_s = parts
+        prefix = prefix.strip()
+        if not prefix.startswith("/"):
+            continue
+        try:
+            r = int(read_s)
+            w = int(write_s)
+        except ValueError:
+            continue
+        out.append((prefix, r, w))
+    return sorted(out, key=lambda t: len(t[0]), reverse=True)
+
+
+def _resolve_limits(path: str) -> tuple[int, int, str]:
+    """Return (read_limit, write_limit, matching_prefix_or_empty) for ``path``."""
+    overrides = _parse_route_overrides(settings.RATE_LIMIT_ROUTE_OVERRIDES)
+    for prefix, r, w in overrides:
+        if path.startswith(prefix):
+            return r, w, prefix
+    return (
+        settings.RATE_LIMIT_READ_PER_MINUTE,
+        settings.RATE_LIMIT_WRITE_PER_MINUTE,
+        "",
+    )
+
+
+def _matching_prefix(path: str) -> str:
+    return _resolve_limits(path)[2]
 
 
 def _api_caller_key(request: Request) -> str:
@@ -72,14 +115,13 @@ def check_api_rate_limit(request: Request) -> tuple[int, int, float] | None:
     if not settings.RATE_LIMIT_ENABLED:
         return None
     bucket = _classify(request.method)
-    limit = (
-        settings.RATE_LIMIT_READ_PER_MINUTE
-        if bucket == "read"
-        else settings.RATE_LIMIT_WRITE_PER_MINUTE
-    )
+    read_lim, write_lim, prefix = _resolve_limits(request.url.path)
+    limit = read_lim if bucket == "read" else write_lim
     if limit <= 0:
         return None
-    key = (_api_caller_key(request), bucket)
+    # Bucket key includes the matching prefix so a tightened-prefix budget
+    # gets its own counter, distinct from the global one.
+    key = (_api_caller_key(request), bucket, prefix)
     now = time.monotonic()
     window = _api_window[key]
     cutoff = now - _WINDOW_SECONDS

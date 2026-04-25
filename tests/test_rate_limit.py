@@ -100,6 +100,57 @@ async def test_token_bucket_distinct_from_session(pool, auth_client):
 
 
 @pytest.mark.asyncio
+async def test_route_override_uses_smaller_budget(auth_client, monkeypatch):
+    """An entry like '/api/assets:2:1' caps that prefix tighter than the global."""
+    monkeypatch.setattr(
+        settings, "RATE_LIMIT_ROUTE_OVERRIDES", "/api/assets/:2:1"
+    )
+    monkeypatch.setattr(settings, "RATE_LIMIT_READ_PER_MINUTE", 100)
+    monkeypatch.setattr(settings, "RATE_LIMIT_WRITE_PER_MINUTE", 100)
+    _reset()
+    # Two reads pass…
+    assert (await auth_client.get("/api/assets/")).status_code == 200
+    assert (await auth_client.get("/api/assets/")).status_code == 200
+    # …third trips the per-route override.
+    assert (await auth_client.get("/api/assets/")).status_code == 429
+
+
+@pytest.mark.asyncio
+async def test_route_override_does_not_steal_global_budget(
+    auth_client, monkeypatch
+):
+    """The override gets its own counter, distinct from the global bucket."""
+    monkeypatch.setattr(
+        settings, "RATE_LIMIT_ROUTE_OVERRIDES", "/api/assets/:2:1"
+    )
+    monkeypatch.setattr(settings, "RATE_LIMIT_READ_PER_MINUTE", 5)
+    monkeypatch.setattr(settings, "RATE_LIMIT_WRITE_PER_MINUTE", 5)
+    _reset()
+    # Burn the override's read budget on /api/assets/.
+    await auth_client.get("/api/assets/")
+    await auth_client.get("/api/assets/")
+    assert (await auth_client.get("/api/assets/")).status_code == 429
+    # /api/tags/ falls back to the global budget — still has all 5 reads.
+    assert (await auth_client.get("/api/tags/")).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_longest_matching_prefix_wins(auth_client, monkeypatch):
+    """When multiple overrides match, the longest prefix takes precedence."""
+    monkeypatch.setattr(
+        settings, "RATE_LIMIT_ROUTE_OVERRIDES",
+        "/api:50:50,/api/assets/:2:1",
+    )
+    monkeypatch.setattr(settings, "RATE_LIMIT_READ_PER_MINUTE", 100)
+    monkeypatch.setattr(settings, "RATE_LIMIT_WRITE_PER_MINUTE", 100)
+    _reset()
+    # /api/assets/ should match the longer (tighter) override.
+    await auth_client.get("/api/assets/")
+    await auth_client.get("/api/assets/")
+    assert (await auth_client.get("/api/assets/")).status_code == 429
+
+
+@pytest.mark.asyncio
 async def test_disabled_setting_skips_check(auth_client, monkeypatch):
     monkeypatch.setattr(settings, "RATE_LIMIT_ENABLED", False)
     _reset()

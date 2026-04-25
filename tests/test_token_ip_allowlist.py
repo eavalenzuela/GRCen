@@ -1,4 +1,6 @@
 """IP allowlist enforcement on API tokens."""
+import uuid
+
 import pytest
 
 from grcen.permissions import Permission
@@ -116,6 +118,55 @@ async def test_malformed_entry_is_skipped_not_fatal(pool, auth_client):
         allowed_ips=["not-an-ip", "10.0.0.0/24"],
     )
     assert (await token_service.validate_token(pool, raw, client_ip="10.0.0.5")) is not None
+
+
+@pytest.mark.asyncio
+async def test_my_token_allowlist_form_persists(pool, auth_client):
+    """The /tokens/{id}/allowed-ips form writes through to the token row."""
+    user = await pool.fetchrow("SELECT id FROM users LIMIT 1")
+    token, _raw = await token_service.create_token(
+        pool, user["id"], "form-test", [Permission.VIEW.value]
+    )
+    resp = await auth_client.post(
+        f"/tokens/{token.id}/allowed-ips",
+        data={"allowed_ips": "10.0.0.0/24\n192.168.1.5"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    refreshed = await token_service.get_token_by_id(pool, token.id)
+    assert refreshed.allowed_ips == ["10.0.0.0/24", "192.168.1.5"]
+
+
+@pytest.mark.asyncio
+async def test_my_token_allowlist_form_rejects_garbage(pool, auth_client):
+    """Bogus entries surface a session error instead of silently saving."""
+    user = await pool.fetchrow("SELECT id FROM users LIMIT 1")
+    token, _ = await token_service.create_token(
+        pool, user["id"], "bad", [Permission.VIEW.value]
+    )
+    await auth_client.post(
+        f"/tokens/{token.id}/allowed-ips",
+        data={"allowed_ips": "not-an-ip"},
+    )
+    refreshed = await token_service.get_token_by_id(pool, token.id)
+    # Original empty allowlist preserved.
+    assert refreshed.allowed_ips == []
+
+
+@pytest.mark.asyncio
+async def test_my_token_allowlist_form_blocks_other_users_token(pool, auth_client):
+    """A user can only edit their own token, even if they know the id."""
+    from grcen.services.auth import create_user
+    other = await create_user(pool, f"o_{uuid.uuid4().hex[:8]}", "x")
+    token, _ = await token_service.create_token(
+        pool, other.id, "their-token", [Permission.VIEW.value]
+    )
+    await auth_client.post(
+        f"/tokens/{token.id}/allowed-ips",
+        data={"allowed_ips": "1.2.3.4"},
+    )
+    refreshed = await token_service.get_token_by_id(pool, token.id)
+    assert refreshed.allowed_ips == []
 
 
 @pytest.mark.asyncio

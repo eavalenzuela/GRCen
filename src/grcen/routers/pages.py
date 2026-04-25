@@ -228,7 +228,32 @@ async def login_submit(request: Request, pool: asyncpg.Pool = Depends(get_db), _
     # If the user has TOTP enabled, the password step only established intent —
     # redirect to the second factor step and park the user id in the session.
     from grcen.services import totp_service
-    if await totp_service.is_enabled(pool, user.id):
+    mfa_enabled = await totp_service.is_enabled(pool, user.id)
+
+    # Per-role MFA enforcement: if the user's role is in the required list and
+    # they haven't enrolled, refuse the login outright. SSO users skip this
+    # check — their IdP is the source of truth for MFA on those accounts.
+    required_roles = {
+        r.strip().lower()
+        for r in (app_settings.MFA_REQUIRED_FOR_ROLES or "").split(",")
+        if r.strip()
+    }
+    if (
+        not mfa_enabled
+        and not user.is_sso
+        and user.role.value in required_roles
+    ):
+        ctx = await _sso_context(pool)
+        ctx["error"] = (
+            "Two-factor authentication is required for your role. "
+            "Ask an administrator to set it up via the CLI, "
+            "or finish enrollment on a device that's already MFA-enabled."
+        )
+        return templates.TemplateResponse(
+            request, "auth/login.html", context=ctx
+        )
+
+    if mfa_enabled:
         request.session.clear()
         request.session["mfa_pending_user_id"] = str(user.id)
         return RedirectResponse("/login/mfa", status_code=302)
@@ -2727,6 +2752,53 @@ async def my_tokens_create(
     )
 
     request.session["created_token"] = raw
+    return RedirectResponse("/tokens", status_code=302)
+
+
+@router.post("/tokens/{token_id}/allowed-ips")
+async def my_token_update_ips(
+    token_id: UUID,
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Update the IP allowlist on one of the user's own tokens."""
+    from grcen.services import token_service
+    from grcen.services.token_service import _ip_matches_allowlist  # imports ipaddress
+
+    token = await token_service.get_token_by_id(pool, token_id)
+    if not token or token.user_id != user.id:
+        request.session["token_error"] = "Token not found."
+        return RedirectResponse("/tokens", status_code=302)
+
+    form = await request.form()
+    raw = str(form.get("allowed_ips", "")).strip()
+    # One entry per line, comma, or whitespace.
+    import re
+    entries = [e.strip() for e in re.split(r"[\n,;]+|\s+", raw) if e.strip()]
+    # Validate each entry parses; the runtime _ip_matches_allowlist already
+    # logs and skips bad ones, but validating early gives the user feedback.
+    import ipaddress
+    bad: list[str] = []
+    for e in entries:
+        try:
+            ipaddress.ip_network(e, strict=False)
+        except ValueError:
+            bad.append(e)
+    if bad:
+        request.session["token_error"] = (
+            f"Could not parse: {', '.join(bad)}. "
+            "Use IPs (10.0.0.1) or CIDR ranges (10.0.0.0/24)."
+        )
+        return RedirectResponse("/tokens", status_code=302)
+
+    await token_service.update_allowed_ips(pool, token_id, entries)
+    await audit_svc.log_audit_event(
+        pool, user_id=user.id, username=user.username,
+        action="update", entity_type="api_token",
+        entity_id=token_id, entity_name=token.name,
+        changes={"allowed_ips": {"new": entries}},
+    )
     return RedirectResponse("/tokens", status_code=302)
 
 

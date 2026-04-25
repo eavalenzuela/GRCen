@@ -102,6 +102,20 @@
                 {% endif %}
             </td>
         </tr>
+        {% if not t.revoked %}
+        <tr>
+            <td colspan="8" style="background:#f8fafc;">
+                <form method="post" action="/tokens/{{ t.id }}/allowed-ips" style="display:flex;gap:0.5rem;align-items:flex-start;">
+                    {% include "partials/csrf.html" %}
+                    <label style="flex:1;">
+                        <small style="color:#6b7280;">IP allowlist (one per line, addresses or CIDR; blank = unrestricted)</small>
+                        <textarea name="allowed_ips" rows="2" style="width:100%;font-family:monospace;font-size:0.85em;">{{ t.allowed_ips | join('\n') }}</textarea>
+                    </label>
+                    <button type="submit" class="btn btn-sm" style="margin-top:1.2rem;">Save IPs</button>
+                </form>
+            </td>
+        </tr>
+        {% endif %}
         {% endfor %}
     </tbody>
 </table>

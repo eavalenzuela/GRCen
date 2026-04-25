@@ -37,6 +37,11 @@ class Settings(BaseSettings):
     LOGIN_MAX_FAILED_ATTEMPTS: int = 5
     LOGIN_LOCKOUT_MINUTES: int = 15
 
+    # Roles that MUST have TOTP enabled to log in. Comma-separated string of
+    # role names ('admin', 'editor', 'viewer', 'auditor'). Empty = no
+    # enforcement. SSO users are exempt — their IdP handles MFA.
+    MFA_REQUIRED_FOR_ROLES: str = ""
+
     # Login rate limiting (per-IP spraying protection)
     LOGIN_RATE_LIMIT_SECONDS: float = 2.0
 
@@ -46,6 +51,12 @@ class Settings(BaseSettings):
     RATE_LIMIT_ENABLED: bool = True
     RATE_LIMIT_READ_PER_MINUTE: int = 600
     RATE_LIMIT_WRITE_PER_MINUTE: int = 120
+    # Per-route overrides for the bucket budgets. Format:
+    #   "<path-prefix>:<read>:<write>,<path-prefix>:<read>:<write>"
+    # E.g. "/api/imports:30:30,/api/exports:60:60" tightens import/export
+    # endpoints relative to the global default. Match is by ``startswith``;
+    # the longest matching prefix wins when several apply.
+    RATE_LIMIT_ROUTE_OVERRIDES: str = ""
 
     # SSL/TLS — set both to enable direct HTTPS termination
     SSL_CERTFILE: str | None = None
