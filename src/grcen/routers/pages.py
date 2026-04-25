@@ -40,6 +40,7 @@ from grcen.services import (
 from grcen.services import relationship as rel_svc
 from grcen.services import review_service as review_svc
 from grcen.services import risk_service as risk_svc
+from grcen.services import organization_service
 from grcen.services import workflow_service
 from grcen.services.encryption import is_encryption_enabled
 from grcen.services.encryption_scopes import ALL_PROFILES, ALL_SCOPES
@@ -349,12 +350,14 @@ async def dashboard(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.VIEW)),
 ):
-    assets, total = await asset_svc.list_assets(pool, page=1, page_size=10)
-    alerts = await alert_svc.list_alerts(pool)
-    notif_count = await alert_svc.count_unread_notifications(pool)
-    heatmap = await risk_svc.get_risk_heatmap(pool)
-    top_risks = await risk_svc.get_top_risks(pool)
-    review_counts = await review_svc.get_review_counts(pool)
+    assets, total = await asset_svc.list_assets(
+        pool, page=1, page_size=10, organization_id=user.organization_id
+    )
+    alerts = await alert_svc.list_alerts(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    heatmap = await risk_svc.get_risk_heatmap(pool, organization_id=user.organization_id)
+    top_risks = await risk_svc.get_top_risks(pool, organization_id=user.organization_id)
+    review_counts = await review_svc.get_review_counts(pool, organization_id=user.organization_id)
     return templates.TemplateResponse(request, "dashboard.html", context={
             "user": user,
             "recent_assets": assets,
@@ -411,10 +414,13 @@ async def asset_list(
         tag=tag,
         sort=sort,
         order=order,
+        organization_id=user.organization_id,
     )
-    notif_count = await alert_svc.count_unread_notifications(pool)
-    all_tags = await tag_service.list_tags_with_counts(pool)
-    saved_searches = await saved_search_service.list_visible(pool, user.id, path="/assets")
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    all_tags = await tag_service.list_tags_with_counts(pool, organization_id=user.organization_id)
+    saved_searches = await saved_search_service.list_visible(
+        pool, user.id, path="/assets", organization_id=user.organization_id
+    )
     # Build filter params string for pagination links
     filter_params = ""
     if asset_type:
@@ -472,8 +478,8 @@ async def asset_new(
     user: User = Depends(require_permission(Permission.CREATE)),
     pool: asyncpg.Pool = Depends(get_db),
 ):
-    notif_count = await alert_svc.count_unread_notifications(pool)
-    known_tags = await tag_service.list_tags_with_counts(pool)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    known_tags = await tag_service.list_tags_with_counts(pool, organization_id=user.organization_id)
     return templates.TemplateResponse(request, "assets/form.html", context={
             "user": user,
             "asset": None,
@@ -512,7 +518,9 @@ async def asset_create_submit(
     name = str(form["name"])
     description = str(form.get("description", ""))
     status = str(form.get("status", "active"))
-    if await workflow_service.requires_approval(pool, asset_type, "create"):
+    if await workflow_service.requires_approval(
+        pool, asset_type, "create", organization_id=user.organization_id
+    ):
         change = await workflow_service.submit(
             pool,
             action="create",
@@ -527,18 +535,22 @@ async def asset_create_submit(
             user=user,
         )
         return RedirectResponse(f"/approvals/{change.id}?submitted=1", status_code=302)
-    asset = await asset_svc.create_asset(
-        pool,
-        type=asset_type,
-        name=name,
-        description=description,
-        status=status,
-        owner_id=owner_id,
-        metadata_=metadata,
-        updated_by=user.id,
-        tags=tags,
-        criticality=criticality,
-    )
+    try:
+        asset = await asset_svc.create_asset(
+            pool,
+            organization_id=user.organization_id,
+            type=asset_type,
+            name=name,
+            description=description,
+            status=status,
+            owner_id=owner_id,
+            metadata_=metadata,
+            updated_by=user.id,
+            tags=tags,
+            criticality=criticality,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     await audit_svc.log_audit_event(
         pool,
         user_id=user.id,
@@ -559,7 +571,7 @@ async def asset_detail(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.VIEW)),
 ):
-    asset = await asset_svc.get_asset(pool, asset_id)
+    asset = await asset_svc.get_asset(pool, asset_id, organization_id=user.organization_id)
     if not asset:
         return HTMLResponse("Not found", status_code=404)
     await access_log_service.record(
@@ -573,7 +585,7 @@ async def asset_detail(
         ip_address=request.client.host if request.client else None,
     )
     asset.metadata_ = redaction.redact_metadata(asset.metadata_, asset.type, user)
-    rels = await rel_svc.list_relationships_for_asset(pool, asset_id)
+    rels = await rel_svc.list_relationships_for_asset(pool, asset_id, organization_id=user.organization_id)
     if rels:
         rel_ids = [r.id for r in rels]
         count_rows = await pool.fetch(
@@ -586,9 +598,9 @@ async def asset_detail(
         counts = {row["relationship_id"]: row["n"] for row in count_rows}
         for r in rels:
             r.attachment_count = counts.get(r.id, 0)
-    atts = await att_svc.list_attachments(pool, asset_id)
-    alerts = await alert_svc.list_alerts(pool, asset_id)
-    notif_count = await alert_svc.count_unread_notifications(pool)
+    atts = await att_svc.list_attachments(pool, asset_id, organization_id=user.organization_id)
+    alerts = await alert_svc.list_alerts(pool, asset_id, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
     # For Person assets, find linked user account
     linked_user = None
     if asset.type == AssetType.PERSON:
@@ -599,7 +611,8 @@ async def asset_detail(
         if row:
             linked_user = dict(row)
     pending_changes = await workflow_service.list_changes(
-        pool, status="pending", target_asset_id=asset_id
+        pool, status="pending", target_asset_id=asset_id,
+        organization_id=user.organization_id,
     )
     return templates.TemplateResponse(request, "assets/detail.html", context={
             "user": user,
@@ -623,11 +636,11 @@ async def asset_edit(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.EDIT)),
 ):
-    asset = await asset_svc.get_asset(pool, asset_id)
+    asset = await asset_svc.get_asset(pool, asset_id, organization_id=user.organization_id)
     if not asset:
         return HTMLResponse("Not found", status_code=404)
-    notif_count = await alert_svc.count_unread_notifications(pool)
-    known_tags = await tag_service.list_tags_with_counts(pool)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    known_tags = await tag_service.list_tags_with_counts(pool, organization_id=user.organization_id)
     return templates.TemplateResponse(request, "assets/form.html", context={
             "user": user,
             "asset": asset,
@@ -648,7 +661,7 @@ async def asset_update_submit(
     user: User = Depends(require_permission(Permission.EDIT)),
 ):
     form = await request.form()
-    old = await asset_svc.get_asset(pool, asset_id)
+    old = await asset_svc.get_asset(pool, asset_id, organization_id=user.organization_id)
     metadata = _extract_metadata(form, old.type) if old else {}
     if old and old.type == AssetType.RISK:
         score = risk_svc.compute_risk_score(metadata.get("likelihood"), metadata.get("impact"))
@@ -665,7 +678,9 @@ async def asset_update_submit(
     tags_raw = str(form.get("tags", "")).strip()
     tags = [t.strip() for t in tags_raw.split(",") if t.strip()] if tags_raw else []
     criticality = str(form.get("criticality", "")).strip() or None
-    if old and await workflow_service.requires_approval(pool, old.type, "update"):
+    if old and await workflow_service.requires_approval(
+        pool, old.type, "update", organization_id=user.organization_id
+    ):
         try:
             change = await workflow_service.submit(
                 pool,
@@ -687,18 +702,22 @@ async def asset_update_submit(
         except ValueError as e:
             raise HTTPException(status_code=409, detail=str(e))
         return RedirectResponse(f"/approvals/{change.id}?submitted=1", status_code=302)
-    updated = await asset_svc.update_asset(
-        pool,
-        asset_id,
-        name=str(form["name"]),
-        description=str(form.get("description", "")),
-        status=str(form.get("status", "active")),
-        owner_id=owner_id,
-        metadata_=metadata,
-        updated_by=user.id,
-        tags=tags,
-        criticality=criticality,
-    )
+    try:
+        updated = await asset_svc.update_asset(
+            pool,
+            asset_id,
+            organization_id=user.organization_id,
+            name=str(form["name"]),
+            description=str(form.get("description", "")),
+            status=str(form.get("status", "active")),
+            owner_id=owner_id,
+            metadata_=metadata,
+            updated_by=user.id,
+            tags=tags,
+            criticality=criticality,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     if old and updated:
         diff = audit_svc.compute_diff(old.__dict__, updated.__dict__, _ASSET_FIELDS)
         if diff:
@@ -721,8 +740,10 @@ async def asset_delete_submit(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.DELETE)),
 ):
-    old = await asset_svc.get_asset(pool, asset_id)
-    if old and await workflow_service.requires_approval(pool, old.type, "delete"):
+    old = await asset_svc.get_asset(pool, asset_id, organization_id=user.organization_id)
+    if old and await workflow_service.requires_approval(
+        pool, old.type, "delete", organization_id=user.organization_id
+    ):
         try:
             change = await workflow_service.submit(
                 pool,
@@ -736,7 +757,7 @@ async def asset_delete_submit(
         except ValueError as e:
             raise HTTPException(status_code=409, detail=str(e))
         return RedirectResponse(f"/approvals/{change.id}?submitted=1", status_code=302)
-    await asset_svc.delete_asset(pool, asset_id)
+    await asset_svc.delete_asset(pool, asset_id, organization_id=user.organization_id)
     if old:
         await audit_svc.log_audit_event(
             pool,
@@ -761,7 +782,8 @@ async def asset_clone_submit(
     form = await request.form()
     clone_rels = "clone_relationships" in form
     clone = await asset_svc.clone_asset(
-        pool, asset_id, clone_relationships=clone_rels, updated_by=user.id,
+        pool, asset_id, organization_id=user.organization_id,
+        clone_relationships=clone_rels, updated_by=user.id,
     )
     if not clone:
         return HTMLResponse("Not found", status_code=404)
@@ -791,7 +813,8 @@ async def owner_search(
     if len(q) < 2:
         return HTMLResponse("")
     results = await asset_svc.search_assets(
-        pool, q, types=[AssetType.PERSON, AssetType.ORGANIZATIONAL_UNIT],
+        pool, q, organization_id=user.organization_id,
+        types=[AssetType.PERSON, AssetType.ORGANIZATIONAL_UNIT],
     )
     from html import escape
     html = ""
@@ -820,10 +843,10 @@ async def graph_page(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.VIEW_GRAPH)),
 ):
-    asset = await asset_svc.get_asset(pool, asset_id)
+    asset = await asset_svc.get_asset(pool, asset_id, organization_id=user.organization_id)
     if not asset:
         return HTMLResponse("Not found", status_code=404)
-    notif_count = await alert_svc.count_unread_notifications(pool)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
     return templates.TemplateResponse(request, "graph/view.html", context={
             "user": user,
             "asset": asset,
@@ -841,7 +864,7 @@ async def import_page(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.IMPORT)),
 ):
-    notif_count = await alert_svc.count_unread_notifications(pool)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
     return templates.TemplateResponse(request, "imports/index.html", context={"user": user, "notif_count": notif_count},
     )
 
@@ -855,7 +878,7 @@ async def export_page(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.EXPORT)),
 ):
-    notif_count = await alert_svc.count_unread_notifications(pool)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
     return templates.TemplateResponse(request, "exports/index.html", context={
             "user": user,
             "asset_types": sorted(AssetType, key=lambda t: t.value),
@@ -875,8 +898,10 @@ async def reviews_page(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.VIEW)),
 ):
-    reviews = await review_svc.get_reviews(pool, asset_type=type, status_filter=status)
-    notif_count = await alert_svc.count_unread_notifications(pool)
+    reviews = await review_svc.get_reviews(
+        pool, asset_type=type, status_filter=status, organization_id=user.organization_id
+    )
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
     return templates.TemplateResponse(request, "reviews/index.html", context={
             "user": user,
             "reviews": reviews,
@@ -918,18 +943,21 @@ async def risk_management_page(
         impact_filter=impact,
         sort=sort,
         order=order,
+        organization_id=user.organization_id,
     )
-    summary = await risk_svc.get_risk_summary(pool)
-    heatmap = await risk_svc.get_risk_heatmap(pool)
-    trend = await risk_svc.get_severity_trend(pool)
-    notif_count = await alert_svc.count_unread_notifications(pool)
+    summary = await risk_svc.get_risk_summary(pool, organization_id=user.organization_id)
+    heatmap = await risk_svc.get_risk_heatmap(pool, organization_id=user.organization_id)
+    trend = await risk_svc.get_severity_trend(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
     bulk_owners = await pool.fetch(
         """SELECT id, name FROM assets
            WHERE type IN ('person', 'organizational_unit') AND status = 'active'
-           ORDER BY name"""
+             AND organization_id = $1
+           ORDER BY name""",
+        user.organization_id,
     )
     saved_searches = await saved_search_service.list_visible(
-        pool, user.id, path="/risk-management"
+        pool, user.id, organization_id=user.organization_id, path="/risk-management"
     )
 
     # Build filter_params for sort links
@@ -1003,6 +1031,7 @@ async def risk_bulk_update(
         owner_id=owner_id,
         review_date=review_date,
         updated_by=user.id,
+        organization_id=user.organization_id,
     )
     for rid in updated:
         await audit_svc.log_audit_event(
@@ -1035,8 +1064,8 @@ async def alerts_page(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.VIEW)),
 ):
-    alerts = await alert_svc.list_alerts(pool)
-    notif_count = await alert_svc.count_unread_notifications(pool)
+    alerts = await alert_svc.list_alerts(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
     return templates.TemplateResponse(request, "alerts/list.html", context={
             "user": user,
             "alerts": alerts,
@@ -1054,7 +1083,7 @@ async def org_views_page(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.VIEW)),
 ):
-    notif_count = await alert_svc.count_unread_notifications(pool)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
     return templates.TemplateResponse(request, "org_views.html", context={
             "user": user,
             "notif_count": notif_count,
@@ -1071,8 +1100,8 @@ async def notifications_page(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.VIEW)),
 ):
-    notifs = await alert_svc.list_notifications(pool)
-    notif_count = await alert_svc.count_unread_notifications(pool)
+    notifs = await alert_svc.list_notifications(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
     return templates.TemplateResponse(request, "alerts/notifications.html", context={
             "user": user,
             "notifications": notifs,
@@ -1090,8 +1119,8 @@ async def admin_users(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.MANAGE_USERS)),
 ):
-    users = await auth_svc.list_users(pool)
-    notif_count = await alert_svc.count_unread_notifications(pool)
+    users = await auth_svc.list_users(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
     return templates.TemplateResponse(request, "admin/users.html", context={
             "user": user,
             "users": users,
@@ -1107,7 +1136,7 @@ async def admin_user_new(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.MANAGE_USERS)),
 ):
-    notif_count = await alert_svc.count_unread_notifications(pool)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
     return templates.TemplateResponse(request, "admin/user_form.html", context={
             "user": user,
             "edit_user": None,
@@ -1128,7 +1157,7 @@ async def admin_user_create_submit(
     password = str(form["password"]).strip()
     role = UserRole(form["role"])
     if not username or not password:
-        notif_count = await alert_svc.count_unread_notifications(pool)
+        notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
         return templates.TemplateResponse(request, "admin/user_form.html", context={
                 "user": user,
                 "edit_user": None,
@@ -1161,7 +1190,7 @@ async def admin_user_edit(
     edit_user = await auth_svc.get_user_by_id(pool, user_id)
     if not edit_user:
         return HTMLResponse("Not found", status_code=404)
-    notif_count = await alert_svc.count_unread_notifications(pool)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
     person_assets = await pool.fetch(
         "SELECT id, name FROM assets WHERE type = 'person' ORDER BY name"
     )
@@ -1282,9 +1311,10 @@ async def admin_audit_log(
     user: User = Depends(require_permission(Permission.VIEW_AUDIT)),
 ):
     logs, total = await audit_svc.list_audit_logs(
-        pool, entity_type=entity_type, action=action, username=username, page=page
+        pool, organization_id=user.organization_id,
+        entity_type=entity_type, action=action, username=username, page=page,
     )
-    notif_count = await alert_svc.count_unread_notifications(pool)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
     return templates.TemplateResponse(request, "admin/audit_log.html", context={
             "user": user,
             "logs": logs,
@@ -1299,6 +1329,29 @@ async def admin_audit_log(
     )
 
 
+@router.get("/admin/organization", response_class=HTMLResponse)
+async def admin_organization(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+):
+    org = await organization_service.get_by_id(pool, user.organization_id)
+    user_count = await pool.fetchval(
+        "SELECT count(*) FROM users WHERE organization_id = $1", user.organization_id
+    )
+    asset_count = await pool.fetchval(
+        "SELECT count(*) FROM assets WHERE organization_id = $1", user.organization_id
+    )
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    return templates.TemplateResponse(request, "admin/organization.html", context={
+        "user": user,
+        "org": org,
+        "user_count": user_count,
+        "asset_count": asset_count,
+        "notif_count": notif_count,
+    })
+
+
 @router.get("/admin/audit/settings", response_class=HTMLResponse)
 async def admin_audit_settings(
     request: Request,
@@ -1306,7 +1359,7 @@ async def admin_audit_settings(
     user: User = Depends(require_permission(Permission.MANAGE_USERS)),
 ):
     configs = await audit_svc.get_audit_config_all(pool)
-    notif_count = await alert_svc.count_unread_notifications(pool)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
     return templates.TemplateResponse(request, "admin/audit_settings.html", context={
             "user": user,
             "configs": configs,
@@ -1341,7 +1394,7 @@ async def admin_oidc_settings(
     user: User = Depends(require_permission(Permission.MANAGE_USERS)),
 ):
     oidc_cfg = await oidc_settings.get_settings(pool)
-    notif_count = await alert_svc.count_unread_notifications(pool)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
     return templates.TemplateResponse(request, "admin/oidc_settings.html", context={
             "user": user,
             "oidc": oidc_cfg,
@@ -1387,7 +1440,7 @@ async def admin_saml_settings(
     user: User = Depends(require_permission(Permission.MANAGE_USERS)),
 ):
     saml_cfg = await saml_settings.get_settings(pool)
-    notif_count = await alert_svc.count_unread_notifications(pool)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
     return templates.TemplateResponse(
         request,
         "admin/saml_settings.html",
@@ -1445,7 +1498,7 @@ async def admin_smtp_settings(
     test_result: str | None = None,
 ):
     smtp_cfg = await smtp_settings.get_settings(pool)
-    notif_count = await alert_svc.count_unread_notifications(pool)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
     deliveries = await pool.fetch(
         """SELECT email, status, error, attempted_at
            FROM notification_deliveries
@@ -1543,13 +1596,13 @@ async def admin_webhooks_page(
 ):
     from grcen.services import webhook_service
 
-    hooks = await webhook_service.list_webhooks(pool)
+    hooks = await webhook_service.list_webhooks(pool, organization_id=user.organization_id)
     deliveries = await pool.fetch(
         """SELECT event, url, status_code, error, attempted_at
            FROM webhook_deliveries
            ORDER BY attempted_at DESC LIMIT 20"""
     )
-    notif_count = await alert_svc.count_unread_notifications(pool)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
     return templates.TemplateResponse(
         request,
         "admin/webhooks.html",
@@ -1567,7 +1620,7 @@ async def admin_webhooks_page(
 async def admin_webhooks_create(
     request: Request,
     pool: asyncpg.Pool = Depends(get_db),
-    _user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
 ):
     from grcen.services import webhook_service
 
@@ -1580,6 +1633,7 @@ async def admin_webhooks_create(
         )
     await webhook_service.create_webhook(
         pool,
+        organization_id=user.organization_id,
         name=name,
         url=url,
         secret=str(form.get("secret", "")).strip(),
@@ -1598,10 +1652,10 @@ async def admin_webhook_edit_page(
 ):
     from grcen.services import webhook_service
 
-    hook = await webhook_service.get_webhook(pool, webhook_id)
+    hook = await webhook_service.get_webhook(pool, webhook_id, organization_id=user.organization_id)
     if not hook:
         raise HTTPException(status_code=404, detail="Webhook not found")
-    notif_count = await alert_svc.count_unread_notifications(pool)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
     return templates.TemplateResponse(
         request,
         "admin/webhook_edit.html",
@@ -1614,7 +1668,7 @@ async def admin_webhook_edit_submit(
     request: Request,
     webhook_id: UUID,
     pool: asyncpg.Pool = Depends(get_db),
-    _user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
 ):
     from grcen.services import webhook_service
 
@@ -1622,7 +1676,7 @@ async def admin_webhook_edit_submit(
     # Preserve existing secret if the placeholder was submitted.
     secret = str(form.get("secret", ""))
     if secret == "********":
-        current = await webhook_service.get_webhook(pool, webhook_id)
+        current = await webhook_service.get_webhook(pool, webhook_id, organization_id=user.organization_id)
         secret = current.secret if current else ""
     hook = await webhook_service.update_webhook(
         pool,
@@ -1642,11 +1696,11 @@ async def admin_webhook_edit_submit(
 async def admin_webhook_delete(
     webhook_id: UUID,
     pool: asyncpg.Pool = Depends(get_db),
-    _user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
 ):
     from grcen.services import webhook_service
 
-    await webhook_service.delete_webhook(pool, webhook_id)
+    await webhook_service.delete_webhook(pool, webhook_id, organization_id=user.organization_id)
     return RedirectResponse("/admin/webhooks?flash=ok:Webhook deleted", status_code=302)
 
 
@@ -1654,11 +1708,11 @@ async def admin_webhook_delete(
 async def admin_webhook_test(
     webhook_id: UUID,
     pool: asyncpg.Pool = Depends(get_db),
-    _user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
 ):
     from grcen.services import webhook_service
 
-    hook = await webhook_service.get_webhook(pool, webhook_id)
+    hook = await webhook_service.get_webhook(pool, webhook_id, organization_id=user.organization_id)
     if not hook:
         raise HTTPException(status_code=404, detail="Webhook not found")
     ok, status, err = await webhook_service.send_to_webhook(
@@ -1682,13 +1736,13 @@ async def relationship_evidence_page(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.VIEW)),
 ):
-    rel = await rel_svc.get_relationship(pool, rel_id)
+    rel = await rel_svc.get_relationship(pool, rel_id, organization_id=user.organization_id)
     if not rel:
         raise HTTPException(status_code=404, detail="Relationship not found")
-    source = await asset_svc.get_asset(pool, rel.source_asset_id)
-    target = await asset_svc.get_asset(pool, rel.target_asset_id)
-    attachments = await att_svc.list_attachments_for_relationship(pool, rel_id)
-    notif_count = await alert_svc.count_unread_notifications(pool)
+    source = await asset_svc.get_asset(pool, rel.source_asset_id, organization_id=user.organization_id)
+    target = await asset_svc.get_asset(pool, rel.target_asset_id, organization_id=user.organization_id)
+    attachments = await att_svc.list_attachments_for_relationship(pool, rel_id, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
     return templates.TemplateResponse(
         request,
         "relationships/evidence.html",
@@ -1720,6 +1774,7 @@ async def relationship_evidence_create(
         raise HTTPException(status_code=400, detail="Name and URL/path are required")
     att = await att_svc.create_attachment(
         pool,
+        organization_id=user.organization_id,
         relationship_id=rel_id,
         kind=kind,
         name=name,
@@ -1762,6 +1817,7 @@ async def relationship_evidence_upload(
     filepath = _write_upload(content, owner_dir, filename)
     att = await att_svc.create_attachment(
         pool,
+        organization_id=user.organization_id,
         relationship_id=rel_id,
         kind=AttachmentKind.FILE,
         name=upload.filename or "uploaded_file",
@@ -1788,10 +1844,10 @@ async def relationship_evidence_delete(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.DELETE)),
 ):
-    att = await att_svc.get_attachment(pool, att_id)
+    att = await att_svc.get_attachment(pool, att_id, organization_id=user.organization_id)
     if not att or att.relationship_id != rel_id:
         raise HTTPException(status_code=404, detail="Attachment not found")
-    await att_svc.delete_attachment(pool, att_id)
+    await att_svc.delete_attachment(pool, att_id, organization_id=user.organization_id)
     await audit_svc.log_audit_event(
         pool,
         user_id=user.id,
@@ -1820,15 +1876,17 @@ async def admin_access_log(
     filter_user_uuid = UUID(user_id) if user_id else None
     entries = await access_log_service.query(
         pool,
+        organization_id=user.organization_id,
         user_id=filter_user_uuid,
         entity_type=entity_type or None,
         action=action or None,
         limit=200,
     )
     users_rows = await pool.fetch(
-        "SELECT id, username FROM users ORDER BY username"
+        "SELECT id, username FROM users WHERE organization_id = $1 ORDER BY username",
+        user.organization_id,
     )
-    notif_count = await alert_svc.count_unread_notifications(pool)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
     return templates.TemplateResponse(
         request,
         "admin/access_log.html",
@@ -1856,8 +1914,8 @@ async def tags_index(
     user: User = Depends(require_permission(Permission.VIEW)),
     flash: str | None = None,
 ):
-    tags = await tag_service.list_tags_with_counts(pool)
-    notif_count = await alert_svc.count_unread_notifications(pool)
+    tags = await tag_service.list_tags_with_counts(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
     flash_ctx = None
     if flash:
         ok, _, message = flash.partition(":")
@@ -1885,7 +1943,7 @@ async def tag_rename(
     new = str(form.get("new_name", "")).strip()
     if not new:
         return RedirectResponse("/tags?flash=fail:New name required", status_code=302)
-    affected = await tag_service.rename_tag(pool, old, new)
+    affected = await tag_service.rename_tag(pool, old, new, organization_id=user.organization_id)
     await audit_svc.log_audit_event(
         pool,
         user_id=user.id,
@@ -1907,7 +1965,7 @@ async def tag_delete(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.DELETE)),
 ):
-    affected = await tag_service.delete_tag(pool, name)
+    affected = await tag_service.delete_tag(pool, name, organization_id=user.organization_id)
     await audit_svc.log_audit_event(
         pool,
         user_id=user.id,
@@ -1932,8 +1990,8 @@ async def frameworks_index(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.VIEW)),
 ):
-    frameworks = await framework_service.list_frameworks(pool)
-    notif_count = await alert_svc.count_unread_notifications(pool)
+    frameworks = await framework_service.list_frameworks(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
     return templates.TemplateResponse(
         request,
         "frameworks/index.html",
@@ -1948,10 +2006,10 @@ async def framework_detail(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.VIEW)),
 ):
-    detail = await framework_service.get_framework_detail(pool, framework_id)
+    detail = await framework_service.get_framework_detail(pool, framework_id, organization_id=user.organization_id)
     if not detail:
         raise HTTPException(status_code=404, detail="Framework not found")
-    notif_count = await alert_svc.count_unread_notifications(pool)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
     return templates.TemplateResponse(
         request,
         "frameworks/detail.html",
@@ -2023,7 +2081,7 @@ async def user_settings(
     from grcen.services import totp_service
 
     smtp_cfg = await smtp_settings.get_settings(pool)
-    notif_count = await alert_svc.count_unread_notifications(pool)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
 
     enrollment = await totp_service.get_enrollment(pool, user.id)
     mfa_enabled = bool(enrollment and enrollment["enabled"])
@@ -2173,7 +2231,7 @@ async def my_tokens_page(
     tokens = await token_service.list_tokens_for_user(pool, user.id)
     max_expiry_days = await token_service.get_max_expiry_days(pool)
     available_permissions = sorted(ROLE_PERMISSIONS.get(user.role, set()), key=lambda p: p.value)
-    notif_count = await alert_svc.count_unread_notifications(pool)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
     from datetime import UTC
     from datetime import datetime as dt
 
@@ -2296,9 +2354,9 @@ async def admin_tokens_page(
 
     tokens = await token_service.list_all_tokens(pool)
     max_expiry_days = await token_service.get_max_expiry_days(pool)
-    users = await auth_svc.list_users(pool)
+    users = await auth_svc.list_users(pool, organization_id=user.organization_id)
     users_by_id = {u.id: u for u in users}
-    notif_count = await alert_svc.count_unread_notifications(pool)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
     from datetime import UTC
     from datetime import datetime as dt
 
@@ -2383,7 +2441,7 @@ async def admin_encryption(
 
     active_profile = await encryption_config.get_active_profile(pool)
     active_scopes = await encryption_config.get_active_scopes(pool)
-    notif_count = await alert_svc.count_unread_notifications(pool)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
     success = request.session.pop("enc_success", None)
     error = request.session.pop("enc_error", None)
     # Build a JSON map of profile -> scope list for the JS toggle logic.

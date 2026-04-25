@@ -26,7 +26,7 @@ async def export(
     cols = columns.split(",") if columns else None
     content = await export_assets(
         pool, format=format, asset_types=asset_types, status=status,
-        columns=cols, user=user,
+        columns=cols, user=user, organization_id=user.organization_id,
     )
     await access_log_service.record(
         pool, user=user, action="export",

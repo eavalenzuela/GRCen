@@ -540,6 +540,105 @@ DO $$ BEGIN
         FOREIGN KEY (target_asset_id) REFERENCES assets(id) ON DELETE SET NULL;
 EXCEPTION WHEN undefined_object THEN NULL; WHEN duplicate_object THEN NULL;
 END $$;
+
+-- Multi-tenancy: organizations and tenant scoping ----------------------
+CREATE TABLE IF NOT EXISTS organizations (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    slug        VARCHAR(64) UNIQUE NOT NULL,
+    name        VARCHAR(255) NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+INSERT INTO organizations (slug, name)
+VALUES ('default', 'Default Organization')
+ON CONFLICT (slug) DO NOTHING;
+
+-- Add organization_id to every data table. Backfill existing rows to the
+-- default org, then enforce NOT NULL.
+DO $$
+DECLARE
+    default_org UUID;
+    tbl TEXT;
+BEGIN
+    SELECT id INTO default_org FROM organizations WHERE slug = 'default';
+    FOR tbl IN SELECT unnest(ARRAY[
+        'users', 'assets', 'relationships', 'attachments', 'alerts',
+        'notifications', 'audit_log', 'data_access_log', 'saved_searches',
+        'api_tokens', 'pending_changes', 'webhooks', 'webhook_deliveries',
+        'notification_deliveries', 'risk_snapshots'
+    ])
+    LOOP
+        EXECUTE format(
+            'ALTER TABLE %I ADD COLUMN IF NOT EXISTS organization_id UUID',
+            tbl
+        );
+        EXECUTE format(
+            'UPDATE %I SET organization_id = $1 WHERE organization_id IS NULL',
+            tbl
+        ) USING default_org;
+        EXECUTE format(
+            'ALTER TABLE %I ALTER COLUMN organization_id SET NOT NULL',
+            tbl
+        );
+        EXECUTE format(
+            'CREATE INDEX IF NOT EXISTS ix_%I_org ON %I (organization_id)',
+            tbl, tbl
+        );
+    END LOOP;
+END $$;
+
+-- FKs (added after the column exists). Use SET NULL on logs / audit so an
+-- org delete doesn't drop the historical evidence; CASCADE on user-owned data.
+DO $$ BEGIN
+    ALTER TABLE users
+        ADD CONSTRAINT fk_users_org FOREIGN KEY (organization_id)
+        REFERENCES organizations(id) ON DELETE RESTRICT;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+    ALTER TABLE assets
+        ADD CONSTRAINT fk_assets_org FOREIGN KEY (organization_id)
+        REFERENCES organizations(id) ON DELETE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- Workflow config becomes per-org (composite PK).
+ALTER TABLE workflow_config
+    ADD COLUMN IF NOT EXISTS organization_id UUID;
+DO $$
+DECLARE default_org UUID;
+BEGIN
+    SELECT id INTO default_org FROM organizations WHERE slug = 'default';
+    UPDATE workflow_config SET organization_id = default_org
+        WHERE organization_id IS NULL;
+END $$;
+ALTER TABLE workflow_config ALTER COLUMN organization_id SET NOT NULL;
+
+DO $$ BEGIN
+    ALTER TABLE workflow_config DROP CONSTRAINT workflow_config_pkey;
+EXCEPTION WHEN undefined_object THEN NULL; END $$;
+
+DO $$ BEGIN
+    ALTER TABLE workflow_config
+        ADD CONSTRAINT workflow_config_pkey PRIMARY KEY (organization_id, asset_type);
+EXCEPTION WHEN invalid_table_definition THEN NULL; WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+    ALTER TABLE workflow_config
+        ADD CONSTRAINT fk_workflow_config_org FOREIGN KEY (organization_id)
+        REFERENCES organizations(id) ON DELETE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- risk_snapshots: switch to a (organization_id, snapshot_date) composite PK
+-- so each tenant has its own daily history.
+DO $$ BEGIN
+    ALTER TABLE risk_snapshots DROP CONSTRAINT risk_snapshots_pkey;
+EXCEPTION WHEN undefined_object THEN NULL; END $$;
+DO $$ BEGIN
+    ALTER TABLE risk_snapshots
+        ADD CONSTRAINT risk_snapshots_pkey PRIMARY KEY (organization_id, snapshot_date);
+EXCEPTION WHEN invalid_table_definition THEN NULL; WHEN duplicate_object THEN NULL;
+END $$;
 """
 
 

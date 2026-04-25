@@ -16,7 +16,7 @@ router = APIRouter(prefix="/api/tags", tags=["tags"])
 @router.get("/", summary="List all tags with asset counts")
 async def list_tags(
     pool: asyncpg.Pool = Depends(get_db),
-    _user: User = Depends(require_permission(Permission.VIEW)),
+    user: User = Depends(require_permission(Permission.VIEW)),
 ):
-    rows = await tag_service.list_tags_with_counts(pool)
+    rows = await tag_service.list_tags_with_counts(pool, organization_id=user.organization_id)
     return [asdict(r) for r in rows]

@@ -14,6 +14,7 @@ class User:
     role: UserRole
     created_at: datetime
     updated_at: datetime
+    organization_id: UUID
     oidc_sub: str | None = None
     saml_sub: str | None = None
     person_asset_id: UUID | None = None
@@ -49,4 +50,5 @@ class User:
             failed_login_count=row.get("failed_login_count", 0),
             locked_until=row.get("locked_until"),
             email_notifications_enabled=row.get("email_notifications_enabled", False),
+            organization_id=row["organization_id"],
         )

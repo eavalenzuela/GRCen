@@ -17,6 +17,7 @@ _SELECT_WITH_OWNER = """
 async def create_asset(
     pool: asyncpg.Pool,
     *,
+    organization_id: UUID | None = None,
     type: AssetType,
     name: str,
     description: str | None = None,
@@ -27,10 +28,19 @@ async def create_asset(
     tags: list[str] | None = None,
     criticality: str | None = None,
 ) -> Asset:
+    if organization_id is None:
+        from grcen.services import organization_service
+        organization_id = await organization_service.get_default_org_id(pool)
+    if owner_id is not None:
+        owner_row = await pool.fetchrow(
+            "SELECT name, organization_id FROM assets WHERE id = $1", owner_id
+        )
+        if owner_row is None or owner_row["organization_id"] != organization_id:
+            raise ValueError("owner_id refers to an asset in a different organization")
     row = await pool.fetchrow(
         """
-        INSERT INTO assets (id, type, name, description, status, owner_id, metadata, updated_by, tags, criticality)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        INSERT INTO assets (id, type, name, description, status, owner_id, metadata, updated_by, tags, criticality, organization_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         RETURNING *
         """,
         uuid.uuid4(),
@@ -43,22 +53,29 @@ async def create_asset(
         updated_by,
         tags or [],
         criticality,
+        organization_id,
     )
-    # Resolve owner name
     if owner_id:
-        owner_row = await pool.fetchrow("SELECT name FROM assets WHERE id = $1", owner_id)
-        # Build a dict-like row with owner_name
         row_dict = dict(row)
-        row_dict["owner_name"] = owner_row["name"] if owner_row else None
+        row_dict["owner_name"] = owner_row["name"]
         return Asset.from_row(row_dict)
     return Asset.from_row(row)
 
 
-async def get_asset(pool: asyncpg.Pool, asset_id: UUID) -> Asset | None:
-    row = await pool.fetchrow(
-        _SELECT_WITH_OWNER + " WHERE a.id = $1",
-        asset_id,
-    )
+async def get_asset(
+    pool: asyncpg.Pool, asset_id: UUID, *, organization_id: UUID | None = None
+) -> Asset | None:
+    if organization_id is not None:
+        row = await pool.fetchrow(
+            _SELECT_WITH_OWNER + " WHERE a.id = $1 AND a.organization_id = $2",
+            asset_id,
+            organization_id,
+        )
+    else:
+        row = await pool.fetchrow(
+            _SELECT_WITH_OWNER + " WHERE a.id = $1",
+            asset_id,
+        )
     return Asset.from_row(row) if row else None
 
 
@@ -77,10 +94,15 @@ async def list_assets(
     tag: str | None = None,
     sort: str = "name",
     order: str = "asc",
+    organization_id: UUID | None = None,
 ) -> tuple[list[Asset], int]:
     where_parts: list[str] = []
     vals: list = []
     idx = 1
+    if organization_id is not None:
+        where_parts.append(f"a.organization_id = ${idx}")
+        vals.append(organization_id)
+        idx += 1
 
     # Single type (backwards compat) or multi-type
     if asset_type:
@@ -170,6 +192,7 @@ async def update_asset(
     pool: asyncpg.Pool,
     asset_id: UUID,
     *,
+    organization_id: UUID | None = None,
     name: str | None = None,
     description: str | None = None,
     status: str | None = None,
@@ -179,6 +202,18 @@ async def update_asset(
     tags: list[str] | None = None,
     criticality: str | None = None,
 ) -> Asset | None:
+    if organization_id is not None:
+        existing = await pool.fetchrow(
+            "SELECT organization_id FROM assets WHERE id = $1", asset_id
+        )
+        if existing is None or existing["organization_id"] != organization_id:
+            return None
+    if owner_id is not None and organization_id is not None:
+        owner_row = await pool.fetchrow(
+            "SELECT organization_id FROM assets WHERE id = $1", owner_id
+        )
+        if owner_row is None or owner_row["organization_id"] != organization_id:
+            raise ValueError("owner_id refers to an asset in a different organization")
     # Build SET clause dynamically from provided fields
     sets: list[str] = []
     vals: list = []
@@ -232,8 +267,16 @@ async def update_asset(
     return Asset.from_row(row_dict)
 
 
-async def delete_asset(pool: asyncpg.Pool, asset_id: UUID) -> bool:
-    result = await pool.execute("DELETE FROM assets WHERE id = $1", asset_id)
+async def delete_asset(
+    pool: asyncpg.Pool, asset_id: UUID, *, organization_id: UUID | None = None
+) -> bool:
+    if organization_id is not None:
+        result = await pool.execute(
+            "DELETE FROM assets WHERE id = $1 AND organization_id = $2",
+            asset_id, organization_id,
+        )
+    else:
+        result = await pool.execute("DELETE FROM assets WHERE id = $1", asset_id)
     return result == "DELETE 1"
 
 
@@ -241,20 +284,24 @@ async def clone_asset(
     pool: asyncpg.Pool,
     asset_id: UUID,
     *,
+    organization_id: UUID | None = None,
     new_name: str | None = None,
     clone_relationships: bool = False,
     updated_by: UUID | None = None,
 ) -> Asset | None:
     """Clone an asset, optionally including its relationships."""
-    original = await get_asset(pool, asset_id)
+    if organization_id is None:
+        from grcen.services import organization_service
+        organization_id = await organization_service.get_default_org_id(pool)
+    original = await get_asset(pool, asset_id, organization_id=organization_id)
     if not original:
         return None
     name = new_name or f"{original.name} (Copy)"
     new_id = uuid.uuid4()
     row = await pool.fetchrow(
         """
-        INSERT INTO assets (id, type, name, description, status, owner_id, metadata, updated_by, tags, criticality)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        INSERT INTO assets (id, type, name, description, status, owner_id, metadata, updated_by, tags, criticality, organization_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         RETURNING *
         """,
         new_id,
@@ -267,31 +314,30 @@ async def clone_asset(
         updated_by,
         original.tags or [],
         original.criticality,
+        organization_id,
     )
     if clone_relationships:
-        # Clone relationships where the original is source
         rels = await pool.fetch(
             "SELECT * FROM relationships WHERE source_asset_id = $1",
             asset_id,
         )
         for rel in rels:
             await pool.execute(
-                """INSERT INTO relationships (id, source_asset_id, target_asset_id, relationship_type, description)
-                   VALUES ($1, $2, $3, $4, $5)""",
+                """INSERT INTO relationships (id, source_asset_id, target_asset_id, relationship_type, description, organization_id)
+                   VALUES ($1, $2, $3, $4, $5, $6)""",
                 uuid.uuid4(), new_id, rel["target_asset_id"],
-                rel["relationship_type"], rel["description"],
+                rel["relationship_type"], rel["description"], organization_id,
             )
-        # Clone relationships where the original is target
         rels = await pool.fetch(
             "SELECT * FROM relationships WHERE target_asset_id = $1",
             asset_id,
         )
         for rel in rels:
             await pool.execute(
-                """INSERT INTO relationships (id, source_asset_id, target_asset_id, relationship_type, description)
-                   VALUES ($1, $2, $3, $4, $5)""",
+                """INSERT INTO relationships (id, source_asset_id, target_asset_id, relationship_type, description, organization_id)
+                   VALUES ($1, $2, $3, $4, $5, $6)""",
                 uuid.uuid4(), rel["source_asset_id"], new_id,
-                rel["relationship_type"], rel["description"],
+                rel["relationship_type"], rel["description"], organization_id,
             )
     # Resolve owner name for return
     row_dict = dict(row)
@@ -305,21 +351,27 @@ async def search_assets(
     query_str: str,
     limit: int = 20,
     types: list[AssetType] | None = None,
+    organization_id: UUID | None = None,
 ) -> list[Asset]:
     if types:
-        placeholders = ", ".join(f"${i}" for i in range(3, 3 + len(types)))
+        placeholders = ", ".join(f"${i}" for i in range(4, 4 + len(types)))
         rows = await pool.fetch(
             f"""{_SELECT_WITH_OWNER}
                 WHERE a.name ILIKE $1 AND a.type IN ({placeholders})
-                ORDER BY a.name LIMIT $2""",
+                  AND ($2::uuid IS NULL OR a.organization_id = $2)
+                ORDER BY a.name LIMIT $3""",
             f"%{query_str}%",
+            organization_id,
             limit,
             *[t.value for t in types],
         )
     else:
         rows = await pool.fetch(
-            _SELECT_WITH_OWNER + " WHERE a.name ILIKE $1 ORDER BY a.name LIMIT $2",
+            _SELECT_WITH_OWNER + """ WHERE a.name ILIKE $1
+                  AND ($3::uuid IS NULL OR a.organization_id = $3)
+                  ORDER BY a.name LIMIT $2""",
             f"%{query_str}%",
             limit,
+            organization_id,
         )
     return [Asset.from_row(r) for r in rows]

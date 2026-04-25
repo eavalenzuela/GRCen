@@ -6,7 +6,11 @@ from grcen.schemas.graph import GraphEdge, GraphNode, GraphResponse
 
 
 async def get_asset_graph(
-    pool: asyncpg.Pool, asset_id: UUID, depth: int = 1
+    pool: asyncpg.Pool,
+    asset_id: UUID,
+    depth: int = 1,
+    *,
+    organization_id: UUID | None = None,
 ) -> GraphResponse:
     depth = min(depth, 3)
 
@@ -15,6 +19,7 @@ async def get_asset_graph(
         WITH RECURSIVE graph AS (
             SELECT a.id AS asset_id, a.name, a.type::text AS asset_type, 0 AS lvl
             FROM assets a WHERE a.id = $1
+              AND ($3::uuid IS NULL OR a.organization_id = $3)
 
             UNION
 
@@ -27,18 +32,21 @@ async def get_asset_graph(
                 a2.type::text AS asset_type,
                 g.lvl + 1 AS lvl
             FROM graph g
-            JOIN relationships r ON r.source_asset_id = g.asset_id
-                                 OR r.target_asset_id = g.asset_id
+            JOIN relationships r ON (r.source_asset_id = g.asset_id
+                                  OR r.target_asset_id = g.asset_id)
+                                 AND ($3::uuid IS NULL OR r.organization_id = $3)
             JOIN assets a2 ON a2.id = CASE
                 WHEN r.source_asset_id = g.asset_id THEN r.target_asset_id
                 ELSE r.source_asset_id
             END
+                AND ($3::uuid IS NULL OR a2.organization_id = $3)
             WHERE g.lvl < $2
         )
         SELECT DISTINCT asset_id, name, asset_type FROM graph
         """,
         asset_id,
         depth,
+        organization_id,
     )
 
     edges_rows = await pool.fetch(
@@ -46,6 +54,7 @@ async def get_asset_graph(
         WITH RECURSIVE graph AS (
             SELECT a.id AS asset_id, 0 AS lvl
             FROM assets a WHERE a.id = $1
+              AND ($3::uuid IS NULL OR a.organization_id = $3)
 
             UNION
 
@@ -56,12 +65,14 @@ async def get_asset_graph(
                 END AS asset_id,
                 g.lvl + 1 AS lvl
             FROM graph g
-            JOIN relationships r ON r.source_asset_id = g.asset_id
-                                 OR r.target_asset_id = g.asset_id
+            JOIN relationships r ON (r.source_asset_id = g.asset_id
+                                  OR r.target_asset_id = g.asset_id)
+                                 AND ($3::uuid IS NULL OR r.organization_id = $3)
             JOIN assets a2 ON a2.id = CASE
                 WHEN r.source_asset_id = g.asset_id THEN r.target_asset_id
                 ELSE r.source_asset_id
             END
+                AND ($3::uuid IS NULL OR a2.organization_id = $3)
             WHERE g.lvl < $2
         ),
         node_ids AS (SELECT DISTINCT asset_id FROM graph)
@@ -69,9 +80,11 @@ async def get_asset_graph(
         FROM relationships r
         WHERE r.source_asset_id IN (SELECT asset_id FROM node_ids)
           AND r.target_asset_id IN (SELECT asset_id FROM node_ids)
+          AND ($3::uuid IS NULL OR r.organization_id = $3)
         """,
         asset_id,
         depth,
+        organization_id,
     )
 
     nodes = [

@@ -92,6 +92,18 @@ async def get_current_user_or_none(
     return await get_user_by_id(pool, UUID(user_id))
 
 
+async def get_current_organization_id(
+    user: User = Depends(get_current_user),
+) -> UUID:
+    """Tenant scope for the current request.
+
+    Every read or write that touches per-tenant data must be scoped through
+    this — never trust an `organization_id` arriving from the client. Multi-org
+    membership is not yet modeled, so the user's single org is authoritative.
+    """
+    return user.organization_id
+
+
 def require_permission(*permissions: Permission):
     """Return a FastAPI dependency that enforces the given permissions."""
 

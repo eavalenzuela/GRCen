@@ -21,6 +21,6 @@ async def graph(
     asset_id: UUID,
     depth: int = 1,
     pool: asyncpg.Pool = Depends(get_db),
-    _user: User = Depends(require_permission(Permission.VIEW_GRAPH)),
+    user: User = Depends(require_permission(Permission.VIEW_GRAPH)),
 ):
-    return await get_asset_graph(pool, asset_id, depth)
+    return await get_asset_graph(pool, asset_id, depth, organization_id=user.organization_id)

@@ -65,7 +65,8 @@ def preview_asset_import(content: str, format: str) -> ImportPreview:
 
 
 async def execute_asset_import(
-    pool: asyncpg.Pool, content: str, format: str, dry_run: bool = False
+    pool: asyncpg.Pool, content: str, format: str, dry_run: bool = False,
+    *, organization_id=None,
 ) -> ImportResult:
     rows = _parse_csv(content) if format == "csv" else _parse_json(content)
     result = ImportResult()
@@ -82,17 +83,28 @@ async def execute_asset_import(
                 owner_id = None
                 owner_text = row.get("owner", "").strip()
                 if owner_text:
-                    owner_row = await conn.fetchrow(
-                        "SELECT id FROM assets WHERE name = $1 AND type IN ('person', 'organizational_unit') LIMIT 1",
-                        owner_text,
-                    )
+                    if organization_id is not None:
+                        owner_row = await conn.fetchrow(
+                            "SELECT id FROM assets WHERE name = $1 AND type IN ('person', 'organizational_unit') AND organization_id = $2 LIMIT 1",
+                            owner_text,
+                            organization_id,
+                        )
+                    else:
+                        owner_row = await conn.fetchrow(
+                            "SELECT id FROM assets WHERE name = $1 AND type IN ('person', 'organizational_unit') LIMIT 1",
+                            owner_text,
+                        )
                     if owner_row:
                         owner_id = owner_row["id"]
                 if not dry_run:
+                    org = organization_id
+                    if org is None:
+                        from grcen.services import organization_service
+                        org = await organization_service.get_default_org_id(pool)
                     await conn.execute(
                         """
-                        INSERT INTO assets (id, type, name, description, status, owner_id, metadata)
-                        VALUES ($1, $2, $3, $4, $5, $6, $7)
+                        INSERT INTO assets (id, type, name, description, status, owner_id, metadata, organization_id)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                         """,
                         uuid.uuid4(),
                         row["type"],
@@ -101,6 +113,7 @@ async def execute_asset_import(
                         row.get("status", "active"),
                         owner_id,
                         json.dumps(metadata),
+                        org,
                     )
                 result.created += 1
 
@@ -173,10 +186,15 @@ async def preview_relationship_import(
 
 
 async def execute_relationship_import(
-    pool: asyncpg.Pool, content: str, format: str, dry_run: bool = False
+    pool: asyncpg.Pool, content: str, format: str, dry_run: bool = False,
+    *, organization_id=None,
 ) -> ImportResult:
     rows = _parse_csv(content) if format == "csv" else _parse_json(content)
     result = ImportResult()
+    org = organization_id
+    if org is None:
+        from grcen.services import organization_service
+        org = await organization_service.get_default_org_id(pool)
 
     async with pool.acquire() as conn:
         async with conn.transaction():
@@ -187,14 +205,16 @@ async def execute_relationship_import(
                     continue
 
                 source = await conn.fetchrow(
-                    "SELECT id FROM assets WHERE name = $1 AND type = $2",
+                    "SELECT id FROM assets WHERE name = $1 AND type = $2 AND organization_id = $3",
                     row["source_name"],
                     row["source_type"],
+                    org,
                 )
                 target = await conn.fetchrow(
-                    "SELECT id FROM assets WHERE name = $1 AND type = $2",
+                    "SELECT id FROM assets WHERE name = $1 AND type = $2 AND organization_id = $3",
                     row["target_name"],
                     row["target_type"],
+                    org,
                 )
 
                 if not source:
@@ -208,7 +228,6 @@ async def execute_relationship_import(
                     )
                     continue
 
-                # Auto-convert owns→manages when target is a person
                 rel_type = row["relationship_type"]
                 if rel_type == "owns" and row.get("target_type") == "person":
                     rel_type = "manages"
@@ -217,14 +236,15 @@ async def execute_relationship_import(
                     await conn.execute(
                         """
                         INSERT INTO relationships
-                            (id, source_asset_id, target_asset_id, relationship_type, description)
-                        VALUES ($1, $2, $3, $4, $5)
+                            (id, source_asset_id, target_asset_id, relationship_type, description, organization_id)
+                        VALUES ($1, $2, $3, $4, $5, $6)
                         """,
                         uuid.uuid4(),
                         source["id"],
                         target["id"],
                         rel_type,
                         row.get("description", ""),
+                        org,
                     )
                 result.created += 1
 

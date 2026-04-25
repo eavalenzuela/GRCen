@@ -82,26 +82,32 @@ async def test_create_attachment_rejects_both_or_neither_owner(pool, two_assets_
 
 @pytest.mark.asyncio
 async def test_db_constraint_rejects_both_owners(pool, two_assets_and_rel):
+    from grcen.services import organization_service
+    org_id = await organization_service.get_default_org_id(pool)
     src, _, rel = two_assets_and_rel
     with pytest.raises(Exception) as exc:
         await pool.execute(
             """INSERT INTO attachments
-                   (id, asset_id, relationship_id, kind, name, url_or_path)
-               VALUES ($1, $2, $3, 'url', 'bad', 'x')""",
+                   (id, asset_id, relationship_id, kind, name, url_or_path, organization_id)
+               VALUES ($1, $2, $3, 'url', 'bad', 'x', $4)""",
             uuid.uuid4(),
             src.id,
             rel.id,
+            org_id,
         )
     assert "attachments_exactly_one_owner" in str(exc.value)
 
 
 @pytest.mark.asyncio
 async def test_db_constraint_rejects_neither_owner(pool):
+    from grcen.services import organization_service
+    org_id = await organization_service.get_default_org_id(pool)
     with pytest.raises(Exception) as exc:
         await pool.execute(
-            """INSERT INTO attachments (id, kind, name, url_or_path)
-               VALUES ($1, 'url', 'orphan', 'x')""",
+            """INSERT INTO attachments (id, kind, name, url_or_path, organization_id)
+               VALUES ($1, 'url', 'orphan', 'x', $2)""",
             uuid.uuid4(),
+            org_id,
         )
     assert "attachments_exactly_one_owner" in str(exc.value)
 

@@ -21,9 +21,9 @@ _ALERT_FIELDS = ["title", "message", "schedule_type", "cron_expression", "enable
 async def list_alerts(
     asset_id: UUID | None = None,
     pool: asyncpg.Pool = Depends(get_db),
-    _user: User = Depends(require_permission(Permission.VIEW)),
+    user: User = Depends(require_permission(Permission.VIEW)),
 ):
-    alerts = await alert_svc.list_alerts(pool, asset_id)
+    alerts = await alert_svc.list_alerts(pool, asset_id, organization_id=user.organization_id)
     return [AlertResponse.model_validate(a, from_attributes=True) for a in alerts]
 
 
@@ -33,8 +33,15 @@ async def create_alert(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.MANAGE_ALERTS)),
 ):
+    # Ensure the alert is being attached to an asset in the user's org.
+    asset_row = await pool.fetchrow(
+        "SELECT organization_id FROM assets WHERE id = $1", data.asset_id
+    )
+    if asset_row is None or asset_row["organization_id"] != user.organization_id:
+        raise HTTPException(status_code=404, detail="Asset not found")
     alert = await alert_svc.create_alert(
         pool,
+        organization_id=user.organization_id,
         asset_id=data.asset_id,
         title=data.title,
         message=data.message,
@@ -60,9 +67,9 @@ async def create_alert(
 async def get_alert(
     alert_id: UUID,
     pool: asyncpg.Pool = Depends(get_db),
-    _user: User = Depends(require_permission(Permission.VIEW)),
+    user: User = Depends(require_permission(Permission.VIEW)),
 ):
-    alert = await alert_svc.get_alert(pool, alert_id)
+    alert = await alert_svc.get_alert(pool, alert_id, organization_id=user.organization_id)
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
     return AlertResponse.model_validate(alert, from_attributes=True)
@@ -81,6 +88,7 @@ async def update_alert(
     kwargs = data.model_dump(exclude_unset=True)
     if "schedule_type" in kwargs and kwargs["schedule_type"]:
         kwargs["schedule_type"] = kwargs["schedule_type"].value
+    # Update is service-layer; the get_alert above already enforced org-scope on `old`.
     alert = await alert_svc.update_alert(pool, alert_id, **kwargs)
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
@@ -108,7 +116,10 @@ async def delete_alert(
     old = await alert_svc.get_alert(pool, alert_id)
     if not old:
         raise HTTPException(status_code=404, detail="Alert not found")
-    deleted = await alert_svc.delete_alert(pool, alert_id)
+    deleted = await pool.execute(
+        "DELETE FROM alerts WHERE id = $1 AND organization_id = $2",
+        alert_id, user.organization_id,
+    ) == "DELETE 1"
     if not deleted:
         raise HTTPException(status_code=404, detail="Alert not found")
     await audit_svc.log_audit_event(
@@ -127,18 +138,18 @@ async def delete_alert(
 async def list_notifications(
     unread_only: bool = False,
     pool: asyncpg.Pool = Depends(get_db),
-    _user: User = Depends(require_permission(Permission.VIEW)),
+    user: User = Depends(require_permission(Permission.VIEW)),
 ):
-    notifs = await alert_svc.list_notifications(pool, unread_only)
+    notifs = await alert_svc.list_notifications(pool, unread_only, organization_id=user.organization_id)
     return [NotificationResponse.model_validate(n, from_attributes=True) for n in notifs]
 
 
 @router.get("/notifications/count", response_class=HTMLResponse)
 async def notification_count(
     pool: asyncpg.Pool = Depends(get_db),
-    _user: User = Depends(require_permission(Permission.VIEW)),
+    user: User = Depends(require_permission(Permission.VIEW)),
 ):
-    count = await alert_svc.count_unread_notifications(pool)
+    count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
     if count:
         return HTMLResponse(f"({count})")
     return HTMLResponse("")
@@ -148,8 +159,8 @@ async def notification_count(
 async def mark_read(
     notif_id: UUID,
     pool: asyncpg.Pool = Depends(get_db),
-    _user: User = Depends(require_permission(Permission.VIEW)),
+    user: User = Depends(require_permission(Permission.VIEW)),
 ):
-    ok = await alert_svc.mark_notification_read(pool, notif_id)
+    ok = await alert_svc.mark_notification_read(pool, notif_id, organization_id=user.organization_id)
     if not ok:
         raise HTTPException(status_code=404, detail="Notification not found")

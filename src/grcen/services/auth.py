@@ -63,12 +63,16 @@ async def create_user(
     username: str,
     password: str | None = None,
     role: UserRole = UserRole.VIEWER,
+    organization_id: UUID | None = None,
 ) -> User:
+    from grcen.services import organization_service
+    if organization_id is None:
+        organization_id = await organization_service.get_default_org_id(pool)
     hashed = hash_password(password) if password else _UNUSABLE_PASSWORD
     row = await pool.fetchrow(
         """
-        INSERT INTO users (id, username, hashed_password, is_active, is_admin, role)
-        VALUES ($1, $2, $3, true, $4, $5)
+        INSERT INTO users (id, username, hashed_password, is_active, is_admin, role, organization_id)
+        VALUES ($1, $2, $3, true, $4, $5, $6)
         ON CONFLICT (username) DO UPDATE
             SET hashed_password = EXCLUDED.hashed_password,
                 is_admin = EXCLUDED.is_admin,
@@ -81,6 +85,7 @@ async def create_user(
         hashed,
         role == UserRole.ADMIN,
         role.value,
+        organization_id,
     )
     return _decrypt_user_email(User.from_row(row))
 
@@ -150,8 +155,16 @@ async def get_user_by_id(pool: asyncpg.Pool, user_id: UUID) -> User | None:
     return _decrypt_user_email(User.from_row(row)) if row else None
 
 
-async def list_users(pool: asyncpg.Pool) -> list[User]:
-    rows = await pool.fetch("SELECT * FROM users ORDER BY username")
+async def list_users(
+    pool: asyncpg.Pool, organization_id: UUID | None = None
+) -> list[User]:
+    if organization_id is not None:
+        rows = await pool.fetch(
+            "SELECT * FROM users WHERE organization_id = $1 ORDER BY username",
+            organization_id,
+        )
+    else:
+        rows = await pool.fetch("SELECT * FROM users ORDER BY username")
     users = [User.from_row(r) for r in rows]
     return _decrypt_users_email(users)
 
@@ -215,13 +228,17 @@ async def create_oidc_user(
     email: str | None,
     oidc_sub: str,
     role: UserRole = UserRole.VIEWER,
+    organization_id: UUID | None = None,
 ) -> User:
+    from grcen.services import organization_service
+    if organization_id is None:
+        organization_id = await organization_service.get_default_org_id(pool)
     stored_email, email_idx = await _prepare_email(pool, email)
     row = await pool.fetchrow(
         """INSERT INTO users
                (id, username, email, email_blind_idx, hashed_password,
-                is_active, is_admin, role, oidc_sub)
-           VALUES ($1, $2, $3, $4, $5, true, $6, $7, $8)
+                is_active, is_admin, role, oidc_sub, organization_id)
+           VALUES ($1, $2, $3, $4, $5, true, $6, $7, $8, $9)
            RETURNING *""",
         uuid.uuid4(),
         username,
@@ -231,6 +248,7 @@ async def create_oidc_user(
         role == UserRole.ADMIN,
         role.value,
         oidc_sub,
+        organization_id,
     )
     return _decrypt_user_email(User.from_row(row))
 
@@ -284,13 +302,17 @@ async def create_saml_user(
     email: str | None,
     saml_sub: str,
     role: UserRole = UserRole.VIEWER,
+    organization_id: UUID | None = None,
 ) -> User:
+    from grcen.services import organization_service
+    if organization_id is None:
+        organization_id = await organization_service.get_default_org_id(pool)
     stored_email, email_idx = await _prepare_email(pool, email)
     row = await pool.fetchrow(
         """INSERT INTO users
                (id, username, email, email_blind_idx, hashed_password,
-                is_active, is_admin, role, saml_sub)
-           VALUES ($1, $2, $3, $4, $5, true, $6, $7, $8)
+                is_active, is_admin, role, saml_sub, organization_id)
+           VALUES ($1, $2, $3, $4, $5, true, $6, $7, $8, $9)
            RETURNING *""",
         uuid.uuid4(),
         username,
@@ -300,6 +322,7 @@ async def create_saml_user(
         role == UserRole.ADMIN,
         role.value,
         saml_sub,
+        organization_id,
     )
     return _decrypt_user_email(User.from_row(row))
 

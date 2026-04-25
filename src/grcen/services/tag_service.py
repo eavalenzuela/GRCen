@@ -11,6 +11,7 @@ distinct tags with counts, filter assets by tag) and the admin ops
 from __future__ import annotations
 
 from dataclasses import dataclass
+from uuid import UUID
 
 import asyncpg
 
@@ -21,19 +22,25 @@ class TagCount:
     asset_count: int
 
 
-async def list_tags_with_counts(pool: asyncpg.Pool) -> list[TagCount]:
+async def list_tags_with_counts(
+    pool: asyncpg.Pool, *, organization_id: UUID | None = None
+) -> list[TagCount]:
     """Return every distinct tag with the number of assets using it."""
     rows = await pool.fetch(
         """SELECT unnest(tags) AS tag, count(*)::int AS n
            FROM assets
            WHERE tags IS NOT NULL AND array_length(tags, 1) > 0
+             AND ($1::uuid IS NULL OR organization_id = $1)
            GROUP BY tag
-           ORDER BY n DESC, tag"""
+           ORDER BY n DESC, tag""",
+        organization_id,
     )
     return [TagCount(name=r["tag"], asset_count=r["n"]) for r in rows]
 
 
-async def rename_tag(pool: asyncpg.Pool, old: str, new: str) -> int:
+async def rename_tag(
+    pool: asyncpg.Pool, old: str, new: str, *, organization_id: UUID | None = None
+) -> int:
     """Replace every occurrence of ``old`` with ``new``. Returns affected row count.
 
     Deduplicates on the way through: if an asset already has ``new``,
@@ -52,15 +59,19 @@ async def rename_tag(pool: asyncpg.Pool, old: str, new: str) -> int:
                  ) AS t
              ),
                  updated_at = now()
-           WHERE $1 = ANY(tags)""",
+           WHERE $1 = ANY(tags)
+             AND ($3::uuid IS NULL OR organization_id = $3)""",
         old,
         new,
+        organization_id,
     )
     return _affected(result)
 
 
-async def delete_tag(pool: asyncpg.Pool, name: str) -> int:
-    """Remove ``name`` from every asset that has it. Returns affected row count."""
+async def delete_tag(
+    pool: asyncpg.Pool, name: str, *, organization_id: UUID | None = None
+) -> int:
+    """Remove ``name`` from every asset that has it within the org."""
     name = name.strip()
     if not name:
         return 0
@@ -68,8 +79,10 @@ async def delete_tag(pool: asyncpg.Pool, name: str) -> int:
         """UPDATE assets
              SET tags = array_remove(tags, $1),
                  updated_at = now()
-           WHERE $1 = ANY(tags)""",
+           WHERE $1 = ANY(tags)
+             AND ($2::uuid IS NULL OR organization_id = $2)""",
         name,
+        organization_id,
     )
     return _affected(result)
 

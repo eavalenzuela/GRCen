@@ -91,6 +91,10 @@ async def clean_tables(pool):
     yield
     for table in ("sessions", "api_tokens", "app_settings", "audit_log", "data_access_log", "user_totp", "webhook_deliveries", "webhooks", "notification_deliveries", "notifications", "alerts", "attachments", "relationships", "risk_snapshots", "saved_searches", "pending_changes", "workflow_config", "assets", "users", "encryption_config"):
         await pool.execute(f"DELETE FROM {table}")
+    # Keep the default organization (slug='default'); drop any test-created ones.
+    await pool.execute("DELETE FROM organizations WHERE slug != 'default'")
+    for table in ():
+        await pool.execute(f"DELETE FROM {table}")
     # Reset audit config to defaults so tests start fresh
     await pool.execute("UPDATE audit_config SET enabled = true, field_level = true")
     from grcen.services import audit_service

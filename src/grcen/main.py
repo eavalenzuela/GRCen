@@ -60,10 +60,10 @@ async def _tick_alerts():
 
 
 async def _nightly_risk_snapshot():
-    from grcen.services.risk_service import capture_risk_snapshot
+    from grcen.services.risk_service import capture_all_org_snapshots
 
     pool = await get_pool()
-    await capture_risk_snapshot(pool)
+    await capture_all_org_snapshots(pool)
 
 
 @asynccontextmanager
@@ -200,13 +200,17 @@ def cli():
     """CLI entrypoint for management commands."""
     if len(sys.argv) < 2:
         print("Usage: grcen <command>")
-        print("Commands: createadmin, runserver, generate-key, rotate-keys")
+        print("Commands: createadmin, createorg, listorgs, runserver, generate-key, rotate-keys")
         sys.exit(1)
 
     command = sys.argv[1]
 
     if command == "createadmin":
         asyncio.run(_create_admin())
+    elif command == "createorg":
+        asyncio.run(_create_org())
+    elif command == "listorgs":
+        asyncio.run(_list_orgs())
     elif command == "runserver":
         import uvicorn
 
@@ -227,6 +231,7 @@ def cli():
 
 async def _create_admin():
     from grcen.permissions import UserRole
+    from grcen.services import organization_service
     from grcen.services.auth import create_user
 
     pool = await init_pool()
@@ -234,9 +239,50 @@ async def _create_admin():
 
     username = input("Username: ")
     password = input("Password: ")
+    org_slug = input("Organization slug (blank = default): ").strip()
+    org_id = None
+    if org_slug:
+        org = await organization_service.get_by_slug(pool, org_slug)
+        if org is None:
+            print(f"Organization '{org_slug}' not found. Run `grcen createorg` first.")
+            await close_pool()
+            sys.exit(1)
+        org_id = org.id
 
-    user = await create_user(pool, username, password, role=UserRole.ADMIN)
-    print(f"Admin user '{user.username}' created (id={user.id}, role={user.role.value})")
+    user = await create_user(pool, username, password, role=UserRole.ADMIN, organization_id=org_id)
+    print(f"Admin user '{user.username}' created (id={user.id}, role={user.role.value}, org={user.organization_id})")
+    await close_pool()
+
+
+async def _create_org():
+    from grcen.services import organization_service
+
+    pool = await init_pool()
+    await init_schema()
+
+    slug = input("Slug (lowercase, hyphenated): ").strip()
+    name = input("Display name: ").strip()
+    if not slug or not name:
+        print("Slug and name are required.")
+        await close_pool()
+        sys.exit(1)
+    existing = await organization_service.get_by_slug(pool, slug)
+    if existing:
+        print(f"Organization '{slug}' already exists (id={existing.id}).")
+        await close_pool()
+        return
+    org = await organization_service.create_organization(pool, slug=slug, name=name)
+    print(f"Created organization '{org.slug}' (id={org.id}).")
+    await close_pool()
+
+
+async def _list_orgs():
+    from grcen.services import organization_service
+
+    pool = await init_pool()
+    await init_schema()
+    for org in await organization_service.list_organizations(pool):
+        print(f"  {org.slug:20s} {org.name:40s} {org.id}")
     await close_pool()
 
 

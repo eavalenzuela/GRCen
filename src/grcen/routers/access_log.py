@@ -22,10 +22,11 @@ async def list_access_log(
     until: str | None = None,
     limit: int = 100,
     pool: asyncpg.Pool = Depends(get_db),
-    _user: User = Depends(require_permission(Permission.VIEW_AUDIT)),
+    user: User = Depends(require_permission(Permission.VIEW_AUDIT)),
 ):
     entries = await access_log_service.query(
         pool,
+        organization_id=user.organization_id,
         user_id=user_id,
         entity_type=entity_type,
         action=action,

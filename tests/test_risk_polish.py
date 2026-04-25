@@ -133,11 +133,13 @@ async def test_capture_snapshot_is_idempotent(pool, admin_user):
 async def test_severity_trend_returns_deltas(pool, admin_user):
     # Insert a "yesterday" snapshot with 1 critical.
     yesterday = date.today() - timedelta(days=1)
+    from grcen.services import organization_service
+    org_id = await organization_service.get_default_org_id(pool)
     await pool.execute(
         """INSERT INTO risk_snapshots
-               (snapshot_date, total, critical, high, medium, low, overdue, no_treatment)
-           VALUES ($1, 1, 1, 0, 0, 0, 0, 0)""",
-        yesterday,
+               (snapshot_date, total, critical, high, medium, low, overdue, no_treatment, organization_id)
+           VALUES ($1, 1, 1, 0, 0, 0, 0, 0, $2)""",
+        yesterday, org_id,
     )
     # Today: add a new critical risk (likely × catastrophic = 20 = critical).
     await _risk(pool, admin_user.id, "R1", impact="catastrophic")

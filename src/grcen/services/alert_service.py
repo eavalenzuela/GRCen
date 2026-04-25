@@ -21,12 +21,21 @@ async def create_alert(
     cron_expression: str | None = None,
     next_fire_at=None,
     enabled: bool = True,
+    organization_id: UUID | None = None,
 ) -> Alert:
+    if organization_id is None:
+        # Derive from the owning asset so the alert lands in the same tenant.
+        owner = await pool.fetchrow(
+            "SELECT organization_id FROM assets WHERE id = $1", asset_id
+        )
+        if owner is None:
+            raise ValueError("Asset not found")
+        organization_id = owner["organization_id"]
     row = await pool.fetchrow(
         """
         INSERT INTO alerts
-            (id, asset_id, title, message, schedule_type, cron_expression, next_fire_at, enabled)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            (id, asset_id, title, message, schedule_type, cron_expression, next_fire_at, enabled, organization_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING *
         """,
         uuid.uuid4(),
@@ -37,22 +46,44 @@ async def create_alert(
         cron_expression,
         next_fire_at,
         enabled,
+        organization_id,
     )
     return Alert.from_row(row)
 
 
-async def get_alert(pool: asyncpg.Pool, alert_id: UUID) -> Alert | None:
-    row = await pool.fetchrow("SELECT * FROM alerts WHERE id = $1", alert_id)
+async def get_alert(
+    pool: asyncpg.Pool, alert_id: UUID, *, organization_id: UUID | None = None
+) -> Alert | None:
+    row = await pool.fetchrow(
+        """SELECT * FROM alerts WHERE id = $1
+           AND ($2::uuid IS NULL OR organization_id = $2)""",
+        alert_id, organization_id,
+    )
     return Alert.from_row(row) if row else None
 
 
-async def list_alerts(pool: asyncpg.Pool, asset_id: UUID | None = None) -> list[Alert]:
+async def list_alerts(
+    pool: asyncpg.Pool,
+    asset_id: UUID | None = None,
+    *,
+    organization_id: UUID | None = None,
+) -> list[Alert]:
+    where = []
+    vals = []
+    idx = 1
     if asset_id:
-        rows = await pool.fetch(
-            "SELECT * FROM alerts WHERE asset_id = $1 ORDER BY next_fire_at", asset_id
-        )
-    else:
-        rows = await pool.fetch("SELECT * FROM alerts ORDER BY next_fire_at")
+        where.append(f"asset_id = ${idx}")
+        vals.append(asset_id)
+        idx += 1
+    if organization_id is not None:
+        where.append(f"organization_id = ${idx}")
+        vals.append(organization_id)
+        idx += 1
+    sql = "SELECT * FROM alerts"
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " ORDER BY next_fire_at"
+    rows = await pool.fetch(sql, *vals)
     return [Alert.from_row(r) for r in rows]
 
 
@@ -101,15 +132,20 @@ async def fire_alert(pool: asyncpg.Pool, alert_id: UUID) -> None:
     alert = await get_alert(pool, alert_id)
     if not alert:
         return
+    org_row = await pool.fetchrow(
+        "SELECT organization_id FROM alerts WHERE id = $1", alert_id
+    )
+    org_id = org_row["organization_id"]
     await pool.execute(
         """
-        INSERT INTO notifications (id, alert_id, title, message)
-        VALUES ($1, $2, $3, $4)
+        INSERT INTO notifications (id, alert_id, title, message, organization_id)
+        VALUES ($1, $2, $3, $4, $5)
         """,
         uuid.uuid4(),
         alert.id,
         alert.title,
         alert.message,
+        org_id,
     )
     asset_row = await pool.fetchrow(
         "SELECT name FROM assets WHERE id = $1", alert.asset_id
@@ -177,27 +213,58 @@ async def _deliver_webhooks(
         "message": alert.message,
         "link": link,
     }
-    await webhook_service.dispatch(pool, "alert.fired", data, alert_id=alert.id)
+    org_row = await pool.fetchrow(
+        "SELECT organization_id FROM alerts WHERE id = $1", alert.id
+    )
+    org_id = org_row["organization_id"] if org_row else None
+    await webhook_service.dispatch(
+        pool, "alert.fired", data, alert_id=alert.id, organization_id=org_id
+    )
 
 
 async def list_notifications(
-    pool: asyncpg.Pool, unread_only: bool = False
+    pool: asyncpg.Pool,
+    unread_only: bool = False,
+    *,
+    organization_id: UUID | None = None,
 ) -> list[Notification]:
+    where = []
+    vals = []
+    idx = 1
     if unread_only:
-        rows = await pool.fetch(
-            "SELECT * FROM notifications WHERE read = false ORDER BY created_at DESC"
-        )
-    else:
-        rows = await pool.fetch("SELECT * FROM notifications ORDER BY created_at DESC")
+        where.append("read = false")
+    if organization_id is not None:
+        where.append(f"organization_id = ${idx}")
+        vals.append(organization_id)
+        idx += 1
+    sql = "SELECT * FROM notifications"
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " ORDER BY created_at DESC"
+    rows = await pool.fetch(sql, *vals)
     return [Notification.from_row(r) for r in rows]
 
 
-async def count_unread_notifications(pool: asyncpg.Pool) -> int:
-    return await pool.fetchval("SELECT count(*) FROM notifications WHERE read = false")
-
-
-async def mark_notification_read(pool: asyncpg.Pool, notif_id: UUID) -> bool:
-    result = await pool.execute(
-        "UPDATE notifications SET read = true, updated_at = now() WHERE id = $1", notif_id
+async def count_unread_notifications(
+    pool: asyncpg.Pool, *, organization_id: UUID | None = None
+) -> int:
+    return await pool.fetchval(
+        """SELECT count(*) FROM notifications WHERE read = false
+           AND ($1::uuid IS NULL OR organization_id = $1)""",
+        organization_id,
     )
+
+
+async def mark_notification_read(
+    pool: asyncpg.Pool, notif_id: UUID, *, organization_id: UUID | None = None
+) -> bool:
+    if organization_id is not None:
+        result = await pool.execute(
+            "UPDATE notifications SET read = true, updated_at = now() WHERE id = $1 AND organization_id = $2",
+            notif_id, organization_id,
+        )
+    else:
+        result = await pool.execute(
+            "UPDATE notifications SET read = true, updated_at = now() WHERE id = $1", notif_id
+        )
     return result == "UPDATE 1"

@@ -32,11 +32,16 @@ async def record(
 ) -> None:
     """Best-effort access-log insert. Swallows DB errors after logging."""
     try:
+        if user is not None:
+            org_id = user.organization_id
+        else:
+            from grcen.services import organization_service
+            org_id = await organization_service.get_default_org_id(pool)
         await pool.execute(
             """INSERT INTO data_access_log
                    (id, user_id, username, action, entity_type, entity_id,
-                    entity_name, path, ip_address)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)""",
+                    entity_name, path, ip_address, organization_id)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)""",
             uuid.uuid4(),
             user.id if user else None,
             user.username if user else "anonymous",
@@ -46,6 +51,7 @@ async def record(
             (entity_name or "")[:255],
             (path or "")[:400],
             (ip_address or "")[:64],
+            org_id,
         )
     except Exception:
         log.exception("Failed to record access-log entry")
@@ -54,6 +60,7 @@ async def record(
 async def query(
     pool: asyncpg.Pool,
     *,
+    organization_id: UUID | None = None,
     user_id: UUID | None = None,
     entity_type: str | None = None,
     action: str | None = None,
@@ -64,6 +71,10 @@ async def query(
     clauses: list[str] = []
     vals: list = []
     idx = 1
+    if organization_id is not None:
+        clauses.append(f"organization_id = ${idx}")
+        vals.append(organization_id)
+        idx += 1
     if user_id:
         clauses.append(f"user_id = ${idx}")
         vals.append(user_id)

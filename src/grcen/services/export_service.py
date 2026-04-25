@@ -17,11 +17,16 @@ async def export_assets(
     status: AssetStatus | None = None,
     columns: list[str] | None = None,
     user: User | None = None,
+    organization_id=None,
 ) -> str:
     conditions: list[str] = []
     params: list = []
     idx = 1
 
+    if organization_id is not None:
+        conditions.append(f"a.organization_id = ${idx}")
+        params.append(organization_id)
+        idx += 1
     if asset_types:
         placeholders = ", ".join(f"${i}" for i in range(idx, idx + len(asset_types)))
         conditions.append(f"a.type IN ({placeholders})")

@@ -47,18 +47,18 @@ def score_color(score: int) -> str:
     return "low"
 
 
-async def get_risk_heatmap(pool: asyncpg.Pool) -> dict[tuple[int, int], list[dict]]:
-    """Query active risk assets and bucket them by (likelihood_val, impact_val).
-
-    Returns a dict mapping (likelihood_idx, impact_idx) -> list of {id, name, score}.
-    Indices are 1-based (1=lowest, 5=highest).
-    """
+async def get_risk_heatmap(
+    pool: asyncpg.Pool, *, organization_id: UUID | None = None
+) -> dict[tuple[int, int], list[dict]]:
+    """Query active risk assets and bucket them by (likelihood_val, impact_val)."""
     rows = await pool.fetch(
         """
         SELECT id, name, metadata
         FROM assets
         WHERE type = 'risk' AND status = 'active'
-        """
+          AND ($1::uuid IS NULL OR organization_id = $1)
+        """,
+        organization_id,
     )
 
     heatmap: dict[tuple[int, int], list[dict]] = {}
@@ -79,14 +79,18 @@ async def get_risk_heatmap(pool: asyncpg.Pool) -> dict[tuple[int, int], list[dic
     return heatmap
 
 
-async def get_top_risks(pool: asyncpg.Pool, limit: int = 5) -> list[dict]:
+async def get_top_risks(
+    pool: asyncpg.Pool, limit: int = 5, *, organization_id: UUID | None = None
+) -> list[dict]:
     """Return top N active risks sorted by computed score descending."""
     rows = await pool.fetch(
         """
         SELECT a.id, a.name, COALESCE(o.name, a.owner) AS owner, a.metadata
         FROM assets a LEFT JOIN assets o ON o.id = a.owner_id
         WHERE a.type = 'risk' AND a.status = 'active'
-        """
+          AND ($1::uuid IS NULL OR a.organization_id = $1)
+        """,
+        organization_id,
     )
 
     risks = []
@@ -211,6 +215,7 @@ async def get_risk_register(
     impact_filter: str | None = None,
     sort: str = "score",
     order: str = "desc",
+    organization_id: UUID | None = None,
 ) -> list[dict]:
     """Return all active risks with computed fields, supporting filters and sorting."""
     rows = await pool.fetch(
@@ -219,7 +224,9 @@ async def get_risk_register(
                COALESCE(o.name, a.owner) AS owner, a.metadata
         FROM assets a LEFT JOIN assets o ON o.id = a.owner_id
         WHERE a.type = 'risk' AND a.status = 'active'
-        """
+          AND ($1::uuid IS NULL OR a.organization_id = $1)
+        """,
+        organization_id,
     )
 
     today = datetime.now(UTC).date()
@@ -297,20 +304,24 @@ async def get_risk_register(
     return risks
 
 
-async def capture_risk_snapshot(pool: asyncpg.Pool, for_date=None) -> dict:
-    """Write today's risk counts to risk_snapshots (idempotent: one row per date).
-
-    Returns the snapshot row that's now in the table.
-    """
+async def capture_risk_snapshot(
+    pool: asyncpg.Pool, for_date=None, *, organization_id: UUID | None = None
+) -> dict:
+    """Write today's per-org risk counts. Defaults to the default org."""
     from datetime import date as date_type
     snap_date = for_date or date_type.today()
-    summary = await get_risk_summary(pool)
+
+    if organization_id is None:
+        from grcen.services import organization_service
+        organization_id = await organization_service.get_default_org_id(pool)
+
+    summary = await get_risk_summary(pool, organization_id=organization_id)
     by_sev = summary["by_severity"]
     await pool.execute(
         """INSERT INTO risk_snapshots
-               (snapshot_date, total, critical, high, medium, low, overdue, no_treatment)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-           ON CONFLICT (snapshot_date) DO UPDATE SET
+               (snapshot_date, total, critical, high, medium, low, overdue, no_treatment, organization_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+           ON CONFLICT (organization_id, snapshot_date) DO UPDATE SET
                total = EXCLUDED.total,
                critical = EXCLUDED.critical,
                high = EXCLUDED.high,
@@ -327,6 +338,7 @@ async def capture_risk_snapshot(pool: asyncpg.Pool, for_date=None) -> dict:
         by_sev["low"],
         summary["overdue"],
         summary["no_treatment"],
+        organization_id,
     )
     return {
         "snapshot_date": snap_date,
@@ -337,7 +349,15 @@ async def capture_risk_snapshot(pool: asyncpg.Pool, for_date=None) -> dict:
     }
 
 
-async def get_severity_trend(pool: asyncpg.Pool) -> dict:
+async def capture_all_org_snapshots(pool: asyncpg.Pool, for_date=None) -> list[dict]:
+    """Run a daily snapshot for every organization. Used by the scheduler."""
+    rows = await pool.fetch("SELECT id FROM organizations")
+    return [await capture_risk_snapshot(pool, for_date, organization_id=r["id"]) for r in rows]
+
+
+async def get_severity_trend(
+    pool: asyncpg.Pool, *, organization_id: UUID | None = None
+) -> dict:
     """Return current counts plus deltas vs. the previous snapshot (if any).
 
     Shape: {"current": {..}, "prior": {..}|None, "deltas": {critical: int, ...}}.
@@ -346,7 +366,7 @@ async def get_severity_trend(pool: asyncpg.Pool) -> dict:
     with a date < today.
     """
     from datetime import date as date_type
-    summary = await get_risk_summary(pool)
+    summary = await get_risk_summary(pool, organization_id=organization_id)
     by_sev = summary["by_severity"]
     current = {
         "total": summary["total"],
@@ -358,8 +378,10 @@ async def get_severity_trend(pool: asyncpg.Pool) -> dict:
     prior_row = await pool.fetchrow(
         """SELECT * FROM risk_snapshots
            WHERE snapshot_date < $1
+             AND ($2::uuid IS NULL OR organization_id = $2)
            ORDER BY snapshot_date DESC LIMIT 1""",
         date_type.today(),
+        organization_id,
     )
     if not prior_row:
         return {"current": current, "prior": None, "deltas": {}}
@@ -383,6 +405,7 @@ async def bulk_update_risks(
     owner_id: UUID | None = None,
     review_date: str | None = None,
     updated_by: UUID | None = None,
+    organization_id: UUID | None = None,
 ) -> list[UUID]:
     """Update non-empty fields on the given risks. Returns ids actually updated.
 
@@ -399,10 +422,16 @@ async def bulk_update_risks(
     async with pool.acquire() as conn:
         async with conn.transaction():
             for rid in risk_ids:
-                row = await conn.fetchrow(
-                    "SELECT metadata FROM assets WHERE id = $1 AND type = 'risk'",
-                    rid,
-                )
+                if organization_id is not None:
+                    row = await conn.fetchrow(
+                        "SELECT metadata FROM assets WHERE id = $1 AND type = 'risk' AND organization_id = $2",
+                        rid, organization_id,
+                    )
+                else:
+                    row = await conn.fetchrow(
+                        "SELECT metadata FROM assets WHERE id = $1 AND type = 'risk'",
+                        rid,
+                    )
                 if not row:
                     continue
                 meta = row["metadata"]
@@ -447,13 +476,17 @@ async def bulk_update_risks(
     return updated
 
 
-async def get_risk_summary(pool: asyncpg.Pool) -> dict:
+async def get_risk_summary(
+    pool: asyncpg.Pool, *, organization_id: UUID | None = None
+) -> dict:
     """Return summary statistics for active risks."""
     rows = await pool.fetch(
         """
         SELECT a.metadata FROM assets a
         WHERE a.type = 'risk' AND a.status = 'active'
-        """
+          AND ($1::uuid IS NULL OR a.organization_id = $1)
+        """,
+        organization_id,
     )
 
     today = datetime.now(UTC).date()

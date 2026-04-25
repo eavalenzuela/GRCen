@@ -35,12 +35,12 @@ class WorkflowConfig:
 @dataclass
 class PendingChange:
     id: UUID
-    action: str  # 'create' | 'update' | 'delete'
+    action: str
     asset_type: str
     target_asset_id: UUID | None
     title: str
     payload: dict
-    status: str  # 'pending' | 'approved' | 'rejected' | 'withdrawn'
+    status: str
     submitted_by: UUID | None
     submitted_by_username: str
     submitted_at: datetime
@@ -48,6 +48,7 @@ class PendingChange:
     decided_by_username: str | None
     decided_at: datetime | None
     decision_note: str | None
+    organization_id: UUID | None = None
 
     @classmethod
     def from_row(cls, row) -> "PendingChange":
@@ -69,15 +70,21 @@ class PendingChange:
             decided_by_username=row["decided_by_username"],
             decided_at=row["decided_at"],
             decision_note=row["decision_note"],
+            organization_id=row.get("organization_id"),
         )
 
 
 # ---- workflow_config ----------------------------------------------------
 
-async def get_config(pool: asyncpg.Pool, asset_type: AssetType) -> WorkflowConfig:
+async def get_config(
+    pool: asyncpg.Pool, asset_type: AssetType, *, organization_id: UUID | None = None
+) -> WorkflowConfig:
+    if organization_id is None:
+        from grcen.services import organization_service
+        organization_id = await organization_service.get_default_org_id(pool)
     row = await pool.fetchrow(
-        "SELECT * FROM workflow_config WHERE asset_type = $1",
-        asset_type.value,
+        "SELECT * FROM workflow_config WHERE asset_type = $1 AND organization_id = $2",
+        asset_type.value, organization_id,
     )
     if not row:
         return WorkflowConfig(
@@ -94,8 +101,15 @@ async def get_config(pool: asyncpg.Pool, asset_type: AssetType) -> WorkflowConfi
     )
 
 
-async def list_configs(pool: asyncpg.Pool) -> dict[str, WorkflowConfig]:
-    rows = await pool.fetch("SELECT * FROM workflow_config")
+async def list_configs(
+    pool: asyncpg.Pool, *, organization_id: UUID | None = None
+) -> dict[str, WorkflowConfig]:
+    if organization_id is None:
+        from grcen.services import organization_service
+        organization_id = await organization_service.get_default_org_id(pool)
+    rows = await pool.fetch(
+        "SELECT * FROM workflow_config WHERE organization_id = $1", organization_id
+    )
     return {
         r["asset_type"]: WorkflowConfig(
             asset_type=r["asset_type"],
@@ -111,22 +125,27 @@ async def upsert_config(
     pool: asyncpg.Pool,
     asset_type: AssetType,
     *,
+    organization_id: UUID | None = None,
     require_approval_create: bool,
     require_approval_update: bool,
     require_approval_delete: bool,
 ) -> None:
+    if organization_id is None:
+        from grcen.services import organization_service
+        organization_id = await organization_service.get_default_org_id(pool)
     await pool.execute(
         """
-        INSERT INTO workflow_config (asset_type, require_approval_create,
+        INSERT INTO workflow_config (asset_type, organization_id, require_approval_create,
             require_approval_update, require_approval_delete, updated_at)
-        VALUES ($1, $2, $3, $4, now())
-        ON CONFLICT (asset_type) DO UPDATE SET
+        VALUES ($1, $2, $3, $4, $5, now())
+        ON CONFLICT (organization_id, asset_type) DO UPDATE SET
             require_approval_create = EXCLUDED.require_approval_create,
             require_approval_update = EXCLUDED.require_approval_update,
             require_approval_delete = EXCLUDED.require_approval_delete,
             updated_at = now()
         """,
         asset_type.value,
+        organization_id,
         require_approval_create,
         require_approval_update,
         require_approval_delete,
@@ -134,9 +153,13 @@ async def upsert_config(
 
 
 async def requires_approval(
-    pool: asyncpg.Pool, asset_type: AssetType, action: str
+    pool: asyncpg.Pool,
+    asset_type: AssetType,
+    action: str,
+    *,
+    organization_id: UUID | None = None,
 ) -> bool:
-    cfg = await get_config(pool, asset_type)
+    cfg = await get_config(pool, asset_type, organization_id=organization_id)
     if action == "create":
         return cfg.require_approval_create
     if action == "update":
@@ -160,13 +183,14 @@ async def submit(
 ) -> PendingChange:
     if action not in ("create", "update", "delete"):
         raise ValueError(f"Invalid pending-change action: {action}")
-    # Block stacking duplicate pending changes for the same target+action
     if target_asset_id is not None:
         existing = await pool.fetchrow(
             """SELECT id FROM pending_changes
-               WHERE target_asset_id = $1 AND action = $2 AND status = 'pending'""",
+               WHERE target_asset_id = $1 AND action = $2 AND status = 'pending'
+                 AND organization_id = $3""",
             target_asset_id,
             action,
+            user.organization_id,
         )
         if existing:
             raise ValueError(
@@ -175,8 +199,8 @@ async def submit(
     row = await pool.fetchrow(
         """
         INSERT INTO pending_changes (id, action, asset_type, target_asset_id,
-            title, payload, status, submitted_by, submitted_by_username)
-        VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7, $8)
+            title, payload, status, submitted_by, submitted_by_username, organization_id)
+        VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7, $8, $9)
         RETURNING *
         """,
         uuid.uuid4(),
@@ -187,18 +211,26 @@ async def submit(
         json.dumps(payload),
         user.id,
         user.username,
+        user.organization_id,
     )
     return PendingChange.from_row(row)
 
 
-async def get(pool: asyncpg.Pool, change_id: UUID) -> PendingChange | None:
-    row = await pool.fetchrow("SELECT * FROM pending_changes WHERE id = $1", change_id)
+async def get(
+    pool: asyncpg.Pool, change_id: UUID, *, organization_id: UUID | None = None
+) -> PendingChange | None:
+    row = await pool.fetchrow(
+        """SELECT * FROM pending_changes WHERE id = $1
+           AND ($2::uuid IS NULL OR organization_id = $2)""",
+        change_id, organization_id,
+    )
     return PendingChange.from_row(row) if row else None
 
 
 async def list_changes(
     pool: asyncpg.Pool,
     *,
+    organization_id: UUID | None = None,
     status: str | None = "pending",
     target_asset_id: UUID | None = None,
     submitted_by: UUID | None = None,
@@ -206,6 +238,10 @@ async def list_changes(
     where: list[str] = []
     vals: list[Any] = []
     idx = 1
+    if organization_id is not None:
+        where.append(f"organization_id = ${idx}")
+        vals.append(organization_id)
+        idx += 1
     if status:
         where.append(f"status = ${idx}")
         vals.append(status)
@@ -287,12 +323,14 @@ async def approve(
     asset_type = AssetType(change.asset_type)
     payload = change.payload or {}
     asset: Asset | None = None
+    org_id = change.organization_id or approver.organization_id
 
     async with pool.acquire() as conn:
         async with conn.transaction():
             if change.action == "create":
                 asset = await asset_svc.create_asset(
                     conn,
+                    organization_id=org_id,
                     type=asset_type,
                     name=payload.get("name") or change.title,
                     description=payload.get("description"),
@@ -321,7 +359,9 @@ async def approve(
                     },
                 )
             elif change.action == "update":
-                old = await asset_svc.get_asset(conn, change.target_asset_id)
+                old = await asset_svc.get_asset(
+                    conn, change.target_asset_id, organization_id=org_id
+                )
                 if old is None:
                     raise ValueError("Target asset no longer exists.")
                 kwargs: dict[str, Any] = {}
@@ -335,7 +375,11 @@ async def approve(
                 if "tags" in payload:
                     kwargs["tags"] = payload["tags"]
                 asset = await asset_svc.update_asset(
-                    conn, change.target_asset_id, updated_by=approver.id, **kwargs
+                    conn,
+                    change.target_asset_id,
+                    organization_id=org_id,
+                    updated_by=approver.id,
+                    **kwargs,
                 )
                 if asset is not None:
                     diff = audit_svc.compute_diff(
@@ -359,10 +403,14 @@ async def approve(
                             },
                         )
             elif change.action == "delete":
-                old = await asset_svc.get_asset(conn, change.target_asset_id)
+                old = await asset_svc.get_asset(
+                    conn, change.target_asset_id, organization_id=org_id
+                )
                 if old is None:
                     raise ValueError("Target asset no longer exists.")
-                await asset_svc.delete_asset(conn, change.target_asset_id)
+                await asset_svc.delete_asset(
+                    conn, change.target_asset_id, organization_id=org_id
+                )
                 await audit_svc.log_audit_event(
                     conn,
                     user_id=approver.id,

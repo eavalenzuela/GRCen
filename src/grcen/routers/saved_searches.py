@@ -19,7 +19,9 @@ async def list_saved_searches(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    items = await ss_svc.list_visible(pool, user.id, path=path)
+    items = await ss_svc.list_visible(
+        pool, user.id, organization_id=user.organization_id, path=path
+    )
     return [
         {**asdict(s), "id": str(s.id), "user_id": str(s.user_id), "href": s.href}
         for s in items
@@ -39,6 +41,7 @@ async def create_saved_search(
     created = await ss_svc.create_saved_search(
         pool,
         user_id=user.id,
+        organization_id=user.organization_id,
         name=name,
         path=path,
         query_string=str(payload.get("query_string", "")),
@@ -59,7 +62,8 @@ async def delete_saved_search(
     user: User = Depends(get_current_user),
 ):
     ok = await ss_svc.delete_saved_search(
-        pool, search_id, user.id, is_admin=user.is_admin
+        pool, search_id, user.id, is_admin=user.is_admin,
+        organization_id=user.organization_id,
     )
     if not ok:
         raise HTTPException(status_code=404, detail="Saved search not found")

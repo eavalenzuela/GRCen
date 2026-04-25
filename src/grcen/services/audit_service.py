@@ -113,6 +113,7 @@ async def log_audit_event(
     entity_id: UUID | None = None,
     entity_name: str | None = None,
     changes: dict | None = None,
+    organization_id: UUID | None = None,
 ) -> None:
     config = await get_config(pool)
     entry = config.get(entity_type)
@@ -120,9 +121,21 @@ async def log_audit_event(
         return
     final_changes = changes if entry[1] else None  # strip if field_level disabled
     final_changes = await _sanitize_changes(pool, final_changes)
+    if organization_id is None:
+        # Resolve the org from the actor when caller didn't pass it. Fall back to
+        # the default org so audit writes never silently fail.
+        if user_id is not None:
+            row = await pool.fetchrow(
+                "SELECT organization_id FROM users WHERE id = $1", user_id
+            )
+            if row:
+                organization_id = row["organization_id"]
+        if organization_id is None:
+            from grcen.services import organization_service
+            organization_id = await organization_service.get_default_org_id(pool)
     await pool.execute(
-        """INSERT INTO audit_log (user_id, username, action, entity_type, entity_id, entity_name, changes)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)""",
+        """INSERT INTO audit_log (user_id, username, action, entity_type, entity_id, entity_name, changes, organization_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)""",
         user_id,
         username,
         action,
@@ -130,6 +143,7 @@ async def log_audit_event(
         entity_id,
         entity_name,
         json.dumps(final_changes) if final_changes else None,
+        organization_id,
     )
 
 
@@ -139,15 +153,16 @@ async def log_audit_event(
 async def list_audit_logs(
     pool: asyncpg.Pool,
     *,
+    organization_id: UUID,
     entity_type: str | None = None,
     action: str | None = None,
     username: str | None = None,
     page: int = 1,
     page_size: int = 50,
 ) -> tuple[list[dict], int]:
-    where_parts: list[str] = []
-    vals: list = []
-    idx = 1
+    where_parts: list[str] = ["organization_id = $1"]
+    vals: list = [organization_id]
+    idx = 2
 
     if entity_type:
         where_parts.append(f"entity_type = ${idx}")
@@ -162,7 +177,7 @@ async def list_audit_logs(
         vals.append(f"%{username}%")
         idx += 1
 
-    where_clause = " AND ".join(where_parts) if where_parts else "TRUE"
+    where_clause = " AND ".join(where_parts)
 
     total = await pool.fetchval(
         f"SELECT count(*) FROM audit_log WHERE {where_clause}", *vals

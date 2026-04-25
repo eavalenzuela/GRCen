@@ -45,7 +45,7 @@ async def execute_import(
 ):
     content = (await file.read()).decode("utf-8")
     fmt = "json" if file.filename and file.filename.endswith(".json") else "csv"
-    result = await execute_asset_import(pool, content, fmt, dry_run=dry_run)
+    result = await execute_asset_import(pool, content, fmt, dry_run=dry_run, organization_id=user.organization_id)
     if not dry_run:
         await audit_svc.log_audit_event(
             pool,
@@ -85,7 +85,7 @@ async def execute_rel_import(
 ):
     content = (await file.read()).decode("utf-8")
     fmt = "json" if file.filename and file.filename.endswith(".json") else "csv"
-    result = await execute_relationship_import(pool, content, fmt, dry_run=dry_run)
+    result = await execute_relationship_import(pool, content, fmt, dry_run=dry_run, organization_id=user.organization_id)
     if not dry_run:
         await audit_svc.log_audit_event(
             pool,
@@ -118,7 +118,7 @@ async def bulk_assets(
     user: User = Depends(require_permission(Permission.IMPORT)),
 ):
     content = json.dumps(rows)
-    result = await execute_asset_import(pool, content, "json", dry_run=dry_run)
+    result = await execute_asset_import(pool, content, "json", dry_run=dry_run, organization_id=user.organization_id)
     if not dry_run and result.created:
         await audit_svc.log_audit_event(
             pool,
@@ -148,7 +148,7 @@ async def bulk_relationships(
     user: User = Depends(require_permission(Permission.IMPORT)),
 ):
     content = json.dumps(rows)
-    result = await execute_relationship_import(pool, content, "json", dry_run=dry_run)
+    result = await execute_relationship_import(pool, content, "json", dry_run=dry_run, organization_id=user.organization_id)
     if not dry_run and result.created:
         await audit_svc.log_audit_event(
             pool,

@@ -46,7 +46,7 @@ async def list_assets(
         pool, asset_type=type, page=page, page_size=page_size,
         q=q, status=status, owner=owner,
         created_after=created_after, created_before=created_before,
-        tag=tag,
+        tag=tag, organization_id=user.organization_id,
     )
     for a in items:
         a.metadata_ = redaction.redact_metadata(a.metadata_, a.type, user)
@@ -68,7 +68,9 @@ async def search_assets(
     type_list = None
     if types:
         type_list = [AssetType(t.strip()) for t in types.split(",") if t.strip()]
-    results = await asset_svc.search_assets(pool, q, types=type_list)
+    results = await asset_svc.search_assets(
+        pool, q, types=type_list, organization_id=user.organization_id
+    )
     for a in results:
         a.metadata_ = redaction.redact_metadata(a.metadata_, a.type, user)
     return [AssetResponse.model_validate(a, from_attributes=True) for a in results]
@@ -80,7 +82,9 @@ async def create_asset(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.CREATE)),
 ):
-    if await workflow_service.requires_approval(pool, data.type, "create"):
+    if await workflow_service.requires_approval(
+        pool, data.type, "create", organization_id=user.organization_id
+    ):
         change = await workflow_service.submit(
             pool,
             action="create",
@@ -107,18 +111,22 @@ async def create_asset(
                 "asset_type": data.type.value,
             },
         )
-    asset = await asset_svc.create_asset(
-        pool,
-        type=data.type,
-        name=data.name,
-        description=data.description,
-        status=data.status.value,
-        owner_id=data.owner_id,
-        metadata_=data.metadata_,
-        updated_by=user.id,
-        tags=data.tags,
-        criticality=data.criticality,
-    )
+    try:
+        asset = await asset_svc.create_asset(
+            pool,
+            organization_id=user.organization_id,
+            type=data.type,
+            name=data.name,
+            description=data.description,
+            status=data.status.value,
+            owner_id=data.owner_id,
+            metadata_=data.metadata_,
+            updated_by=user.id,
+            tags=data.tags,
+            criticality=data.criticality,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     await audit_svc.log_audit_event(
         pool,
         user_id=user.id,
@@ -138,7 +146,9 @@ async def get_asset(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.VIEW)),
 ):
-    asset = await asset_svc.get_asset(pool, asset_id)
+    asset = await asset_svc.get_asset(
+        pool, asset_id, organization_id=user.organization_id
+    )
     if not asset:
         raise HTTPException(status_code=404, detail="Asset not found")
     asset.metadata_ = redaction.redact_metadata(asset.metadata_, asset.type, user)
@@ -152,13 +162,17 @@ async def update_asset(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.EDIT)),
 ):
-    old = await asset_svc.get_asset(pool, asset_id)
+    old = await asset_svc.get_asset(
+        pool, asset_id, organization_id=user.organization_id
+    )
     if not old:
         raise HTTPException(status_code=404, detail="Asset not found")
     kwargs = data.model_dump(exclude_unset=True)
     if "status" in kwargs and kwargs["status"]:
         kwargs["status"] = kwargs["status"].value
-    if await workflow_service.requires_approval(pool, old.type, "update"):
+    if await workflow_service.requires_approval(
+        pool, old.type, "update", organization_id=user.organization_id
+    ):
         try:
             change = await workflow_service.submit(
                 pool,
@@ -180,7 +194,12 @@ async def update_asset(
                 "asset_id": str(asset_id),
             },
         )
-    asset = await asset_svc.update_asset(pool, asset_id, **kwargs, updated_by=user.id)
+    try:
+        asset = await asset_svc.update_asset(
+            pool, asset_id, organization_id=user.organization_id, **kwargs, updated_by=user.id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     if not asset:
         raise HTTPException(status_code=404, detail="Asset not found")
     diff = audit_svc.compute_diff(old.__dict__, asset.__dict__, _ASSET_FIELDS)
@@ -204,10 +223,14 @@ async def delete_asset(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.DELETE)),
 ):
-    old = await asset_svc.get_asset(pool, asset_id)
+    old = await asset_svc.get_asset(
+        pool, asset_id, organization_id=user.organization_id
+    )
     if not old:
         raise HTTPException(status_code=404, detail="Asset not found")
-    if await workflow_service.requires_approval(pool, old.type, "delete"):
+    if await workflow_service.requires_approval(
+        pool, old.type, "delete", organization_id=user.organization_id
+    ):
         try:
             change = await workflow_service.submit(
                 pool,
@@ -229,7 +252,9 @@ async def delete_asset(
                 "asset_id": str(asset_id),
             },
         )
-    deleted = await asset_svc.delete_asset(pool, asset_id)
+    deleted = await asset_svc.delete_asset(
+        pool, asset_id, organization_id=user.organization_id
+    )
     if not deleted:
         raise HTTPException(status_code=404, detail="Asset not found")
     await audit_svc.log_audit_event(

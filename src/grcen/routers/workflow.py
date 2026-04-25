@@ -40,7 +40,8 @@ async def approvals_index(
     if status not in ("pending", "approved", "rejected", "withdrawn", "all"):
         status = "pending"
     items = await workflow_service.list_changes(
-        pool, status=None if status == "all" else status
+        pool, status=None if status == "all" else status,
+        organization_id=user.organization_id,
     )
     return _templates().TemplateResponse(
         request,
@@ -57,12 +58,14 @@ async def approval_detail(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.VIEW)),
 ):
-    change = await workflow_service.get(pool, change_id)
+    change = await workflow_service.get(pool, change_id, organization_id=user.organization_id)
     if not change:
         return HTMLResponse("Not found", status_code=404)
     target = None
     if change.target_asset_id:
-        target = await asset_svc.get_asset(pool, change.target_asset_id)
+        target = await asset_svc.get_asset(
+            pool, change.target_asset_id, organization_id=user.organization_id
+        )
     return _templates().TemplateResponse(
         request,
         "workflow/approvals_detail.html",
@@ -82,7 +85,7 @@ async def approval_approve(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.APPROVE)),
 ):
-    change = await workflow_service.get(pool, change_id)
+    change = await workflow_service.get(pool, change_id, organization_id=user.organization_id)
     if not change:
         raise HTTPException(status_code=404, detail="Pending change not found")
     form = await request.form()
@@ -101,7 +104,7 @@ async def approval_reject(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.APPROVE)),
 ):
-    change = await workflow_service.get(pool, change_id)
+    change = await workflow_service.get(pool, change_id, organization_id=user.organization_id)
     if not change:
         raise HTTPException(status_code=404, detail="Pending change not found")
     form = await request.form()
@@ -120,7 +123,7 @@ async def approval_withdraw(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.EDIT)),
 ):
-    change = await workflow_service.get(pool, change_id)
+    change = await workflow_service.get(pool, change_id, organization_id=user.organization_id)
     if not change:
         raise HTTPException(status_code=404, detail="Pending change not found")
     form = await request.form()
@@ -140,7 +143,7 @@ async def workflow_admin(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.MANAGE_USERS)),
 ):
-    configs = await workflow_service.list_configs(pool)
+    configs = await workflow_service.list_configs(pool, organization_id=user.organization_id)
     rows = []
     for at in sorted(AssetType, key=lambda t: t.value):
         cfg = configs.get(
@@ -171,6 +174,7 @@ async def workflow_admin_save(
         await workflow_service.upsert_config(
             pool,
             at,
+            organization_id=user.organization_id,
             require_approval_create=f"create_{at.value}" in form,
             require_approval_update=f"update_{at.value}" in form,
             require_approval_delete=f"delete_{at.value}" in form,
@@ -204,7 +208,8 @@ async def api_list(
     user: User = Depends(require_permission(Permission.VIEW)),
 ):
     items = await workflow_service.list_changes(
-        pool, status=None if status == "all" else status
+        pool, status=None if status == "all" else status,
+        organization_id=user.organization_id,
     )
     return [_change_to_json(c) for c in items]
 
@@ -215,7 +220,7 @@ async def api_get(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.VIEW)),
 ):
-    change = await workflow_service.get(pool, change_id)
+    change = await workflow_service.get(pool, change_id, organization_id=user.organization_id)
     if not change:
         raise HTTPException(status_code=404, detail="Not found")
     return _change_to_json(change)
@@ -228,7 +233,7 @@ async def api_approve(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.APPROVE)),
 ):
-    change = await workflow_service.get(pool, change_id)
+    change = await workflow_service.get(pool, change_id, organization_id=user.organization_id)
     if not change:
         raise HTTPException(status_code=404, detail="Not found")
     note = (body or {}).get("note") if isinstance(body, dict) else None
@@ -246,7 +251,7 @@ async def api_reject(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.APPROVE)),
 ):
-    change = await workflow_service.get(pool, change_id)
+    change = await workflow_service.get(pool, change_id, organization_id=user.organization_id)
     if not change:
         raise HTTPException(status_code=404, detail="Not found")
     note = (body or {}).get("note") if isinstance(body, dict) else None
@@ -264,7 +269,7 @@ async def api_withdraw(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.EDIT)),
 ):
-    change = await workflow_service.get(pool, change_id)
+    change = await workflow_service.get(pool, change_id, organization_id=user.organization_id)
     if not change:
         raise HTTPException(status_code=404, detail="Not found")
     note = (body or {}).get("note") if isinstance(body, dict) else None

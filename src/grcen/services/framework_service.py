@@ -87,10 +87,16 @@ def _parse_metadata(raw) -> dict:
         return {}
 
 
-async def list_frameworks(pool: asyncpg.Pool) -> list[FrameworkSummary]:
+async def list_frameworks(
+    pool: asyncpg.Pool, *, organization_id: UUID | None = None
+) -> list[FrameworkSummary]:
     """Return every framework with its requirement count and satisfied count."""
     fw_rows = await pool.fetch(
-        "SELECT id, name, metadata FROM assets WHERE type = 'framework' ORDER BY name"
+        """SELECT id, name, metadata FROM assets
+           WHERE type = 'framework'
+             AND ($1::uuid IS NULL OR organization_id = $1)
+           ORDER BY name""",
+        organization_id,
     )
     if not fw_rows:
         return []
@@ -123,12 +129,14 @@ async def list_frameworks(pool: asyncpg.Pool) -> list[FrameworkSummary]:
 
 
 async def get_framework_detail(
-    pool: asyncpg.Pool, framework_id: UUID
+    pool: asyncpg.Pool, framework_id: UUID, *, organization_id: UUID | None = None
 ) -> FrameworkDetail | None:
     fw = await pool.fetchrow(
-        "SELECT id, name, description, metadata, status FROM assets"
-        " WHERE id = $1 AND type = 'framework'",
+        """SELECT id, name, description, metadata, status FROM assets
+           WHERE id = $1 AND type = 'framework'
+             AND ($2::uuid IS NULL OR organization_id = $2)""",
         framework_id,
+        organization_id,
     )
     if not fw:
         return None

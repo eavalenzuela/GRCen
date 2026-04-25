@@ -64,11 +64,7 @@ async def create_token(
     expires_at: datetime | None = None,
     is_service_account: bool = False,
 ) -> tuple[ApiToken, str]:
-    """Create a new API token. Returns (token_record, raw_token).
-
-    The raw token is only available at creation time.
-    """
-    # Enforce global max expiry (service accounts exempt)
+    """Create a new API token. Returns (token_record, raw_token)."""
     if not is_service_account:
         max_days = await get_max_expiry_days(pool)
         if max_days is not None:
@@ -79,10 +75,14 @@ async def create_token(
     raw = _generate_raw_token()
     token_hash = _hash_token(raw)
 
+    # Token inherits the org of its owner so per-token requests stay tenant-scoped.
+    org_row = await pool.fetchrow("SELECT organization_id FROM users WHERE id = $1", user_id)
+    org_id = org_row["organization_id"] if org_row else None
+
     row = await pool.fetchrow(
         """INSERT INTO api_tokens (user_id, name, token_hash, permissions,
-                                   expires_at, is_service_account)
-           VALUES ($1, $2, $3, $4, $5, $6)
+                                   expires_at, is_service_account, organization_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
            RETURNING *""",
         user_id,
         name,
@@ -90,6 +90,7 @@ async def create_token(
         permissions,
         expires_at,
         is_service_account,
+        org_id,
     )
     return ApiToken.from_row(row), raw
 

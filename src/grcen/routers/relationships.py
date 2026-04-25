@@ -29,9 +29,9 @@ _REL_FIELDS = ["relationship_type", "description"]
 async def list_relationships(
     asset_id: UUID,
     pool: asyncpg.Pool = Depends(get_db),
-    _user: User = Depends(require_permission(Permission.VIEW)),
+    user: User = Depends(require_permission(Permission.VIEW)),
 ):
-    rels = await rel_svc.list_relationships_for_asset(pool, asset_id)
+    rels = await rel_svc.list_relationships_for_asset(pool, asset_id, organization_id=user.organization_id)
     return [RelationshipResponse.model_validate(r, from_attributes=True) for r in rels]
 
 
@@ -49,17 +49,21 @@ async def create_relationship(
     # Auto-convert owns→manages when target is a Person
     rel_type = data.relationship_type
     if rel_type == "owns":
-        target = await asset_svc.get_asset(pool, data.target_asset_id)
+        target = await asset_svc.get_asset(pool, data.target_asset_id, organization_id=user.organization_id)
         if target and target.type == AssetType.PERSON:
             rel_type = "manages"
 
-    rel = await rel_svc.create_relationship(
-        pool,
-        source_asset_id=data.source_asset_id,
-        target_asset_id=data.target_asset_id,
-        relationship_type=rel_type,
-        description=data.description,
-    )
+    try:
+        rel = await rel_svc.create_relationship(
+            pool,
+            organization_id=user.organization_id,
+            source_asset_id=data.source_asset_id,
+            target_asset_id=data.target_asset_id,
+            relationship_type=rel_type,
+            description=data.description,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     await audit_svc.log_audit_event(
         pool,
         user_id=user.id,
@@ -81,9 +85,9 @@ async def create_relationship(
 async def get_relationship(
     rel_id: UUID,
     pool: asyncpg.Pool = Depends(get_db),
-    _user: User = Depends(require_permission(Permission.VIEW)),
+    user: User = Depends(require_permission(Permission.VIEW)),
 ):
-    rel = await rel_svc.get_relationship(pool, rel_id)
+    rel = await rel_svc.get_relationship(pool, rel_id, organization_id=user.organization_id)
     if not rel:
         raise HTTPException(status_code=404, detail="Relationship not found")
     return RelationshipResponse.model_validate(rel, from_attributes=True)
@@ -104,7 +108,7 @@ async def update_relationship(
     if not old:
         raise HTTPException(status_code=404, detail="Relationship not found")
     kwargs = data.model_dump(exclude_unset=True)
-    rel = await rel_svc.update_relationship(pool, rel_id, **kwargs)
+    rel = await rel_svc.update_relationship(pool, rel_id, organization_id=user.organization_id, **kwargs)
     if not rel:
         raise HTTPException(status_code=404, detail="Relationship not found")
     diff = audit_svc.compute_diff(old.__dict__, rel.__dict__, _REL_FIELDS)
@@ -131,7 +135,7 @@ async def delete_relationship(
     old = await rel_svc.get_relationship(pool, rel_id)
     if not old:
         raise HTTPException(status_code=404, detail="Relationship not found")
-    deleted = await rel_svc.delete_relationship(pool, rel_id)
+    deleted = await rel_svc.delete_relationship(pool, rel_id, organization_id=user.organization_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Relationship not found")
     await audit_svc.log_audit_event(

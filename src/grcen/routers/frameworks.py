@@ -17,9 +17,9 @@ router = APIRouter(prefix="/api/frameworks", tags=["frameworks"])
 @router.get("/", summary="List frameworks with requirement counts and coverage")
 async def list_frameworks(
     pool: asyncpg.Pool = Depends(get_db),
-    _user: User = Depends(require_permission(Permission.VIEW)),
+    user: User = Depends(require_permission(Permission.VIEW)),
 ):
-    summaries = await framework_service.list_frameworks(pool)
+    summaries = await framework_service.list_frameworks(pool, organization_id=user.organization_id)
     return [
         {
             **asdict(s),
@@ -37,9 +37,9 @@ async def list_frameworks(
 async def get_framework(
     framework_id: UUID,
     pool: asyncpg.Pool = Depends(get_db),
-    _user: User = Depends(require_permission(Permission.VIEW)),
+    user: User = Depends(require_permission(Permission.VIEW)),
 ):
-    detail = await framework_service.get_framework_detail(pool, framework_id)
+    detail = await framework_service.get_framework_detail(pool, framework_id, organization_id=user.organization_id)
     if not detail:
         raise HTTPException(status_code=404, detail="Framework not found")
     return {

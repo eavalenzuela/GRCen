@@ -48,18 +48,19 @@ async def get_reviews(
     *,
     asset_type: str | None = None,
     status_filter: str | None = None,
+    organization_id=None,
 ) -> list[dict]:
-    """Return all active assets that have a review/due date field set.
-
-    Each result has: id, name, type, owner, due_date, due_field, status.
-    Sorted by due_date ascending (most urgent first).
-    """
+    """Return all active assets that have a review/due date field set."""
     where = "a.status = 'active'"
     vals: list = []
     idx = 1
     if asset_type:
         where += f" AND a.type = ${idx}"
         vals.append(asset_type)
+        idx += 1
+    if organization_id is not None:
+        where += f" AND a.organization_id = ${idx}"
+        vals.append(organization_id)
         idx += 1
 
     rows = await pool.fetch(
@@ -105,9 +106,8 @@ async def get_reviews(
     return results
 
 
-async def get_review_counts(pool: asyncpg.Pool) -> dict[str, int]:
-    """Return counts of overdue and due_soon items for the dashboard."""
-    reviews = await get_reviews(pool)
+async def get_review_counts(pool: asyncpg.Pool, *, organization_id=None) -> dict[str, int]:
+    reviews = await get_reviews(pool, organization_id=organization_id)
     counts = {"overdue": 0, "due_soon": 0}
     for r in reviews:
         if r["status"] in counts:

@@ -76,16 +76,33 @@ async def _log_delivery(
     status: str,
     error: str | None,
 ) -> None:
+    org_id = None
+    if alert_id is not None:
+        row = await pool.fetchrow(
+            "SELECT organization_id FROM alerts WHERE id = $1", alert_id
+        )
+        if row:
+            org_id = row["organization_id"]
+    if org_id is None and user_id is not None:
+        row = await pool.fetchrow(
+            "SELECT organization_id FROM users WHERE id = $1", user_id
+        )
+        if row:
+            org_id = row["organization_id"]
+    if org_id is None:
+        from grcen.services import organization_service
+        org_id = await organization_service.get_default_org_id(pool)
     await pool.execute(
         """INSERT INTO notification_deliveries
-               (id, alert_id, user_id, email, status, error)
-           VALUES ($1, $2, $3, $4, $5, $6)""",
+               (id, alert_id, user_id, email, status, error, organization_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)""",
         uuid.uuid4(),
         alert_id,
         user_id,
         email,
         status,
         error,
+        org_id,
     )
 
 

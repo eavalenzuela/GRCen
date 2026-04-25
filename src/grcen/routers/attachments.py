@@ -79,9 +79,9 @@ def _write_upload(content: bytes, owner_dir: str, filename: str) -> str:
 async def list_attachments(
     asset_id: UUID,
     pool: asyncpg.Pool = Depends(get_db),
-    _user: User = Depends(require_permission(Permission.VIEW)),
+    user: User = Depends(require_permission(Permission.VIEW)),
 ):
-    atts = await att_svc.list_attachments(pool, asset_id)
+    atts = await att_svc.list_attachments(pool, asset_id, organization_id=user.organization_id)
     return [AttachmentResponse.model_validate(a, from_attributes=True) for a in atts]
 
 
@@ -93,7 +93,8 @@ async def create_attachment(
     user: User = Depends(require_permission(Permission.CREATE)),
 ):
     att = await att_svc.create_attachment(
-        pool, asset_id=asset_id, kind=data.kind, name=data.name, url_or_path=data.url_or_path
+        pool, organization_id=user.organization_id, asset_id=asset_id,
+        kind=data.kind, name=data.name, url_or_path=data.url_or_path,
     )
     await audit_svc.log_audit_event(
         pool,
@@ -123,6 +124,7 @@ async def upload_file(
     )
     att = await att_svc.create_attachment(
         pool,
+        organization_id=user.organization_id,
         asset_id=asset_id,
         kind=AttachmentKind.FILE,
         name=file.filename or "uploaded_file",
@@ -150,7 +152,7 @@ async def download_file(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.VIEW)),
 ):
-    att = await att_svc.get_attachment(pool, att_id)
+    att = await att_svc.get_attachment(pool, att_id, organization_id=user.organization_id)
     if not att or att.asset_id != asset_id:
         raise HTTPException(status_code=404, detail="Attachment not found")
     if att.kind != AttachmentKind.FILE or not att.url_or_path:
@@ -187,7 +189,7 @@ async def delete_attachment(
     old = await att_svc.get_attachment(pool, att_id)
     if not old or old.asset_id != asset_id:
         raise HTTPException(status_code=404, detail="Attachment not found")
-    deleted = await att_svc.delete_attachment(pool, att_id)
+    deleted = await att_svc.delete_attachment(pool, att_id, organization_id=user.organization_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Attachment not found")
     await audit_svc.log_audit_event(
@@ -213,9 +215,9 @@ async def delete_attachment(
 async def list_rel_attachments(
     relationship_id: UUID,
     pool: asyncpg.Pool = Depends(get_db),
-    _user: User = Depends(require_permission(Permission.VIEW)),
+    user: User = Depends(require_permission(Permission.VIEW)),
 ):
-    atts = await att_svc.list_attachments_for_relationship(pool, relationship_id)
+    atts = await att_svc.list_attachments_for_relationship(pool, relationship_id, organization_id=user.organization_id)
     return [AttachmentResponse.model_validate(a, from_attributes=True) for a in atts]
 
 
@@ -233,6 +235,7 @@ async def create_rel_attachment(
 ):
     att = await att_svc.create_attachment(
         pool,
+        organization_id=user.organization_id,
         relationship_id=relationship_id,
         kind=data.kind,
         name=data.name,
@@ -270,6 +273,7 @@ async def upload_rel_file(
     filepath = _write_upload(content, owner_dir, filename)
     att = await att_svc.create_attachment(
         pool,
+        organization_id=user.organization_id,
         relationship_id=relationship_id,
         kind=AttachmentKind.FILE,
         name=file.filename or "uploaded_file",
@@ -297,7 +301,7 @@ async def download_rel_file(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.VIEW)),
 ):
-    att = await att_svc.get_attachment(pool, att_id)
+    att = await att_svc.get_attachment(pool, att_id, organization_id=user.organization_id)
     if not att or att.relationship_id != relationship_id:
         raise HTTPException(status_code=404, detail="Attachment not found")
     if att.kind != AttachmentKind.FILE or not att.url_or_path:
@@ -332,7 +336,7 @@ async def delete_rel_attachment(
     old = await att_svc.get_attachment(pool, att_id)
     if not old or old.relationship_id != relationship_id:
         raise HTTPException(status_code=404, detail="Attachment not found")
-    deleted = await att_svc.delete_attachment(pool, att_id)
+    deleted = await att_svc.delete_attachment(pool, att_id, organization_id=user.organization_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Attachment not found")
     await audit_svc.log_audit_event(

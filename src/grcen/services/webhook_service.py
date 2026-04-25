@@ -78,12 +78,26 @@ def _encrypt(secret: str, encrypted: bool) -> str:
 # ── CRUD ─────────────────────────────────────────────────────────────────
 
 
-async def list_webhooks(pool: asyncpg.Pool, enabled_only: bool = False) -> list[Webhook]:
-    sql = "SELECT * FROM webhooks"
+async def list_webhooks(
+    pool: asyncpg.Pool,
+    enabled_only: bool = False,
+    *,
+    organization_id: UUID | None = None,
+) -> list[Webhook]:
+    where: list[str] = []
+    vals: list = []
+    idx = 1
     if enabled_only:
-        sql += " WHERE enabled = true"
+        where.append("enabled = true")
+    if organization_id is not None:
+        where.append(f"organization_id = ${idx}")
+        vals.append(organization_id)
+        idx += 1
+    sql = "SELECT * FROM webhooks"
+    if where:
+        sql += " WHERE " + " AND ".join(where)
     sql += " ORDER BY name"
-    rows = await pool.fetch(sql)
+    rows = await pool.fetch(sql, *vals)
     encrypted = await _secrets_encrypted(pool)
     hooks: list[Webhook] = []
     for r in rows:
@@ -93,8 +107,14 @@ async def list_webhooks(pool: asyncpg.Pool, enabled_only: bool = False) -> list[
     return hooks
 
 
-async def get_webhook(pool: asyncpg.Pool, webhook_id: UUID) -> Webhook | None:
-    row = await pool.fetchrow("SELECT * FROM webhooks WHERE id = $1", webhook_id)
+async def get_webhook(
+    pool: asyncpg.Pool, webhook_id: UUID, *, organization_id: UUID | None = None
+) -> Webhook | None:
+    row = await pool.fetchrow(
+        """SELECT * FROM webhooks WHERE id = $1
+           AND ($2::uuid IS NULL OR organization_id = $2)""",
+        webhook_id, organization_id,
+    )
     if not row:
         return None
     h = Webhook.from_row(row)
@@ -105,6 +125,7 @@ async def get_webhook(pool: asyncpg.Pool, webhook_id: UUID) -> Webhook | None:
 async def create_webhook(
     pool: asyncpg.Pool,
     *,
+    organization_id: UUID | None = None,
     name: str,
     url: str,
     secret: str = "",
@@ -112,9 +133,12 @@ async def create_webhook(
     event_filter: list[str] | None = None,
 ) -> Webhook:
     encrypted = await _secrets_encrypted(pool)
+    if organization_id is None:
+        from grcen.services import organization_service
+        organization_id = await organization_service.get_default_org_id(pool)
     row = await pool.fetchrow(
-        """INSERT INTO webhooks (id, name, url, secret, enabled, event_filter)
-           VALUES ($1, $2, $3, $4, $5, $6)
+        """INSERT INTO webhooks (id, name, url, secret, enabled, event_filter, organization_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
            RETURNING *""",
         uuid.uuid4(),
         name,
@@ -122,6 +146,7 @@ async def create_webhook(
         _encrypt(secret, encrypted),
         enabled,
         event_filter or [],
+        organization_id,
     )
     h = Webhook.from_row(row)
     h.secret = secret
@@ -167,8 +192,16 @@ async def update_webhook(
     return h
 
 
-async def delete_webhook(pool: asyncpg.Pool, webhook_id: UUID) -> bool:
-    result = await pool.execute("DELETE FROM webhooks WHERE id = $1", webhook_id)
+async def delete_webhook(
+    pool: asyncpg.Pool, webhook_id: UUID, *, organization_id: UUID | None = None
+) -> bool:
+    if organization_id is not None:
+        result = await pool.execute(
+            "DELETE FROM webhooks WHERE id = $1 AND organization_id = $2",
+            webhook_id, organization_id,
+        )
+    else:
+        result = await pool.execute("DELETE FROM webhooks WHERE id = $1", webhook_id)
     return result == "DELETE 1"
 
 
@@ -229,6 +262,9 @@ async def send_to_webhook(
         error = f"{type(exc).__name__}: {exc}"
         log.warning("Webhook POST to %s failed: %s", hook.url, error)
 
+    org_row = await pool.fetchrow(
+        "SELECT organization_id FROM webhooks WHERE id = $1", hook.id
+    )
     await _log_delivery(
         pool,
         webhook_id=hook.id,
@@ -238,6 +274,7 @@ async def send_to_webhook(
         status_code=status_code,
         response_body=response_body,
         error=error,
+        organization_id=org_row["organization_id"] if org_row else None,
     )
     return ok, status_code, error
 
@@ -247,6 +284,8 @@ async def dispatch(
     event: str,
     data: dict[str, Any],
     alert_id: UUID | None = None,
+    *,
+    organization_id: UUID | None = None,
 ) -> int:
     """Send ``event`` to every enabled webhook whose filter matches.
 
@@ -254,7 +293,7 @@ async def dispatch(
     slow hooks don't starve the pool; if that becomes a problem, move to
     ``asyncio.gather`` with a semaphore.
     """
-    hooks = await list_webhooks(pool, enabled_only=True)
+    hooks = await list_webhooks(pool, enabled_only=True, organization_id=organization_id)
     sent = 0
     for hook in hooks:
         if not _matches_filter(hook, event):
@@ -278,11 +317,15 @@ async def _log_delivery(
     status_code: int | None,
     response_body: str | None,
     error: str | None,
+    organization_id: UUID | None = None,
 ) -> None:
+    if organization_id is None:
+        from grcen.services import organization_service
+        organization_id = await organization_service.get_default_org_id(pool)
     await pool.execute(
         """INSERT INTO webhook_deliveries
-               (id, webhook_id, alert_id, event, url, status_code, response_body, error)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)""",
+               (id, webhook_id, alert_id, event, url, status_code, response_body, error, organization_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)""",
         uuid.uuid4(),
         webhook_id,
         alert_id,
@@ -291,4 +334,5 @@ async def _log_delivery(
         status_code,
         response_body,
         error,
+        organization_id,
     )

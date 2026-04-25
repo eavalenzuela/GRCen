@@ -45,15 +45,14 @@ async def admin_and_editor(pool):
 
 
 async def _enable_gate(pool, asset_type: str, *, create=False, update=False, delete=False):
-    await pool.execute(
-        """INSERT INTO workflow_config (asset_type, require_approval_create,
-            require_approval_update, require_approval_delete, updated_at)
-           VALUES ($1, $2, $3, $4, now())
-           ON CONFLICT (asset_type) DO UPDATE SET
-               require_approval_create=EXCLUDED.require_approval_create,
-               require_approval_update=EXCLUDED.require_approval_update,
-               require_approval_delete=EXCLUDED.require_approval_delete""",
-        asset_type, create, update, delete,
+    from grcen.models.asset import AssetType
+    from grcen.services import workflow_service
+    await workflow_service.upsert_config(
+        pool,
+        AssetType(asset_type),
+        require_approval_create=create,
+        require_approval_update=update,
+        require_approval_delete=delete,
     )
 
 
