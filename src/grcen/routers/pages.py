@@ -2320,11 +2320,79 @@ async def framework_detail(
     detail = await framework_service.get_framework_detail(pool, framework_id, organization_id=user.organization_id)
     if not detail:
         raise HTTPException(status_code=404, detail="Framework not found")
+    last_audited = await framework_service._last_audited_for_requirements(
+        pool, [r.id for r in detail.requirements]
+    )
     notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     return templates.TemplateResponse(
         request,
         "frameworks/detail.html",
-        context={"user": user, "detail": detail, "notif_count": notif_count},
+        context={
+            "user": user, "detail": detail,
+            "last_audited": last_audited, "notif_count": notif_count,
+        },
+    )
+
+
+@router.get("/frameworks/{framework_id}/gap-report.csv")
+async def framework_gap_report_csv(
+    framework_id: UUID,
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.EXPORT)),
+):
+    rows = await framework_service.gap_report_rows(
+        pool, framework_id, organization_id=user.organization_id
+    )
+    if not rows:
+        raise HTTPException(status_code=404, detail="Framework not found")
+    import csv
+    import io
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow([
+        "requirement_id", "requirement_name", "satisfied",
+        "satisfier_count", "satisfiers", "last_audited",
+    ])
+    for r in rows:
+        writer.writerow([
+            r["requirement_id"], r["requirement_name"], r["satisfied"],
+            r["satisfier_count"], r["satisfiers"], r["last_audited"],
+        ])
+    await access_log_service.record(
+        pool, user=user, action="export",
+        entity_type="framework", entity_id=framework_id,
+        entity_name=f"framework-{framework_id}-gap-report.csv",
+        path=str(request.url.path),
+        ip_address=request.client.host if request.client else None,
+    )
+    return Response(
+        content=buf.getvalue(),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="framework-{framework_id}-gap-report.csv"'
+            ),
+        },
+    )
+
+
+@router.get("/controls", response_class=HTMLResponse)
+async def controls_library(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.VIEW)),
+):
+    """Inverted view: every Control with the requirements it covers."""
+    controls = await framework_service.list_controls_with_coverage(
+        pool, organization_id=user.organization_id
+    )
+    notif_count = await alert_svc.count_unread_notifications(
+        pool, organization_id=user.organization_id, user_id=user.id
+    )
+    return templates.TemplateResponse(
+        request, "frameworks/controls.html",
+        context={"user": user, "controls": controls, "notif_count": notif_count},
     )
 
 

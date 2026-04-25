@@ -40,15 +40,20 @@
 </div>
 
 <div class="card" style="margin-top:1.5rem;">
-    <h3>Requirements
-        <span style="color:#6b7280; font-weight:normal; font-size:0.9rem;">
-            &nbsp;— {{ detail.gap_count }} gap{{ 's' if detail.gap_count != 1 else '' }}
-        </span>
-    </h3>
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+        <h3 style="margin:0;">Requirements
+            <span style="color:#6b7280; font-weight:normal; font-size:0.9rem;">
+                &nbsp;— {{ detail.gap_count }} gap{{ 's' if detail.gap_count != 1 else '' }}
+            </span>
+        </h3>
+        {% if has_perm(user.role, Permission.EXPORT) %}
+        <a href="/frameworks/{{ detail.framework.id }}/gap-report.csv" class="btn">Download gap report (CSV)</a>
+        {% endif %}
+    </div>
     {% if detail.requirements %}
     <table class="table">
         <thead>
-            <tr><th>Status</th><th>Requirement</th><th>Satisfied by</th></tr>
+            <tr><th>Status</th><th>Requirement</th><th>Satisfied by</th><th>Last audited</th></tr>
         </thead>
         <tbody>
         {% for req in detail.requirements %}
@@ -69,6 +74,14 @@
                     {% endfor %}
                     {% else %}
                     <span style="color:#6b7280;">—</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% set ts = last_audited.get(req.id) %}
+                    {% if ts %}
+                    <small style="color:#374151;">{{ ts.strftime('%Y-%m-%d') }}</small>
+                    {% else %}
+                    <small style="color:#6b7280;">never</small>
                     {% endif %}
                 </td>
             </tr>

@@ -307,6 +307,149 @@ async def _certified_vendors(
     ]
 
 
+async def gap_report_rows(
+    pool: asyncpg.Pool, framework_id: UUID, *, organization_id: UUID | None = None
+) -> list[dict[str, Any]]:
+    """Flat per-requirement rows for a CSV export of the framework's gap report.
+
+    Each requirement contributes one row regardless of satisfier count;
+    satisfiers are concatenated as ``name (type) via edge_type; ...`` so the
+    row stays grep-friendly in a spreadsheet.
+    """
+    fw = await pool.fetchrow(
+        """SELECT id FROM assets WHERE id = $1 AND type = 'framework'
+           AND ($2::uuid IS NULL OR organization_id = $2)""",
+        framework_id, organization_id,
+    )
+    if not fw:
+        return []
+    req_ids = await _requirement_ids(pool, framework_id)
+    statuses = await _requirement_statuses(pool, req_ids)
+    last_audited = await _last_audited_for_requirements(pool, req_ids)
+    rows: list[dict[str, Any]] = []
+    for r in statuses:
+        sat_str = "; ".join(
+            f"{s['name']} ({s['type']}) via {s['via']}" for s in r.satisfiers
+        )
+        rows.append({
+            "requirement_id": str(r.id),
+            "requirement_name": r.name,
+            "satisfied": "yes" if r.satisfied else "no",
+            "satisfier_count": len(r.satisfiers),
+            "satisfiers": sat_str,
+            "last_audited": (
+                last_audited[r.id].isoformat() if last_audited.get(r.id) else ""
+            ),
+        })
+    return rows
+
+
+async def _last_audited_for_requirements(
+    pool: asyncpg.Pool, req_ids: list[UUID]
+) -> dict[UUID, Any]:
+    """Most-recent audit_log timestamp tied to each requirement or its satisfiers.
+
+    "Audited" here means any update event recorded against the requirement
+    asset itself or any of its satisfier assets — that's the proxy we have
+    until per-audit reports land. Returns {req_id: datetime|None}.
+    """
+    if not req_ids:
+        return {}
+    # Build the (req_id → satisfier_ids) graph in one query, then ask the
+    # audit_log for the most recent update timestamp across that union.
+    rels = await pool.fetch(
+        """SELECT r.source_asset_id AS req_id, r.target_asset_id AS sat_id
+           FROM relationships r
+           WHERE r.source_asset_id = ANY($1::uuid[])
+             AND r.relationship_type = ANY($2::text[])
+           UNION
+           SELECT r.target_asset_id AS req_id, r.source_asset_id AS sat_id
+           FROM relationships r
+           WHERE r.target_asset_id = ANY($1::uuid[])
+             AND r.relationship_type = ANY($3::text[])""",
+        req_ids,
+        list(_OUTBOUND_SATISFIES),
+        list(_INBOUND_SATISFIES),
+    )
+    sats_by_req: dict[UUID, set[UUID]] = {rid: {rid} for rid in req_ids}
+    for r in rels:
+        sats_by_req.setdefault(r["req_id"], {r["req_id"]}).add(r["sat_id"])
+
+    all_ids = {rid for ids in sats_by_req.values() for rid in ids}
+    if not all_ids:
+        return {rid: None for rid in req_ids}
+
+    # Pull the most recent update timestamp per asset id from audit_log.
+    audit_rows = await pool.fetch(
+        """SELECT entity_id, max(created_at) AS last_at
+           FROM audit_log
+           WHERE entity_type = 'asset'
+             AND entity_id = ANY($1::uuid[])
+             AND action IN ('create', 'update')
+           GROUP BY entity_id""",
+        list(all_ids),
+    )
+    last_by_asset = {r["entity_id"]: r["last_at"] for r in audit_rows}
+
+    out: dict[UUID, Any] = {}
+    for rid, sat_ids in sats_by_req.items():
+        timestamps = [last_by_asset.get(sid) for sid in sat_ids if last_by_asset.get(sid)]
+        out[rid] = max(timestamps) if timestamps else None
+    return out
+
+
+async def list_controls_with_coverage(
+    pool: asyncpg.Pool, *, organization_id: UUID | None = None
+) -> list[dict[str, Any]]:
+    """Inverted view: every Control asset and the requirements it covers.
+
+    The graph stores satisfaction as ``control --[satisfies]--> requirement``
+    or ``requirement --[satisfied_by/implemented_by]--> control``; both edges
+    count here so admins see the full picture without having to chase the
+    direction.
+    """
+    rows = await pool.fetch(
+        """SELECT c.id AS control_id, c.name AS control_name,
+                  c.metadata AS control_meta,
+                  rq.id AS req_id, rq.name AS req_name, fw.id AS fw_id,
+                  fw.name AS fw_name
+           FROM assets c
+           LEFT JOIN relationships r
+                  ON ((r.source_asset_id = c.id AND r.relationship_type = 'satisfies')
+                   OR (r.target_asset_id = c.id AND r.relationship_type = ANY($2::text[])))
+           LEFT JOIN assets rq ON rq.id = CASE
+                WHEN r.source_asset_id = c.id THEN r.target_asset_id
+                ELSE r.source_asset_id
+           END AND rq.type = 'requirement'
+           LEFT JOIN relationships fr
+                  ON fr.target_asset_id = rq.id AND fr.relationship_type = 'parent_of'
+           LEFT JOIN assets fw
+                  ON fw.id = fr.source_asset_id AND fw.type = 'framework'
+           WHERE c.type = 'control'
+             AND ($1::uuid IS NULL OR c.organization_id = $1)
+           ORDER BY c.name""",
+        organization_id,
+        list(_OUTBOUND_SATISFIES),
+    )
+    by_control: dict[UUID, dict[str, Any]] = {}
+    for r in rows:
+        bucket = by_control.setdefault(r["control_id"], {
+            "id": r["control_id"],
+            "name": r["control_name"],
+            "metadata": _parse_metadata(r["control_meta"]),
+            "requirements": [],
+        })
+        if r["req_id"] is None:
+            continue
+        bucket["requirements"].append({
+            "id": r["req_id"],
+            "name": r["req_name"],
+            "framework_id": r["fw_id"],
+            "framework_name": r["fw_name"],
+        })
+    return list(by_control.values())
+
+
 async def _in_scope_assets(
     pool: asyncpg.Pool, req_ids: list[UUID]
 ) -> list[dict[str, Any]]:

@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Control Library - GRCen{% endblock %}
+
+{% block content %}
+<h1>Control Library</h1>
+<p>Every control asset and the requirements it covers — the inverse of the
+   per-framework gap view. Coverage edges include both
+   <code>control --[satisfies]--&gt; requirement</code> and
+   <code>requirement --[satisfied_by/implemented_by]--&gt; control</code>.</p>
+
+{% if not controls %}
+<p>No controls defined yet.</p>
+{% else %}
+<table class="table">
+    <thead>
+        <tr>
+            <th>Control</th>
+            <th>Requirements covered</th>
+            <th>Frameworks</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for c in controls %}
+        <tr>
+            <td>
+                <a href="/assets/{{ c.id }}">{{ c.name }}</a>
+                {% if c.metadata.effectiveness %}
+                <small style="color:#6b7280;">({{ c.metadata.effectiveness | replace('_', ' ') }})</small>
+                {% endif %}
+            </td>
+            <td>
+                {% if c.requirements %}
+                <ul style="margin:0;padding-left:1.25rem;">
+                {% for r in c.requirements %}
+                    <li><a href="/assets/{{ r.id }}">{{ r.name }}</a></li>
+                {% endfor %}
+                </ul>
+                {% else %}
+                <em style="color:#b91c1c;">none</em>
+                {% endif %}
+            </td>
+            <td>
+                {% set frameworks = c.requirements | map(attribute='framework_name') | reject('none') | unique | list %}
+                {% if frameworks %}
+                {{ frameworks | join(', ') }}
+                {% else %}
+                <em style="color:#6b7280;">—</em>
+                {% endif %}
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+{% endblock %}
