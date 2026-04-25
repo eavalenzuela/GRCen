@@ -3,6 +3,11 @@
 Reads SMTP settings from the database, sends via aiosmtplib, and records every
 attempt in ``notification_deliveries``. Failures are logged and returned as a
 status — callers (e.g. alert firing) should never crash because email was down.
+
+Messages are sent as ``multipart/alternative`` with both a plain-text body
+(for terminal mail clients) and an HTML body (for everyone else). The
+:func:`render_alert_email` helper wraps the alert templates and the
+unsubscribe-link footer.
 """
 
 import logging
@@ -12,12 +17,35 @@ from uuid import UUID
 
 import aiosmtplib
 import asyncpg
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 
+from grcen.config import settings as app_settings
 from grcen.services import encryption_config
 from grcen.services import smtp_settings as smtp_svc
 from grcen.services.encryption import decrypt_field
 
 log = logging.getLogger(__name__)
+
+_email_env = Environment(
+    loader=FileSystemLoader("src/grcen/templates"),
+    autoescape=select_autoescape(["html"]),
+)
+
+
+def render_alert_email(alert, asset_name: str, link: str) -> tuple[str, str]:
+    """Render the (text, html) bodies for an alert notification."""
+    base_url = app_settings.APP_BASE_URL.rstrip("/")
+    ctx = {
+        "alert": alert,
+        "asset_name": asset_name,
+        "link": link,
+        "app_name": app_settings.APP_NAME,
+        "subject": f"[{app_settings.APP_NAME}] {alert.title}",
+        "unsubscribe_url": f"{base_url}/settings",
+    }
+    text = _email_env.get_template("emails/alert.txt").render(**ctx)
+    html = _email_env.get_template("emails/alert.html").render(**ctx)
+    return text, html
 
 
 async def send_email(
@@ -26,10 +54,11 @@ async def send_email(
     to: str,
     subject: str,
     body: str,
+    html_body: str | None = None,
     alert_id: UUID | None = None,
     user_id: UUID | None = None,
 ) -> tuple[bool, str | None]:
-    """Send a plain-text email. Returns (ok, error_message)."""
+    """Send an email (plain-text by default, multipart when ``html_body`` is set)."""
     settings = await smtp_svc.get_settings(pool)
     if not settings.is_enabled:
         await _log_delivery(
@@ -46,6 +75,14 @@ async def send_email(
     msg["To"] = to
     msg["Subject"] = subject
     msg.set_content(body)
+    if html_body:
+        msg.add_alternative(html_body, subtype="html")
+        # Use a stable List-Unsubscribe header so MUAs surface a one-click
+        # unsubscribe action. The URL points at /settings where the user can
+        # toggle email_notifications_enabled.
+        unsub = f"{app_settings.APP_BASE_URL.rstrip('/')}/settings"
+        msg["List-Unsubscribe"] = f"<{unsub}>"
+        msg["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
 
     try:
         await aiosmtplib.send(

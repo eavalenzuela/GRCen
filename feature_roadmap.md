@@ -69,8 +69,8 @@ Local users can enroll a TOTP second factor from `/settings` — the page shows 
 ### 19. Backup Encryption & Secrets Management — **SHIPPED (backup + IP allowlist)**
 `grcen backup <out>` runs `pg_dump` and writes an AES-256-GCM-encrypted file (magic header `GRCBKP\x01`, fresh nonce per 64 KiB chunk, EOF marker), keyed off the existing `ENCRYPTION_KEY` via HKDF salt `backup-salt`. `grcen restore <in>` decrypts and pipes through `psql -v ON_ERROR_STOP=1`. Stream format pinned by tests with explicit reject paths for missing magic, truncation, and key mismatch. Separately: `api_tokens.allowed_ips TEXT[]` constrains where a token can be used; `routers.deps` passes the request IP to `validate_token` and the token is rejected when the list is non-empty and the caller's IP isn't in it. Empty list = no restriction (default). Remaining: CIDR ranges (currently exact-match strings only), OAuth 2.0 client-credentials flow, admin UI for editing `allowed_ips` on existing tokens, and rotating the backup-derivation salt to invalidate old backups when a key is retired.
 
-### 20. HTML Email Templates
-Current alert emails are plain text. Once webhook is in, add a small HTML template layer with unsubscribe link and branded header.
+### 20. HTML Email Templates — **SHIPPED**
+Outbound alert emails are now `multipart/alternative` (plain-text + HTML branded shell). Templates live in `templates/emails/_layout.html`, `alert.html`, `alert.txt`; `email_service.render_alert_email` returns the (text, html) pair and `send_email` accepts an optional `html_body=` plus stamps a `List-Unsubscribe` / `List-Unsubscribe-Post: List-Unsubscribe=One-Click` header pointing at `/settings`. The footer link in both bodies sends users to `/settings`, where they can flip `email_notifications_enabled` off — that's the unsubscribe action. Autoescape on for HTML so user-supplied alert titles can't smuggle markup. Remaining: per-org branding (logo / colors), digest mode that batches several alert emails into one envelope, and webhook-driven email previews in the admin UI.
 
 ---
 

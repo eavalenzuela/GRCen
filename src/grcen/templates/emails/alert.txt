@@ -1,0 +1,11 @@
+{{ alert.title }}
+{% if alert.message %}
+{{ alert.message }}
+{% endif %}
+Asset: {{ asset_name }}
+Link:  {{ link }}
+
+---
+You are receiving this email because notifications are enabled on your
+{{ app_name }} account. Manage your notification preferences at:
+{{ unsubscribe_url }}

@@ -180,21 +180,15 @@ async def _deliver_email(
         return
 
     subject = f"[GRCen] {alert.title}"
-    body_lines = [alert.title]
-    if alert.message:
-        body_lines.append("")
-        body_lines.append(alert.message)
-    body_lines.append("")
-    body_lines.append(f"Asset: {asset_name}")
-    body_lines.append(f"Link:  {link}")
-    body = "\n".join(body_lines)
+    text_body, html_body = email_service.render_alert_email(alert, asset_name, link)
 
     for user_id, email in recipients:
         await email_service.send_email(
             pool,
             to=email,
             subject=subject,
-            body=body,
+            body=text_body,
+            html_body=html_body,
             alert_id=alert.id,
             user_id=user_id,
         )
