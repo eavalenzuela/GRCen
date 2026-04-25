@@ -19,7 +19,7 @@
             }
         }
         body { font-family: "Helvetica", Arial, sans-serif; color: #111827; font-size: 10pt; line-height: 1.4; }
-        h1 { font-size: 20pt; margin: 0 0 0.5rem 0; color: #1e293b; }
+        h1 { font-size: 20pt; margin: 0 0 0.5rem 0; color: {{ brand_color or '#1e293b' }}; }
         h2 { font-size: 13pt; margin: 1.2rem 0 0.5rem 0; border-bottom: 1px solid #d1d5db; padding-bottom: 0.2rem; color: #374151; }
         h3 { font-size: 11pt; margin: 0.8rem 0 0.3rem 0; color: #4b5563; }
         table { width: 100%; border-collapse: collapse; margin: 0.4rem 0 0.8rem 0; }
@@ -32,14 +32,23 @@
         .pill-warn { background: #fef3c7; color: #92400e; }
         .pill-bad { background: #fee2e2; color: #991b1b; }
         .muted { color: #6b7280; }
-        .header-strap { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 2px solid #1e293b; padding-bottom: 0.4rem; margin-bottom: 0.8rem; }
+        .header-strap { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid {{ brand_color or '#1e293b' }}; padding-bottom: 0.4rem; margin-bottom: 0.8rem; }
         .header-strap small { color: #6b7280; }
+        .header-strap img { max-height: 32pt; }
+        .cover { text-align: center; padding: 4rem 0 3rem 0; page-break-after: always; }
+        .cover .org-name { font-size: 16pt; color: #6b7280; margin-bottom: 0.5rem; }
+        .cover h1 { font-size: 28pt; }
+        .cover .subtitle { font-size: 12pt; color: #6b7280; margin-top: 1rem; }
     </style>
 </head>
 <body>
+    {% block cover %}{% endblock %}
     <div class="header-strap">
         <h1>{% block heading %}GRCen Report{% endblock %}</h1>
-        <small>Generated {{ generated_at.strftime('%Y-%m-%d %H:%M UTC') }}</small>
+        <div style="display:flex;align-items:center;gap:0.6rem;">
+            {% if logo_url %}<img src="{{ logo_url }}" alt="">{% endif %}
+            <small>Generated {{ generated_at.strftime('%Y-%m-%d %H:%M UTC') }}</small>
+        </div>
     </div>
     {% block content %}{% endblock %}
 </body>

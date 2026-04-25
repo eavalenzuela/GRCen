@@ -102,8 +102,10 @@ async def redact_metadata_async(
     asset_type: AssetType | str | None,
     user: User | None,
     organization_id: UUID,
+    *,
+    asset_id: UUID | None = None,
 ) -> dict[str, Any]:
-    """Async variant that picks up per-org overrides."""
+    """Async variant that picks up per-org and per-asset overrides."""
     if not metadata or can_view_pii(user) or asset_type is None:
         return redact_metadata(metadata, asset_type, user)
     if isinstance(asset_type, str):
@@ -112,7 +114,53 @@ async def redact_metadata_async(
         except ValueError:
             return metadata
     fields = await effective_sensitive_field_names(pool, asset_type, organization_id)
+    if asset_id is not None:
+        per_asset = await pool.fetch(
+            """SELECT field_name, sensitive FROM asset_sensitive_overrides
+               WHERE asset_id = $1""",
+            asset_id,
+        )
+        for r in per_asset:
+            if r["sensitive"]:
+                fields.add(r["field_name"])
+            else:
+                fields.discard(r["field_name"])
     return redact_metadata(metadata, asset_type, user, sensitive_fields=fields)
+
+
+# ── per-asset overrides admin API ──────────────────────────────────────
+
+
+async def list_asset_overrides(
+    pool: asyncpg.Pool, asset_id: UUID
+) -> dict[str, bool]:
+    rows = await pool.fetch(
+        "SELECT field_name, sensitive FROM asset_sensitive_overrides WHERE asset_id = $1",
+        asset_id,
+    )
+    return {r["field_name"]: r["sensitive"] for r in rows}
+
+
+async def upsert_asset_override(
+    pool: asyncpg.Pool, asset_id: UUID, field_name: str, sensitive: bool
+) -> None:
+    await pool.execute(
+        """INSERT INTO asset_sensitive_overrides (asset_id, field_name, sensitive, updated_at)
+           VALUES ($1, $2, $3, now())
+           ON CONFLICT (asset_id, field_name) DO UPDATE SET
+               sensitive = EXCLUDED.sensitive,
+               updated_at = now()""",
+        asset_id, field_name, sensitive,
+    )
+
+
+async def clear_asset_override(
+    pool: asyncpg.Pool, asset_id: UUID, field_name: str
+) -> None:
+    await pool.execute(
+        "DELETE FROM asset_sensitive_overrides WHERE asset_id = $1 AND field_name = $2",
+        asset_id, field_name,
+    )
 
 
 # ── overrides admin API ─────────────────────────────────────────────────

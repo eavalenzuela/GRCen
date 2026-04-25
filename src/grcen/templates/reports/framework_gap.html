@@ -1,0 +1,39 @@
+{% extends "reports/_base.html" %}
+{% block title %}{{ framework_name }} Gap Report{% endblock %}
+{% block page_title %}{{ framework_name }} Gap Report{% endblock %}
+{% block heading %}{{ framework_name }} — Gap Report{% endblock %}
+{% block cover %}{% include "reports/_cover.html" %}{% endblock %}
+{% block content %}
+<p>
+    <span class="pill pill-ok">{{ satisfied_count }} satisfied</span>
+    <span class="pill pill-bad">{{ gap_count }} gap{{ 's' if gap_count != 1 else '' }}</span>
+    out of {{ rows|length }} requirements.
+</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>Status</th>
+            <th>Requirement</th>
+            <th>Satisfiers</th>
+            <th>Last audited</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for r in rows %}
+        <tr>
+            <td>
+                {% if r.satisfied == 'yes' %}
+                <span class="pill pill-ok">satisfied</span>
+                {% else %}
+                <span class="pill pill-bad">gap</span>
+                {% endif %}
+            </td>
+            <td>{{ r.requirement_name }}</td>
+            <td class="muted">{{ r.satisfiers or '—' }}</td>
+            <td class="muted">{{ r.last_audited[:10] if r.last_audited else 'never' }}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

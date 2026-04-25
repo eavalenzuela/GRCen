@@ -508,6 +508,12 @@ DO $$ BEGIN
     CREATE TYPE pending_change_action AS ENUM ('create', 'update', 'delete');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
+-- Relationship-action variants for workflow #39.
+DO $$ BEGIN ALTER TYPE pending_change_action ADD VALUE 'relationship_create';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER TYPE pending_change_action ADD VALUE 'relationship_delete';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
 CREATE TABLE IF NOT EXISTS pending_changes (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     action          pending_change_action NOT NULL,
@@ -650,6 +656,23 @@ DO $$ BEGIN
         ADD COLUMN required_approvals INTEGER NOT NULL DEFAULT 1;
 EXCEPTION WHEN duplicate_column THEN NULL; END $$;
 
+-- Relationship-action gating lives on the source asset's workflow_config row.
+DO $$ BEGIN
+    ALTER TABLE workflow_config
+        ADD COLUMN require_approval_relationship_create BOOLEAN NOT NULL DEFAULT false;
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN
+    ALTER TABLE workflow_config
+        ADD COLUMN require_approval_relationship_delete BOOLEAN NOT NULL DEFAULT false;
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+
+-- Approver routing: when set, only users with this exact role may approve
+-- pending changes for this asset type. NULL means "anyone with APPROVE
+-- permission" (the prior behaviour).
+DO $$ BEGIN
+    ALTER TABLE workflow_config ADD COLUMN approver_role user_role;
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+
 CREATE TABLE IF NOT EXISTS pending_change_approvals (
     pending_change_id  UUID NOT NULL REFERENCES pending_changes(id) ON DELETE CASCADE,
     approver_id        UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -673,6 +696,23 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_column THEN NULL; END $$;
 CREATE INDEX IF NOT EXISTS idx_notifications_user
     ON notifications(user_id) WHERE user_id IS NOT NULL;
+
+-- Widen user_totp.secret so the encrypted-at-rest form fits.
+DO $$ BEGIN
+    ALTER TABLE user_totp ALTER COLUMN secret TYPE TEXT;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
+-- Per-asset overrides for the sensitive flag. Lets an admin mark a field
+-- sensitive on one specific asset (e.g. one HR record) without affecting
+-- the rest of the type. Layered on top of the per-org overrides table.
+CREATE TABLE IF NOT EXISTS asset_sensitive_overrides (
+    asset_id    UUID NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
+    field_name  VARCHAR(120) NOT NULL,
+    sensitive   BOOLEAN NOT NULL,
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (asset_id, field_name)
+);
 
 -- Per-org overrides for the code-default `sensitive` flag on custom fields.
 -- Lets admins mark a field sensitive at runtime without touching custom_fields.py.

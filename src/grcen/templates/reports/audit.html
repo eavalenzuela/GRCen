@@ -1,0 +1,64 @@
+{% extends "reports/_base.html" %}
+{% block title %}{{ audit.name }} Audit Report{% endblock %}
+{% block page_title %}{{ audit.name }} Audit Report{% endblock %}
+{% block heading %}{{ audit.name }}{% endblock %}
+{% block cover %}{% include "reports/_cover.html" %}{% endblock %}
+{% block content %}
+<div class="meta-grid">
+    <div><small>Status</small>{{ audit.status.value | title }}</div>
+    <div><small>Owner</small>{{ audit.owner or '—' }}</div>
+    <div><small>Created</small>{{ audit.created_at.strftime('%Y-%m-%d') }}</div>
+    <div><small>Updated</small>{{ audit.updated_at.strftime('%Y-%m-%d') }}</div>
+</div>
+
+{% if audit.description %}
+<h2>Description</h2>
+<p>{{ audit.description }}</p>
+{% endif %}
+
+<h2>Frameworks certified</h2>
+{% if frameworks %}
+<table>
+    <thead><tr><th>Framework</th></tr></thead>
+    <tbody>
+    {% for f in frameworks %}
+        <tr><td>{{ f.name }}</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p class="muted">No <code>certifies</code> edges from this audit yet.</p>
+{% endif %}
+
+<h2>Findings (incidents)</h2>
+{% if findings %}
+<table>
+    <thead><tr><th>Incident</th><th>Status</th></tr></thead>
+    <tbody>
+    {% for f in findings %}
+        <tr><td>{{ f.name }}</td><td>{{ f.status }}</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p class="muted">No incidents recorded for this audit.</p>
+{% endif %}
+
+<h2>In-scope assets</h2>
+{% if in_scope %}
+<table>
+    <thead><tr><th>Type</th><th>Asset</th><th>Status</th></tr></thead>
+    <tbody>
+    {% for a in in_scope %}
+        <tr>
+            <td>{{ a.type | replace('_', ' ') | title }}</td>
+            <td>{{ a.name }}</td>
+            <td>{{ a.status }}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p class="muted">No other assets linked to this audit.</p>
+{% endif %}
+{% endblock %}

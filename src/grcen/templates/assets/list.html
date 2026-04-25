@@ -3,9 +3,14 @@
 {% block content %}
 <div class="page-header">
     <h1>Assets</h1>
-    {% if has_perm(user.role, Permission.CREATE) %}
-    <a href="/assets/new" class="btn btn-primary">New Asset</a>
-    {% endif %}
+    <div>
+        {% if has_perm(user.role, Permission.EXPORT) %}
+        <a href="/exports/assets.pdf?{{ request.url.query }}" class="btn">Download PDF</a>
+        {% endif %}
+        {% if has_perm(user.role, Permission.CREATE) %}
+        <a href="/assets/new" class="btn btn-primary">New Asset</a>
+        {% endif %}
+    </div>
 </div>
 
 {% include "partials/saved_searches.html" %}

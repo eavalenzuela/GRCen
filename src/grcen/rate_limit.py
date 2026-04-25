@@ -45,6 +45,53 @@ def _classify(method: str) -> str:
     return "read" if method.upper() in _READ_METHODS else "write"
 
 
+# DB-backed overrides for the env-default rate-limit budgets. Looked up at
+# request time; cached for ~30 s to avoid hammering the DB on every request.
+_db_cache: dict[str, str] | None = None
+_db_cache_at: float = 0.0
+_DB_CACHE_TTL = 30.0
+
+
+def invalidate_settings_cache() -> None:
+    """Force the next limiter check to reload DB settings.
+
+    Tests and the admin form call this so changes are visible immediately
+    instead of waiting out the TTL.
+    """
+    global _db_cache, _db_cache_at
+    _db_cache = None
+    _db_cache_at = 0.0
+
+
+async def _load_db_settings(pool) -> dict[str, str]:
+    """Pull rate-limit-related rows from app_settings into a dict."""
+    rows = await pool.fetch(
+        "SELECT key, value FROM app_settings WHERE key LIKE 'rate_limit_%'"
+    )
+    return {r["key"]: r["value"] for r in rows}
+
+
+def _read_db_setting(name: str) -> str | None:
+    if _db_cache is None:
+        return None
+    return _db_cache.get(name)
+
+
+def _resolve_setting(name: str, env_default):
+    """Prefer DB override, fall back to the env-derived setting."""
+    db = _read_db_setting(name)
+    if db is None:
+        return env_default
+    if isinstance(env_default, int):
+        try:
+            return int(db)
+        except ValueError:
+            return env_default
+    if isinstance(env_default, bool):
+        return db.lower() in ("1", "true", "yes")
+    return db
+
+
 def _parse_route_overrides(raw: str) -> list[tuple[str, int, int]]:
     """Parse the RATE_LIMIT_ROUTE_OVERRIDES setting.
 
@@ -73,13 +120,16 @@ def _parse_route_overrides(raw: str) -> list[tuple[str, int, int]]:
 
 def _resolve_limits(path: str) -> tuple[int, int, str]:
     """Return (read_limit, write_limit, matching_prefix_or_empty) for ``path``."""
-    overrides = _parse_route_overrides(settings.RATE_LIMIT_ROUTE_OVERRIDES)
+    raw = _resolve_setting(
+        "rate_limit_route_overrides", settings.RATE_LIMIT_ROUTE_OVERRIDES
+    )
+    overrides = _parse_route_overrides(raw or "")
     for prefix, r, w in overrides:
         if path.startswith(prefix):
             return r, w, prefix
     return (
-        settings.RATE_LIMIT_READ_PER_MINUTE,
-        settings.RATE_LIMIT_WRITE_PER_MINUTE,
+        _resolve_setting("rate_limit_read_per_minute", settings.RATE_LIMIT_READ_PER_MINUTE),
+        _resolve_setting("rate_limit_write_per_minute", settings.RATE_LIMIT_WRITE_PER_MINUTE),
         "",
     )
 
@@ -103,6 +153,21 @@ def _api_caller_key(request: Request) -> str:
         return f"session:{sid}"
     ip = request.client.host if request.client else "unknown"
     return f"ip:{ip}"
+
+
+async def refresh_db_settings(pool) -> None:
+    """Populate the in-memory cache from app_settings (called by middleware)."""
+    global _db_cache, _db_cache_at
+    _db_cache = await _load_db_settings(pool)
+    import time as _t
+    _db_cache_at = _t.monotonic()
+
+
+def _cache_fresh() -> bool:
+    if _db_cache is None:
+        return False
+    import time as _t
+    return (_t.monotonic() - _db_cache_at) < _DB_CACHE_TTL
 
 
 def check_api_rate_limit(request: Request) -> tuple[int, int, float] | None:

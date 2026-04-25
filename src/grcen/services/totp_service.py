@@ -18,8 +18,24 @@ import pyotp
 import qrcode
 
 from grcen.config import settings
+from grcen.services import encryption_config
+from grcen.services.encryption import decrypt_field, encrypt_field
 
 _ISSUER = "GRCen"
+_TOTP_SCOPE = "totp_secrets"
+
+
+async def _maybe_encrypt_secret(pool: asyncpg.Pool, secret: str) -> str:
+    """Encrypt the TOTP secret when the totp_secrets scope is active."""
+    if await encryption_config.is_scope_active(pool, _TOTP_SCOPE):
+        return encrypt_field(secret, _TOTP_SCOPE)
+    return secret
+
+
+def _maybe_decrypt_secret(secret: str) -> str:
+    """decrypt_field is a no-op on plaintext, so this is safe even when the
+    scope hasn't been activated yet (mixed-state migration window)."""
+    return decrypt_field(secret, _TOTP_SCOPE)
 
 
 def generate_secret() -> str:
@@ -68,7 +84,7 @@ async def get_enrollment(pool: asyncpg.Pool, user_id: UUID) -> dict | None:
     if not row:
         return None
     return {
-        "secret": row["secret"],
+        "secret": _maybe_decrypt_secret(row["secret"]),
         "recovery_codes": list(row["recovery_codes"] or []),
         "enabled": row["enabled"],
     }
@@ -90,6 +106,7 @@ async def begin_enrollment(
     secret = generate_secret()
     recovery_plain = generate_recovery_codes()
     recovery_hashed = [_hash_code(c) for c in recovery_plain]
+    stored_secret = await _maybe_encrypt_secret(pool, secret)
     await pool.execute(
         """INSERT INTO user_totp (user_id, secret, recovery_codes, enabled)
            VALUES ($1, $2, $3, false)
@@ -99,7 +116,7 @@ async def begin_enrollment(
                enabled = false,
                updated_at = now()""",
         user_id,
-        secret,
+        stored_secret,
         recovery_hashed,
     )
     return secret, recovery_plain

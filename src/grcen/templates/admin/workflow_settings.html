@@ -43,6 +43,33 @@
                            style="width:4rem;">
                 </td>
             </tr>
+            <tr>
+                <td colspan="5" style="background:#f8fafc;font-size:0.9em;color:#374151;">
+                    Outbound edges from {{ cfg.asset_type }} —
+                    <label>
+                        <input type="checkbox" name="rel_create_{{ cfg.asset_type }}"
+                            {% if cfg.require_approval_relationship_create %}checked{% endif %}>
+                        require approval to add
+                    </label>
+                    &nbsp;|&nbsp;
+                    <label>
+                        <input type="checkbox" name="rel_delete_{{ cfg.asset_type }}"
+                            {% if cfg.require_approval_relationship_delete %}checked{% endif %}>
+                        require approval to remove
+                    </label>
+                    &nbsp;|&nbsp;
+                    <label>
+                        Approver role:
+                        <select name="approver_role_{{ cfg.asset_type }}">
+                            <option value="" {% if not cfg.approver_role %}selected{% endif %}>any approver</option>
+                            <option value="admin" {% if cfg.approver_role == 'admin' %}selected{% endif %}>admin only</option>
+                            <option value="editor" {% if cfg.approver_role == 'editor' %}selected{% endif %}>editor only</option>
+                            <option value="auditor" {% if cfg.approver_role == 'auditor' %}selected{% endif %}>auditor only</option>
+                            <option value="viewer" {% if cfg.approver_role == 'viewer' %}selected{% endif %}>viewer only</option>
+                        </select>
+                    </label>
+                </td>
+            </tr>
             {% endfor %}
         </tbody>
     </table>

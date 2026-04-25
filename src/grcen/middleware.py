@@ -7,7 +7,7 @@ from fastapi import HTTPException, Request
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import JSONResponse, RedirectResponse, Response
 
-from grcen.rate_limit import check_api_rate_limit
+from grcen.rate_limit import check_api_rate_limit, refresh_db_settings, _cache_fresh
 
 # ---------------------------------------------------------------------------
 # Security headers middleware
@@ -114,6 +114,15 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         path = request.url.path
         if any(path == p or path.startswith(p) for p in _RATE_LIMIT_EXEMPT_PREFIXES):
             return await call_next(request)
+        # Refresh the DB-backed override cache opportunistically so admin form
+        # edits propagate to all workers within the TTL.
+        if not _cache_fresh():
+            try:
+                from grcen.database import get_pool
+                await refresh_db_settings(await get_pool())
+            except Exception:
+                # Pool not initialised yet (test bootstrap) — fall back to env.
+                pass
         result = check_api_rate_limit(request)
         if result is not None:
             _, limit, retry_after = result

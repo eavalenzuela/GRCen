@@ -131,6 +131,16 @@ SCOPE_ASSET_METADATA = EncryptionScope(
     warning="Encrypted metadata cannot be searched with PostgreSQL JSON operators.",
 )
 
+SCOPE_TOTP_SECRETS = EncryptionScope(
+    name="totp_secrets",
+    display_name="TOTP secrets",
+    description="Per-user TOTP shared secrets in user_totp.secret",
+    targets=(
+        FieldTarget(table="user_totp", column="secret"),
+    ),
+    warning="Existing TOTP rows are not retroactively encrypted; they re-encrypt on next confirm/disable.",
+)
+
 SCOPE_FILE_CONTENTS = EncryptionScope(
     name="file_contents",
     display_name="Uploaded Files",
@@ -149,6 +159,7 @@ ALL_SCOPES: dict[str, EncryptionScope] = {
         SCOPE_SESSION_PII,
         SCOPE_AUDIT_PII,
         SCOPE_ASSET_METADATA,
+        SCOPE_TOTP_SECRETS,
         SCOPE_FILE_CONTENTS,
     ]
 }
@@ -191,6 +202,7 @@ PROFILE_FULL = EncryptionProfile(
         "session_pii",
         "audit_pii",
         "asset_metadata",
+        "totp_secrets",
         "file_contents",
     ),
 )

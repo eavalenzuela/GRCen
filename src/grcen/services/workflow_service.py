@@ -31,6 +31,9 @@ class WorkflowConfig:
     require_approval_update: bool
     require_approval_delete: bool
     required_approvals: int = 1
+    require_approval_relationship_create: bool = False
+    require_approval_relationship_delete: bool = False
+    approver_role: str | None = None
 
 
 @dataclass
@@ -139,6 +142,9 @@ async def get_config(
         require_approval_update=row["require_approval_update"],
         require_approval_delete=row["require_approval_delete"],
         required_approvals=row.get("required_approvals", 1) or 1,
+        require_approval_relationship_create=row.get("require_approval_relationship_create") or False,
+        require_approval_relationship_delete=row.get("require_approval_relationship_delete") or False,
+        approver_role=row.get("approver_role"),
     )
 
 
@@ -158,6 +164,9 @@ async def list_configs(
             require_approval_update=r["require_approval_update"],
             require_approval_delete=r["require_approval_delete"],
             required_approvals=r.get("required_approvals", 1) or 1,
+            require_approval_relationship_create=r.get("require_approval_relationship_create") or False,
+            require_approval_relationship_delete=r.get("require_approval_relationship_delete") or False,
+            approver_role=r.get("approver_role"),
         )
         for r in rows
     }
@@ -172,22 +181,31 @@ async def upsert_config(
     require_approval_update: bool,
     require_approval_delete: bool,
     required_approvals: int = 1,
+    require_approval_relationship_create: bool = False,
+    require_approval_relationship_delete: bool = False,
+    approver_role: str | None = None,
 ) -> None:
     if organization_id is None:
         from grcen.services import organization_service
         organization_id = await organization_service.get_default_org_id(pool)
     if required_approvals < 1:
         required_approvals = 1
+    role_val = approver_role if approver_role in ("admin", "editor", "viewer", "auditor") else None
     await pool.execute(
         """
         INSERT INTO workflow_config (asset_type, organization_id, require_approval_create,
-            require_approval_update, require_approval_delete, required_approvals, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, now())
+            require_approval_update, require_approval_delete, required_approvals,
+            require_approval_relationship_create, require_approval_relationship_delete,
+            approver_role, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now())
         ON CONFLICT (organization_id, asset_type) DO UPDATE SET
             require_approval_create = EXCLUDED.require_approval_create,
             require_approval_update = EXCLUDED.require_approval_update,
             require_approval_delete = EXCLUDED.require_approval_delete,
             required_approvals = EXCLUDED.required_approvals,
+            require_approval_relationship_create = EXCLUDED.require_approval_relationship_create,
+            require_approval_relationship_delete = EXCLUDED.require_approval_relationship_delete,
+            approver_role = EXCLUDED.approver_role,
             updated_at = now()
         """,
         asset_type.value,
@@ -196,6 +214,9 @@ async def upsert_config(
         require_approval_update,
         require_approval_delete,
         required_approvals,
+        require_approval_relationship_create,
+        require_approval_relationship_delete,
+        role_val,
     )
 
 
@@ -213,6 +234,10 @@ async def requires_approval(
         return cfg.require_approval_update
     if action == "delete":
         return cfg.require_approval_delete
+    if action == "relationship_create":
+        return cfg.require_approval_relationship_create
+    if action == "relationship_delete":
+        return cfg.require_approval_relationship_delete
     return False
 
 
@@ -228,7 +253,7 @@ async def submit(
     payload: dict,
     user: User,
 ) -> PendingChange:
-    if action not in ("create", "update", "delete"):
+    if action not in ("create", "update", "delete", "relationship_create", "relationship_delete"):
         raise ValueError(f"Invalid pending-change action: {action}")
     if target_asset_id is not None:
         existing = await pool.fetchrow(
@@ -427,6 +452,15 @@ async def approve(
     cfg = await get_config(pool, asset_type, organization_id=org_id)
     threshold = cfg.required_approvals or 1
 
+    # Approver-role gating: when set, only that role can act. Superadmins
+    # always count regardless of the per-org role mapping.
+    if cfg.approver_role and not approver.is_superadmin:
+        if approver.role.value != cfg.approver_role:
+            raise PermissionError(
+                f"Only users with role '{cfg.approver_role}' may approve "
+                f"changes of type '{cfg.asset_type}'."
+            )
+
     async with pool.acquire() as conn:
         async with conn.transaction():
             await conn.execute(
@@ -536,6 +570,57 @@ async def approve(
                                 **diff,
                             },
                         )
+            elif change.action == "relationship_create":
+                from grcen.services import relationship as rel_svc
+                src = _uuid_or_none(payload.get("source_asset_id"))
+                tgt = _uuid_or_none(payload.get("target_asset_id"))
+                rel_type = payload.get("relationship_type") or ""
+                desc = payload.get("description") or None
+                if not src or not tgt:
+                    raise ValueError("relationship payload missing endpoints")
+                await rel_svc.create_relationship(
+                    conn, organization_id=org_id,
+                    source_asset_id=src, target_asset_id=tgt,
+                    relationship_type=rel_type, description=desc,
+                )
+                await audit_svc.log_audit_event(
+                    conn,
+                    user_id=approver.id,
+                    username=approver.username,
+                    action="create",
+                    entity_type="relationship",
+                    entity_id=None,
+                    entity_name=rel_type,
+                    changes={
+                        "_workflow": {
+                            "submitted_by": change.submitted_by_username,
+                            "pending_change_id": str(change.id),
+                        },
+                    },
+                )
+            elif change.action == "relationship_delete":
+                from grcen.services import relationship as rel_svc
+                rel_id = _uuid_or_none(payload.get("relationship_id"))
+                if not rel_id:
+                    raise ValueError("relationship_id missing from payload")
+                await rel_svc.delete_relationship(
+                    conn, rel_id, organization_id=org_id
+                )
+                await audit_svc.log_audit_event(
+                    conn,
+                    user_id=approver.id,
+                    username=approver.username,
+                    action="delete",
+                    entity_type="relationship",
+                    entity_id=rel_id,
+                    entity_name=str(rel_id),
+                    changes={
+                        "_workflow": {
+                            "submitted_by": change.submitted_by_username,
+                            "pending_change_id": str(change.id),
+                        },
+                    },
+                )
             elif change.action == "delete":
                 old = await asset_svc.get_asset(
                     conn, change.target_asset_id, organization_id=org_id

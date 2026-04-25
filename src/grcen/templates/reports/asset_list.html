@@ -1,0 +1,38 @@
+{% extends "reports/_base.html" %}
+{% block title %}Asset Inventory{% endblock %}
+{% block page_title %}Asset Inventory{% endblock %}
+{% block heading %}Asset Inventory{% endblock %}
+{% block cover %}{% include "reports/_cover.html" %}{% endblock %}
+{% block content %}
+<p>
+    {{ items|length }} of {{ total }} matching assets.
+    {% if filter_summary %}<span class="muted">Filters: {{ filter_summary }}.</span>{% endif %}
+</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>Type</th>
+            <th>Name</th>
+            <th>Status</th>
+            <th>Owner</th>
+            <th>Criticality</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for a in items %}
+        <tr>
+            <td>{{ a.type | replace('_', ' ') | title }}</td>
+            <td>{{ a.name }}</td>
+            <td>{{ a.status | title }}</td>
+            <td class="muted">{{ a.owner or '—' }}</td>
+            <td>
+                {% if a.criticality %}
+                <span class="pill pill-warn">{{ a.criticality | title }}</span>
+                {% else %}—{% endif %}
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

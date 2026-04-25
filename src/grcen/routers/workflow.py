@@ -210,6 +210,8 @@ async def workflow_admin_save(
             required = max(1, int(str(raw)))
         except (ValueError, TypeError):
             required = 1
+        role_raw = str(form.get(f"approver_role_{at.value}", "")).strip()
+        approver_role = role_raw if role_raw in ("admin", "editor", "viewer", "auditor") else None
         await workflow_service.upsert_config(
             pool,
             at,
@@ -218,6 +220,9 @@ async def workflow_admin_save(
             require_approval_update=f"update_{at.value}" in form,
             require_approval_delete=f"delete_{at.value}" in form,
             required_approvals=required,
+            require_approval_relationship_create=f"rel_create_{at.value}" in form,
+            require_approval_relationship_delete=f"rel_delete_{at.value}" in form,
+            approver_role=approver_role,
         )
     return RedirectResponse("/admin/workflow", status_code=302)
 

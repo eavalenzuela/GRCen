@@ -12,9 +12,12 @@ from grcen.schemas.relationship import (
     RelationshipUpdate,
 )
 from grcen.models.asset import AssetType
+from fastapi.responses import JSONResponse
+
 from grcen.services import asset as asset_svc
 from grcen.services import relationship as rel_svc
 from grcen.services import audit_service as audit_svc
+from grcen.services import workflow_service
 
 router = APIRouter(prefix="/api/relationships", tags=["relationships"])
 
@@ -52,6 +55,38 @@ async def create_relationship(
         target = await asset_svc.get_asset(pool, data.target_asset_id, organization_id=user.organization_id)
         if target and target.type == AssetType.PERSON:
             rel_type = "manages"
+
+    # If the workflow gates relationship_create on the source asset's type,
+    # park the request in pending_changes instead of writing it.
+    source_asset = await asset_svc.get_asset(
+        pool, data.source_asset_id, organization_id=user.organization_id
+    )
+    if source_asset and await workflow_service.requires_approval(
+        pool, source_asset.type, "relationship_create",
+        organization_id=user.organization_id,
+    ):
+        change = await workflow_service.submit(
+            pool,
+            action="relationship_create",
+            asset_type=source_asset.type,
+            target_asset_id=data.source_asset_id,
+            title=f"link {source_asset.name} → {rel_type}",
+            payload={
+                "source_asset_id": str(data.source_asset_id),
+                "target_asset_id": str(data.target_asset_id),
+                "relationship_type": rel_type,
+                "description": data.description,
+            },
+            user=user,
+        )
+        return JSONResponse(
+            status_code=202,
+            content={
+                "status": "pending_approval",
+                "pending_change_id": str(change.id),
+                "action": "relationship_create",
+            },
+        )
 
     try:
         rel = await rel_svc.create_relationship(
@@ -135,6 +170,31 @@ async def delete_relationship(
     old = await rel_svc.get_relationship(pool, rel_id)
     if not old:
         raise HTTPException(status_code=404, detail="Relationship not found")
+    # If the gate is on for the source asset's type, queue the delete instead.
+    source = await asset_svc.get_asset(
+        pool, old.source_asset_id, organization_id=user.organization_id
+    )
+    if source and await workflow_service.requires_approval(
+        pool, source.type, "relationship_delete",
+        organization_id=user.organization_id,
+    ):
+        change = await workflow_service.submit(
+            pool,
+            action="relationship_delete",
+            asset_type=source.type,
+            target_asset_id=old.source_asset_id,
+            title=f"unlink {source.name}",
+            payload={"relationship_id": str(rel_id)},
+            user=user,
+        )
+        return JSONResponse(
+            status_code=202,
+            content={
+                "status": "pending_approval",
+                "pending_change_id": str(change.id),
+                "action": "relationship_delete",
+            },
+        )
     deleted = await rel_svc.delete_relationship(pool, rel_id, organization_id=user.organization_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Relationship not found")

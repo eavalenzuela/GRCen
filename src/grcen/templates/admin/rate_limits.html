@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Rate Limits - GRCen{% endblock %}
+
+{% block content %}
+<h1>Rate Limit Budgets</h1>
+<p>Override the env-defined budgets at runtime. Leave a field blank to fall
+   back to the deploy-time default. The middleware refreshes this cache every
+   30 seconds, so changes propagate quickly without a restart.</p>
+
+{% if flash %}
+<div class="callout" style="background:{{ '#e0f2fe' if flash.ok else '#fee2e2' }};padding:0.75rem;margin:0 0 1rem 0;">{{ flash.message }}</div>
+{% endif %}
+
+<form method="post" action="/admin/rate-limits">
+    {% include "partials/csrf.html" %}
+    <div class="form-group">
+        <label>Read budget per minute
+            <input type="number" name="read" min="0" value="{{ db_read }}" placeholder="env: {{ env_read }}">
+        </label>
+        <small style="color:#6b7280;">Applies to GET / HEAD / OPTIONS.</small>
+    </div>
+    <div class="form-group">
+        <label>Write budget per minute
+            <input type="number" name="write" min="0" value="{{ db_write }}" placeholder="env: {{ env_write }}">
+        </label>
+        <small style="color:#6b7280;">Applies to POST / PUT / DELETE / PATCH.</small>
+    </div>
+    <div class="form-group">
+        <label>Per-route overrides
+            <textarea name="overrides" rows="3" style="width:100%;font-family:monospace;font-size:0.9em;"
+                      placeholder="env: {{ env_overrides or '(none)' }}">{{ db_overrides }}</textarea>
+        </label>
+        <small style="color:#6b7280;">
+            Comma-separated entries of the form <code>/path-prefix:read:write</code>
+            (e.g. <code>/api/imports/:30:30,/api/exports/:60:60</code>).
+            Longest matching prefix wins.
+        </small>
+    </div>
+    <button type="submit" class="btn btn-primary">Save</button>
+</form>
+{% endblock %}

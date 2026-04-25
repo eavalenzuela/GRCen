@@ -8,6 +8,9 @@
         <a href="/graph/{{ asset.id }}" class="btn">View Graph</a>
         {% endif %}
         <a href="/assets/{{ asset.id }}/report.pdf" class="btn">Download PDF</a>
+        {% if asset.type.value == 'audit' %}
+        <a href="/assets/{{ asset.id }}/audit-report.pdf" class="btn">Audit Report PDF</a>
+        {% endif %}
         {% if has_perm(user.role, Permission.EDIT) %}
         <a href="/assets/{{ asset.id }}/edit" class="btn">Edit</a>
         {% endif %}
@@ -29,6 +32,41 @@
         {% endif %}
     </div>
 </div>
+
+{% if has_perm(user.role, Permission.MANAGE_USERS) and asset_custom_fields %}
+<details class="card" style="margin-bottom:1rem;">
+    <summary style="cursor:pointer;font-weight:600;">Sensitive field overrides (this asset)</summary>
+    <p style="color:#6b7280;font-size:0.9em;">
+        Per-asset overrides win over the per-type config. Choose <em>Inherit</em> to
+        fall back to the org-wide rules.
+    </p>
+    <form method="post" action="/assets/{{ asset.id }}/sensitive-overrides">
+        {% include "partials/csrf.html" %}
+        <table class="table">
+            <thead>
+                <tr><th>Field</th><th>Override</th></tr>
+            </thead>
+            <tbody>
+            {% for fdef in asset_custom_fields %}
+                {% set val = sensitive_overrides.get(fdef.name) %}
+                {% set choice = 'sensitive' if val is true else ('public' if val is false else 'inherit') %}
+                <tr>
+                    <td><code>{{ fdef.name }}</code> &mdash; {{ fdef.label }}</td>
+                    <td>
+                        <select name="override.{{ fdef.name }}">
+                            <option value="inherit" {% if choice == 'inherit' %}selected{% endif %}>Inherit</option>
+                            <option value="sensitive" {% if choice == 'sensitive' %}selected{% endif %}>Sensitive</option>
+                            <option value="public" {% if choice == 'public' %}selected{% endif %}>Public</option>
+                        </select>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        <button type="submit" class="btn">Save overrides</button>
+    </form>
+</details>
+{% endif %}
 
 {% if pending_changes %}
 <div class="callout" style="background:#fffbe6;padding:0.75rem;margin-bottom:1rem;border-left:4px solid #d4a017;">

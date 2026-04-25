@@ -47,7 +47,8 @@
             </span>
         </h3>
         {% if has_perm(user.role, Permission.EXPORT) %}
-        <a href="/frameworks/{{ detail.framework.id }}/gap-report.csv" class="btn">Download gap report (CSV)</a>
+        <a href="/frameworks/{{ detail.framework.id }}/gap-report.csv" class="btn">Gap CSV</a>
+        <a href="/frameworks/{{ detail.framework.id }}/gap-report.pdf" class="btn">Gap PDF</a>
         {% endif %}
     </div>
     {% if detail.requirements %}

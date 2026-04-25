@@ -1,0 +1,9 @@
+{% if cover_title %}
+<div class="cover">
+    {% if logo_url %}<img src="{{ logo_url }}" alt="" style="max-height:64pt;margin-bottom:1.5rem;"><br>{% endif %}
+    <div class="org-name">{{ org_name }}</div>
+    <h1>{{ cover_title }}</h1>
+    {% if cover_subtitle %}<div class="subtitle">{{ cover_subtitle }}</div>{% endif %}
+    <div class="subtitle">Generated {{ generated_at.strftime('%Y-%m-%d %H:%M UTC') }}</div>
+</div>
+{% endif %}

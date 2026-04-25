@@ -639,6 +639,7 @@ async def asset_detail(
         pool, status="pending", target_asset_id=asset_id,
         organization_id=user.organization_id,
     )
+    sensitive_overrides = await redaction.list_asset_overrides(pool, asset_id)
     return templates.TemplateResponse(request, "assets/detail.html", context={
             "user": user,
             "asset": asset,
@@ -650,6 +651,7 @@ async def asset_detail(
             "asset_custom_fields": CUSTOM_FIELDS.get(asset.type, []),
             "linked_user": linked_user,
             "pending_changes": pending_changes,
+            "sensitive_overrides": sensitive_overrides,
         },
     )
 
@@ -1486,6 +1488,33 @@ async def admin_sensitive_fields(
     )
 
 
+@router.post("/assets/{asset_id}/sensitive-overrides")
+async def asset_sensitive_overrides_save(
+    asset_id: UUID,
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+):
+    """Per-asset sensitive flag overrides — narrower than the per-type page.
+
+    Form submits one entry per field with value 'sensitive', 'public', or
+    'inherit' (drop the row, fall back to type-level rules).
+    """
+    asset = await asset_svc.get_asset(pool, asset_id, organization_id=user.organization_id)
+    if asset is None:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    form = await request.form()
+    for fdef in CUSTOM_FIELDS.get(asset.type, []):
+        choice = str(form.get(f"override.{fdef.name}", "inherit")).strip()
+        if choice == "inherit":
+            await redaction.clear_asset_override(pool, asset_id, fdef.name)
+        elif choice == "sensitive":
+            await redaction.upsert_asset_override(pool, asset_id, fdef.name, True)
+        elif choice == "public":
+            await redaction.upsert_asset_override(pool, asset_id, fdef.name, False)
+    return RedirectResponse(f"/assets/{asset_id}", status_code=302)
+
+
 @router.post("/admin/sensitive-fields")
 async def admin_sensitive_fields_save(
     request: Request,
@@ -2170,6 +2199,73 @@ async def admin_access_log_export(
     )
 
 
+@router.get("/admin/rate-limits", response_class=HTMLResponse)
+async def admin_rate_limits(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+    flash: str | None = None,
+):
+    """Edit the read/write budgets and route overrides without a redeploy."""
+    rows = await pool.fetch(
+        "SELECT key, value FROM app_settings WHERE key LIKE 'rate_limit_%'"
+    )
+    db = {r["key"]: r["value"] for r in rows}
+    notif_count = await alert_svc.count_unread_notifications(
+        pool, organization_id=user.organization_id, user_id=user.id,
+    )
+    flash_ctx = None
+    if flash:
+        ok, _, message = flash.partition(":")
+        flash_ctx = {"ok": ok == "ok", "message": message or flash}
+    return templates.TemplateResponse(
+        request, "admin/rate_limits.html",
+        context={
+            "user": user,
+            "db_read": db.get("rate_limit_read_per_minute", ""),
+            "db_write": db.get("rate_limit_write_per_minute", ""),
+            "db_overrides": db.get("rate_limit_route_overrides", ""),
+            "env_read": settings.RATE_LIMIT_READ_PER_MINUTE,
+            "env_write": settings.RATE_LIMIT_WRITE_PER_MINUTE,
+            "env_overrides": settings.RATE_LIMIT_ROUTE_OVERRIDES,
+            "notif_count": notif_count,
+            "flash": flash_ctx,
+        },
+    )
+
+
+@router.post("/admin/rate-limits")
+async def admin_rate_limits_save(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+):
+    from grcen import rate_limit as rl
+    form = await request.form()
+    pairs: list[tuple[str, str]] = []
+    for key_form, key_db in (
+        ("read", "rate_limit_read_per_minute"),
+        ("write", "rate_limit_write_per_minute"),
+        ("overrides", "rate_limit_route_overrides"),
+    ):
+        raw = str(form.get(key_form, "")).strip()
+        pairs.append((key_db, raw))
+    for key_db, raw in pairs:
+        if raw == "":
+            await pool.execute("DELETE FROM app_settings WHERE key = $1", key_db)
+        else:
+            await pool.execute(
+                """INSERT INTO app_settings (key, value, updated_at)
+                   VALUES ($1, $2, now())
+                   ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()""",
+                key_db, raw,
+            )
+    rl.invalidate_settings_cache()
+    return RedirectResponse(
+        "/admin/rate-limits?flash=ok:Rate-limit settings saved.", status_code=302
+    )
+
+
 @router.post("/admin/access-log/retention")
 async def admin_access_log_retention(
     request: Request,
@@ -2421,6 +2517,87 @@ async def controls_library(
     )
 
 
+@router.get("/frameworks/{framework_id}/gap-report.pdf")
+async def framework_gap_report_pdf(
+    framework_id: UUID,
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.EXPORT)),
+):
+    pdf = await pdf_service.render_framework_gap_report(
+        pool, framework_id, organization_id=user.organization_id
+    )
+    if pdf is None:
+        raise HTTPException(status_code=404, detail="Framework not found")
+    await access_log_service.record(
+        pool, user=user, action="pdf_export",
+        entity_type="framework", entity_id=framework_id,
+        entity_name=f"framework-{framework_id}-gap-report.pdf",
+        path=str(request.url.path),
+        ip_address=request.client.host if request.client else None,
+    )
+    return Response(
+        content=pdf, media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="framework-{framework_id}-gap-report.pdf"'},
+    )
+
+
+@router.get("/assets/{asset_id}/audit-report.pdf")
+async def audit_report_pdf(
+    asset_id: UUID,
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.EXPORT)),
+):
+    """Per-audit dossier PDF — only valid when the asset's type is 'audit'."""
+    pdf = await pdf_service.render_audit_report(
+        pool, asset_id, organization_id=user.organization_id
+    )
+    if pdf is None:
+        raise HTTPException(status_code=404, detail="Audit not found")
+    await access_log_service.record(
+        pool, user=user, action="pdf_export",
+        entity_type="asset", entity_id=asset_id,
+        entity_name=f"audit-{asset_id}.pdf",
+        path=str(request.url.path),
+        ip_address=request.client.host if request.client else None,
+    )
+    return Response(
+        content=pdf, media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="audit-{asset_id}.pdf"'},
+    )
+
+
+@router.get("/exports/assets.pdf")
+async def assets_list_pdf(
+    request: Request,
+    type: str | None = None,
+    q: str | None = None,
+    status: str | None = None,
+    tag: str | None = None,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.EXPORT)),
+):
+    """Filtered asset list as a single PDF dossier."""
+    asset_type = AssetType(type) if type else None
+    pdf = await pdf_service.render_asset_list_report(
+        pool,
+        organization_id=user.organization_id, user=user,
+        asset_type=asset_type, q=q, status=status, tag=tag,
+    )
+    await access_log_service.record(
+        pool, user=user, action="pdf_export",
+        entity_type="asset", entity_id=None,
+        entity_name="assets.pdf",
+        path=str(request.url.path),
+        ip_address=request.client.host if request.client else None,
+    )
+    return Response(
+        content=pdf, media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="assets.pdf"'},
+    )
+
+
 @router.get("/frameworks/{framework_id}/report.pdf")
 async def framework_report_pdf(
     framework_id: UUID,
@@ -2428,7 +2605,9 @@ async def framework_report_pdf(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.VIEW)),
 ):
-    pdf = await pdf_service.render_framework_report(pool, framework_id)
+    pdf = await pdf_service.render_framework_report(
+        pool, framework_id, organization_id=user.organization_id,
+    )
     if pdf is None:
         raise HTTPException(status_code=404, detail="Framework not found")
     await access_log_service.record(
@@ -2453,7 +2632,9 @@ async def asset_report_pdf(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.VIEW)),
 ):
-    pdf = await pdf_service.render_asset_report(pool, asset_id, user=user)
+    pdf = await pdf_service.render_asset_report(
+        pool, asset_id, user=user, organization_id=user.organization_id,
+    )
     if pdf is None:
         raise HTTPException(status_code=404, detail="Asset not found")
     await access_log_service.record(
