@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Active Sessions - GRCen{% endblock %}
+
+{% block content %}
+<h1>Active Sessions</h1>
+<p>Every active session in this organization. Revoking signs the user out
+   of that browser at their next request.</p>
+
+{% if flash %}
+<div class="callout" style="background:{{ '#e0f2fe' if flash.ok else '#fee2e2' }};padding:0.75rem;margin:0 0 1rem 0;">{{ flash.message }}</div>
+{% endif %}
+
+{% if sessions %}
+<table class="table">
+    <thead>
+        <tr>
+            <th>User</th>
+            <th>Started</th>
+            <th>Last active</th>
+            <th>User agent</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for s in sessions %}
+        <tr>
+            <td>{{ s.username }}</td>
+            <td>{{ s.created_at.strftime('%Y-%m-%d %H:%M UTC') }}</td>
+            <td>{{ s.last_active.strftime('%Y-%m-%d %H:%M UTC') }}</td>
+            <td style="font-size:0.85em;color:#6b7280;">{{ (s.user_agent or '')[:80] }}</td>
+            <td>
+                <form method="post" action="/admin/sessions/{{ s.session_id }}/revoke" style="display:inline;"
+                      onsubmit="return confirm('Revoke this session?');">
+                    {% include "partials/csrf.html" %}
+                    <button type="submit" class="btn btn-danger">Revoke</button>
+                </form>
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No active sessions.</p>
+{% endif %}
+{% endblock %}

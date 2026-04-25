@@ -629,6 +629,32 @@ DO $$ BEGIN
         REFERENCES organizations(id) ON DELETE CASCADE;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
+-- Allow system-generated notifications (no alert_id) so the session-cap eviction
+-- and similar UX events have somewhere to land.
+DO $$ BEGIN
+    ALTER TABLE notifications ALTER COLUMN alert_id DROP NOT NULL;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
+-- Targeted notifications (NULL user_id = org-wide, e.g. alert-fired).
+DO $$ BEGIN
+    ALTER TABLE notifications
+        ADD COLUMN user_id UUID REFERENCES users(id) ON DELETE CASCADE;
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+CREATE INDEX IF NOT EXISTS idx_notifications_user
+    ON notifications(user_id) WHERE user_id IS NOT NULL;
+
+-- Per-org overrides for the code-default `sensitive` flag on custom fields.
+-- Lets admins mark a field sensitive at runtime without touching custom_fields.py.
+CREATE TABLE IF NOT EXISTS sensitive_field_overrides (
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    asset_type      VARCHAR(64) NOT NULL,
+    field_name      VARCHAR(120) NOT NULL,
+    sensitive       BOOLEAN NOT NULL,
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (organization_id, asset_type, field_name)
+);
+
 -- Email digest mode: 'immediate' (per-event) or 'digest' (queued + batched
 -- by an hourly job). Per-user toggle that overlays the existing
 -- email_notifications_enabled flag — disabled trumps either mode.

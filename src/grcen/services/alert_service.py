@@ -248,7 +248,14 @@ async def list_notifications(
     unread_only: bool = False,
     *,
     organization_id: UUID | None = None,
+    user_id: UUID | None = None,
 ) -> list[Notification]:
+    """List visible notifications.
+
+    Targeted rows (``user_id`` set) belong to one user; broadcast rows
+    (``user_id IS NULL``) are visible to anyone in the org. When ``user_id``
+    is supplied here, both kinds matching are returned.
+    """
     where = []
     vals = []
     idx = 1
@@ -257,6 +264,10 @@ async def list_notifications(
     if organization_id is not None:
         where.append(f"organization_id = ${idx}")
         vals.append(organization_id)
+        idx += 1
+    if user_id is not None:
+        where.append(f"(user_id IS NULL OR user_id = ${idx})")
+        vals.append(user_id)
         idx += 1
     sql = "SELECT * FROM notifications"
     if where:
@@ -267,12 +278,16 @@ async def list_notifications(
 
 
 async def count_unread_notifications(
-    pool: asyncpg.Pool, *, organization_id: UUID | None = None
+    pool: asyncpg.Pool,
+    *,
+    organization_id: UUID | None = None,
+    user_id: UUID | None = None,
 ) -> int:
     return await pool.fetchval(
         """SELECT count(*) FROM notifications WHERE read = false
-           AND ($1::uuid IS NULL OR organization_id = $1)""",
-        organization_id,
+           AND ($1::uuid IS NULL OR organization_id = $1)
+           AND ($2::uuid IS NULL OR user_id IS NULL OR user_id = $2)""",
+        organization_id, user_id,
     )
 
 

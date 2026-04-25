@@ -23,8 +23,15 @@ class Settings(BaseSettings):
     SESSION_IDLE_TIMEOUT_MINUTES: int = 30
     SESSION_ABSOLUTE_TIMEOUT_MINUTES: int = 480  # 8 hours
     # Cap concurrent sessions per user. 0 = unlimited. When the cap is hit,
-    # the oldest session(s) are evicted to make room for the new one.
+    # the oldest session(s) are evicted to make room for the new one. Per-role
+    # overrides take precedence (admins are typically capped tighter).
     SESSION_MAX_CONCURRENT: int = 5
+    # Per-role overrides: -1 means "use the global default". Admin defaults to
+    # a tighter cap because admin sessions are higher-value targets.
+    SESSION_MAX_CONCURRENT_ADMIN: int = 3
+    SESSION_MAX_CONCURRENT_AUDITOR: int = -1
+    SESSION_MAX_CONCURRENT_EDITOR: int = -1
+    SESSION_MAX_CONCURRENT_VIEWER: int = -1
 
     # Login lockout
     LOGIN_MAX_FAILED_ATTEMPTS: int = 5

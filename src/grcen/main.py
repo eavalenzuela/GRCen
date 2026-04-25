@@ -73,6 +73,13 @@ async def _flush_email_digests():
     await flush_digests(pool)
 
 
+async def _purge_access_log():
+    from grcen.services.access_log_service import purge_expired
+
+    pool = await get_pool()
+    await purge_expired(pool)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_pool()
@@ -90,6 +97,12 @@ async def lifespan(app: FastAPI):
         _flush_email_digests,
         CronTrigger(minute=15),
         id="email_digest_hourly",
+    )
+    # Daily at 03:00 UTC — purge access-log rows past the configured retention.
+    scheduler.add_job(
+        _purge_access_log,
+        CronTrigger(hour=3, minute=0),
+        id="access_log_purge_daily",
     )
     scheduler.start()
     yield

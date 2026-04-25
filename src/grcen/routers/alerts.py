@@ -140,7 +140,7 @@ async def list_notifications(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.VIEW)),
 ):
-    notifs = await alert_svc.list_notifications(pool, unread_only, organization_id=user.organization_id)
+    notifs = await alert_svc.list_notifications(pool, unread_only, organization_id=user.organization_id, user_id=user.id)
     return [NotificationResponse.model_validate(n, from_attributes=True) for n in notifs]
 
 
@@ -149,7 +149,7 @@ async def notification_count(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.VIEW)),
 ):
-    count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     if count:
         return HTMLResponse(f"({count})")
     return HTMLResponse("")

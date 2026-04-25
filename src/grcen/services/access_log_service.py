@@ -57,6 +57,56 @@ async def record(
         log.exception("Failed to record access-log entry")
 
 
+async def get_retention_days(pool: asyncpg.Pool) -> int | None:
+    """Return the configured retention window for data_access_log, in days.
+
+    None = retain forever (no purge job runs). Stored under app_settings so
+    admins can change it without a deploy.
+    """
+    row = await pool.fetchrow(
+        "SELECT value FROM app_settings WHERE key = 'data_access_log_retention_days'"
+    )
+    if not row:
+        return None
+    try:
+        n = int(row["value"])
+    except (ValueError, TypeError):
+        return None
+    return n if n > 0 else None
+
+
+async def set_retention_days(pool: asyncpg.Pool, days: int | None) -> None:
+    if days is None or days <= 0:
+        await pool.execute(
+            "DELETE FROM app_settings WHERE key = 'data_access_log_retention_days'"
+        )
+        return
+    await pool.execute(
+        """INSERT INTO app_settings (key, value, updated_at)
+           VALUES ('data_access_log_retention_days', $1, now())
+           ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()""",
+        str(days),
+    )
+
+
+async def purge_expired(pool: asyncpg.Pool) -> int:
+    """Delete data_access_log rows older than the configured retention window.
+
+    Returns the number of rows removed (0 if retention is disabled).
+    """
+    days = await get_retention_days(pool)
+    if days is None:
+        return 0
+    result = await pool.execute(
+        f"DELETE FROM data_access_log WHERE created_at < now() - INTERVAL '{int(days)} days'"
+    )
+    # asyncpg returns "DELETE N"
+    try:
+        return int(result.split()[-1])
+    except (ValueError, IndexError):
+        return 0
+
+
 async def query(
     pool: asyncpg.Pool,
     *,

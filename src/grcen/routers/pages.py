@@ -354,7 +354,7 @@ async def dashboard(
         pool, page=1, page_size=10, organization_id=user.organization_id
     )
     alerts = await alert_svc.list_alerts(pool, organization_id=user.organization_id)
-    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     heatmap = await risk_svc.get_risk_heatmap(pool, organization_id=user.organization_id)
     top_risks = await risk_svc.get_top_risks(pool, organization_id=user.organization_id)
     review_counts = await review_svc.get_review_counts(pool, organization_id=user.organization_id)
@@ -416,7 +416,7 @@ async def asset_list(
         order=order,
         organization_id=user.organization_id,
     )
-    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     all_tags = await tag_service.list_tags_with_counts(pool, organization_id=user.organization_id)
     saved_searches = await saved_search_service.list_visible(
         pool, user.id, path="/assets", organization_id=user.organization_id
@@ -478,7 +478,7 @@ async def asset_new(
     user: User = Depends(require_permission(Permission.CREATE)),
     pool: asyncpg.Pool = Depends(get_db),
 ):
-    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     known_tags = await tag_service.list_tags_with_counts(pool, organization_id=user.organization_id)
     return templates.TemplateResponse(request, "assets/form.html", context={
             "user": user,
@@ -600,7 +600,7 @@ async def asset_detail(
             r.attachment_count = counts.get(r.id, 0)
     atts = await att_svc.list_attachments(pool, asset_id, organization_id=user.organization_id)
     alerts = await alert_svc.list_alerts(pool, asset_id, organization_id=user.organization_id)
-    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     # For Person assets, find linked user account
     linked_user = None
     if asset.type == AssetType.PERSON:
@@ -639,7 +639,7 @@ async def asset_edit(
     asset = await asset_svc.get_asset(pool, asset_id, organization_id=user.organization_id)
     if not asset:
         return HTMLResponse("Not found", status_code=404)
-    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     known_tags = await tag_service.list_tags_with_counts(pool, organization_id=user.organization_id)
     return templates.TemplateResponse(request, "assets/form.html", context={
             "user": user,
@@ -846,7 +846,7 @@ async def graph_page(
     asset = await asset_svc.get_asset(pool, asset_id, organization_id=user.organization_id)
     if not asset:
         return HTMLResponse("Not found", status_code=404)
-    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     return templates.TemplateResponse(request, "graph/view.html", context={
             "user": user,
             "asset": asset,
@@ -864,7 +864,7 @@ async def import_page(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.IMPORT)),
 ):
-    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     return templates.TemplateResponse(request, "imports/index.html", context={"user": user, "notif_count": notif_count},
     )
 
@@ -878,7 +878,7 @@ async def export_page(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.EXPORT)),
 ):
-    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     return templates.TemplateResponse(request, "exports/index.html", context={
             "user": user,
             "asset_types": sorted(AssetType, key=lambda t: t.value),
@@ -901,7 +901,7 @@ async def reviews_page(
     reviews = await review_svc.get_reviews(
         pool, asset_type=type, status_filter=status, organization_id=user.organization_id
     )
-    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     return templates.TemplateResponse(request, "reviews/index.html", context={
             "user": user,
             "reviews": reviews,
@@ -948,7 +948,7 @@ async def risk_management_page(
     summary = await risk_svc.get_risk_summary(pool, organization_id=user.organization_id)
     heatmap = await risk_svc.get_risk_heatmap(pool, organization_id=user.organization_id)
     trend = await risk_svc.get_severity_trend(pool, organization_id=user.organization_id)
-    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     bulk_owners = await pool.fetch(
         """SELECT id, name FROM assets
            WHERE type IN ('person', 'organizational_unit') AND status = 'active'
@@ -1065,7 +1065,7 @@ async def alerts_page(
     user: User = Depends(require_permission(Permission.VIEW)),
 ):
     alerts = await alert_svc.list_alerts(pool, organization_id=user.organization_id)
-    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     return templates.TemplateResponse(request, "alerts/list.html", context={
             "user": user,
             "alerts": alerts,
@@ -1083,7 +1083,7 @@ async def org_views_page(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.VIEW)),
 ):
-    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     return templates.TemplateResponse(request, "org_views.html", context={
             "user": user,
             "notif_count": notif_count,
@@ -1100,8 +1100,8 @@ async def notifications_page(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.VIEW)),
 ):
-    notifs = await alert_svc.list_notifications(pool, organization_id=user.organization_id)
-    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    notifs = await alert_svc.list_notifications(pool, organization_id=user.organization_id, user_id=user.id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     return templates.TemplateResponse(request, "alerts/notifications.html", context={
             "user": user,
             "notifications": notifs,
@@ -1120,7 +1120,7 @@ async def admin_users(
     user: User = Depends(require_permission(Permission.MANAGE_USERS)),
 ):
     users = await auth_svc.list_users(pool, organization_id=user.organization_id)
-    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     return templates.TemplateResponse(request, "admin/users.html", context={
             "user": user,
             "users": users,
@@ -1136,7 +1136,7 @@ async def admin_user_new(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.MANAGE_USERS)),
 ):
-    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     return templates.TemplateResponse(request, "admin/user_form.html", context={
             "user": user,
             "edit_user": None,
@@ -1157,7 +1157,7 @@ async def admin_user_create_submit(
     password = str(form["password"]).strip()
     role = UserRole(form["role"])
     if not username or not password:
-        notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+        notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
         return templates.TemplateResponse(request, "admin/user_form.html", context={
                 "user": user,
                 "edit_user": None,
@@ -1190,7 +1190,7 @@ async def admin_user_edit(
     edit_user = await auth_svc.get_user_by_id(pool, user_id)
     if not edit_user:
         return HTMLResponse("Not found", status_code=404)
-    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     person_assets = await pool.fetch(
         "SELECT id, name FROM assets WHERE type = 'person' ORDER BY name"
     )
@@ -1314,7 +1314,7 @@ async def admin_audit_log(
         pool, organization_id=user.organization_id,
         entity_type=entity_type, action=action, username=username, page=page,
     )
-    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     return templates.TemplateResponse(request, "admin/audit_log.html", context={
             "user": user,
             "logs": logs,
@@ -1363,7 +1363,7 @@ async def admin_orgs_index(
     flash: str | None = None,
 ):
     rows = await organization_service.stats_for_orgs(pool)
-    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     flash_ctx = None
     if flash:
         ok, _, message = flash.partition(":")
@@ -1425,6 +1425,70 @@ async def admin_orgs_delete(
     return RedirectResponse("/admin/orgs?flash=fail:Not found.", status_code=302)
 
 
+@router.get("/admin/sensitive-fields", response_class=HTMLResponse)
+async def admin_sensitive_fields(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+    flash: str | None = None,
+):
+    """List every (asset_type, field) pair with its effective sensitive status."""
+    overrides = await redaction.list_overrides(pool, user.organization_id)
+    rows: list[dict] = []
+    for at in sorted(AssetType, key=lambda t: t.value):
+        for fdef in CUSTOM_FIELDS.get(at, []):
+            override = overrides.get((at.value, fdef.name))
+            effective = fdef.sensitive if override is None else override
+            rows.append({
+                "asset_type": at.value,
+                "field_name": fdef.name,
+                "label": fdef.label,
+                "code_default": fdef.sensitive,
+                "override": override,
+                "effective": effective,
+            })
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
+    flash_ctx = None
+    if flash:
+        ok, _, message = flash.partition(":")
+        flash_ctx = {"ok": ok == "ok", "message": message or flash}
+    return templates.TemplateResponse(
+        request, "admin/sensitive_fields.html",
+        context={
+            "user": user, "rows": rows,
+            "notif_count": notif_count, "flash": flash_ctx,
+        },
+    )
+
+
+@router.post("/admin/sensitive-fields")
+async def admin_sensitive_fields_save(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+):
+    """Save the form. The HTML form submits one entry per (type, field) with
+    a value of 'sensitive', 'public', or 'inherit' so we can also clear an
+    override and revert to the code default."""
+    form = await request.form()
+    for at in AssetType:
+        for fdef in CUSTOM_FIELDS.get(at, []):
+            choice = str(form.get(f"{at.value}.{fdef.name}", "inherit")).strip()
+            if choice == "inherit":
+                await redaction.clear_override(pool, user.organization_id, at, fdef.name)
+            elif choice == "sensitive":
+                await redaction.upsert_override(
+                    pool, user.organization_id, at, fdef.name, sensitive=True
+                )
+            elif choice == "public":
+                await redaction.upsert_override(
+                    pool, user.organization_id, at, fdef.name, sensitive=False
+                )
+    return RedirectResponse(
+        "/admin/sensitive-fields?flash=ok:Field sensitivity saved.", status_code=302
+    )
+
+
 @router.post("/admin/organization/branding")
 async def admin_organization_branding(
     request: Request,
@@ -1456,7 +1520,7 @@ async def admin_organization(
     asset_count = await pool.fetchval(
         "SELECT count(*) FROM assets WHERE organization_id = $1", user.organization_id
     )
-    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     flash_ctx = None
     if flash:
         ok, _, message = flash.partition(":")
@@ -1478,7 +1542,7 @@ async def admin_audit_settings(
     user: User = Depends(require_permission(Permission.MANAGE_USERS)),
 ):
     configs = await audit_svc.get_audit_config_all(pool)
-    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     return templates.TemplateResponse(request, "admin/audit_settings.html", context={
             "user": user,
             "configs": configs,
@@ -1513,7 +1577,7 @@ async def admin_oidc_settings(
     user: User = Depends(require_permission(Permission.MANAGE_USERS)),
 ):
     oidc_cfg = await oidc_settings.get_settings(pool)
-    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     return templates.TemplateResponse(request, "admin/oidc_settings.html", context={
             "user": user,
             "oidc": oidc_cfg,
@@ -1559,7 +1623,7 @@ async def admin_saml_settings(
     user: User = Depends(require_permission(Permission.MANAGE_USERS)),
 ):
     saml_cfg = await saml_settings.get_settings(pool)
-    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     return templates.TemplateResponse(
         request,
         "admin/saml_settings.html",
@@ -1617,7 +1681,7 @@ async def admin_smtp_settings(
     test_result: str | None = None,
 ):
     smtp_cfg = await smtp_settings.get_settings(pool)
-    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     deliveries = await pool.fetch(
         """SELECT email, status, error, attempted_at
            FROM notification_deliveries
@@ -1721,7 +1785,7 @@ async def admin_webhooks_page(
            FROM webhook_deliveries
            ORDER BY attempted_at DESC LIMIT 20"""
     )
-    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     return templates.TemplateResponse(
         request,
         "admin/webhooks.html",
@@ -1774,7 +1838,7 @@ async def admin_webhook_edit_page(
     hook = await webhook_service.get_webhook(pool, webhook_id, organization_id=user.organization_id)
     if not hook:
         raise HTTPException(status_code=404, detail="Webhook not found")
-    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     return templates.TemplateResponse(
         request,
         "admin/webhook_edit.html",
@@ -1861,7 +1925,7 @@ async def relationship_evidence_page(
     source = await asset_svc.get_asset(pool, rel.source_asset_id, organization_id=user.organization_id)
     target = await asset_svc.get_asset(pool, rel.target_asset_id, organization_id=user.organization_id)
     attachments = await att_svc.list_attachments_for_relationship(pool, rel_id, organization_id=user.organization_id)
-    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     return templates.TemplateResponse(
         request,
         "relationships/evidence.html",
@@ -1983,6 +2047,126 @@ async def relationship_evidence_delete(
 # --- Data access log ---
 
 
+@router.get("/admin/sessions", response_class=HTMLResponse)
+async def admin_sessions(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+    flash: str | None = None,
+):
+    """Cross-user view of every active session in this org."""
+    from grcen.services import session_service
+    sessions = await session_service.list_all_sessions(
+        pool, organization_id=user.organization_id
+    )
+    notif_count = await alert_svc.count_unread_notifications(
+        pool, organization_id=user.organization_id, user_id=user.id,
+    )
+    flash_ctx = None
+    if flash:
+        ok, _, message = flash.partition(":")
+        flash_ctx = {"ok": ok == "ok", "message": message or flash}
+    return templates.TemplateResponse(
+        request, "admin/sessions.html",
+        context={
+            "user": user, "sessions": sessions,
+            "notif_count": notif_count, "flash": flash_ctx,
+        },
+    )
+
+
+@router.post("/admin/sessions/{session_id}/revoke")
+async def admin_session_revoke(
+    session_id: str,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+):
+    """Force-end a session belonging to any user in the same org."""
+    await pool.execute(
+        """DELETE FROM sessions
+           WHERE session_id = $1
+             AND user_id IN (SELECT id FROM users WHERE organization_id = $2)""",
+        session_id, user.organization_id,
+    )
+    return RedirectResponse(
+        "/admin/sessions?flash=ok:Session revoked.", status_code=302
+    )
+
+
+@router.get("/admin/access-log/export.csv")
+async def admin_access_log_export(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.VIEW_AUDIT)),
+    user_id: str | None = None,
+    entity_type: str | None = None,
+    action: str | None = None,
+    limit: int = 10000,
+):
+    """Stream the access log as CSV, honoring the same filters as the page."""
+    import csv
+    import io
+    filter_user_uuid = UUID(user_id) if user_id else None
+    entries = await access_log_service.query(
+        pool, organization_id=user.organization_id, user_id=filter_user_uuid,
+        entity_type=entity_type or None, action=action or None,
+        limit=max(1, min(int(limit), 50000)),
+    )
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow([
+        "id", "created_at", "user_id", "username", "action",
+        "entity_type", "entity_id", "entity_name", "path", "ip_address",
+    ])
+    for e in entries:
+        writer.writerow([
+            str(e.get("id") or ""),
+            e["created_at"].isoformat() if e.get("created_at") else "",
+            str(e.get("user_id") or ""),
+            e.get("username") or "",
+            e.get("action") or "",
+            e.get("entity_type") or "",
+            str(e.get("entity_id") or ""),
+            e.get("entity_name") or "",
+            e.get("path") or "",
+            e.get("ip_address") or "",
+        ])
+    # Record the export itself in the access log.
+    await access_log_service.record(
+        pool, user=user, action="export",
+        entity_type="access_log", entity_id=None,
+        entity_name="access_log.csv",
+        path=str(request.url.path),
+        ip_address=request.client.host if request.client else None,
+    )
+    return Response(
+        content=buf.getvalue(), media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="access_log.csv"'},
+    )
+
+
+@router.post("/admin/access-log/retention")
+async def admin_access_log_retention(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+):
+    form = await request.form()
+    raw = str(form.get("retention_days", "")).strip()
+    days: int | None = None
+    if raw:
+        try:
+            days = int(raw)
+        except ValueError:
+            return RedirectResponse(
+                "/admin/access-log?flash=fail:retention_days must be an integer",
+                status_code=302,
+            )
+    await access_log_service.set_retention_days(pool, days)
+    msg = f"Retention set to {days} days" if days else "Retention disabled (logs kept forever)"
+    return RedirectResponse(f"/admin/access-log?flash=ok:{msg}", status_code=302)
+
+
 @router.get("/admin/access-log", response_class=HTMLResponse)
 async def admin_access_log(
     request: Request,
@@ -1991,6 +2175,7 @@ async def admin_access_log(
     user_id: str | None = None,
     entity_type: str | None = None,
     action: str | None = None,
+    flash: str | None = None,
 ):
     filter_user_uuid = UUID(user_id) if user_id else None
     entries = await access_log_service.query(
@@ -2005,7 +2190,12 @@ async def admin_access_log(
         "SELECT id, username FROM users WHERE organization_id = $1 ORDER BY username",
         user.organization_id,
     )
-    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
+    retention_days = await access_log_service.get_retention_days(pool)
+    flash_ctx = None
+    if flash:
+        ok, _, message = flash.partition(":")
+        flash_ctx = {"ok": ok == "ok", "message": message or flash}
     return templates.TemplateResponse(
         request,
         "admin/access_log.html",
@@ -2019,6 +2209,8 @@ async def admin_access_log(
             "filter_entity_type": entity_type or "",
             "filter_action": action or "",
             "notif_count": notif_count,
+            "retention_days": retention_days,
+            "flash": flash_ctx,
         },
     )
 
@@ -2034,7 +2226,7 @@ async def tags_index(
     flash: str | None = None,
 ):
     tags = await tag_service.list_tags_with_counts(pool, organization_id=user.organization_id)
-    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     flash_ctx = None
     if flash:
         ok, _, message = flash.partition(":")
@@ -2110,7 +2302,7 @@ async def frameworks_index(
     user: User = Depends(require_permission(Permission.VIEW)),
 ):
     frameworks = await framework_service.list_frameworks(pool, organization_id=user.organization_id)
-    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     return templates.TemplateResponse(
         request,
         "frameworks/index.html",
@@ -2128,7 +2320,7 @@ async def framework_detail(
     detail = await framework_service.get_framework_detail(pool, framework_id, organization_id=user.organization_id)
     if not detail:
         raise HTTPException(status_code=404, detail="Framework not found")
-    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     return templates.TemplateResponse(
         request,
         "frameworks/detail.html",
@@ -2200,7 +2392,7 @@ async def user_settings(
     from grcen.services import totp_service
 
     smtp_cfg = await smtp_settings.get_settings(pool)
-    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
 
     from grcen.services import session_service
     sessions = await session_service.list_sessions_for_user(pool, user.id)
@@ -2384,7 +2576,7 @@ async def my_tokens_page(
     tokens = await token_service.list_tokens_for_user(pool, user.id)
     max_expiry_days = await token_service.get_max_expiry_days(pool)
     available_permissions = sorted(ROLE_PERMISSIONS.get(user.role, set()), key=lambda p: p.value)
-    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     from datetime import UTC
     from datetime import datetime as dt
 
@@ -2509,7 +2701,7 @@ async def admin_tokens_page(
     max_expiry_days = await token_service.get_max_expiry_days(pool)
     users = await auth_svc.list_users(pool, organization_id=user.organization_id)
     users_by_id = {u.id: u for u in users}
-    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     from datetime import UTC
     from datetime import datetime as dt
 
@@ -2594,7 +2786,7 @@ async def admin_encryption(
 
     active_profile = await encryption_config.get_active_profile(pool)
     active_scopes = await encryption_config.get_active_scopes(pool)
-    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     success = request.session.pop("enc_success", None)
     error = request.session.pop("enc_error", None)
     # Build a JSON map of profile -> scope list for the JS toggle logic.

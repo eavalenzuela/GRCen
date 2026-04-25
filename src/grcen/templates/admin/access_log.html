@@ -7,6 +7,27 @@
     <small style="color:#6b7280;">Views, exports, and downloads. Writes are in the separate <a href="/admin/audit">Audit Log</a>.</small>
 </div>
 
+{% if flash %}
+<div class="callout" style="background:{{ '#e0f2fe' if flash.ok else '#fee2e2' }};padding:0.75rem;margin:0 0 1rem 0;">{{ flash.message }}</div>
+{% endif %}
+
+<div class="card" style="margin-bottom:1rem;">
+    <div style="display:flex;gap:1rem;align-items:end;flex-wrap:wrap;">
+        <form method="post" action="/admin/access-log/retention" style="display:flex;gap:0.5rem;align-items:end;">
+            {% include "partials/csrf.html" %}
+            <div class="form-group" style="margin-bottom:0;">
+                <label>Retention (days, blank = forever)
+                    <input type="number" name="retention_days" min="1" max="3650"
+                           value="{{ retention_days if retention_days else '' }}" style="width:8rem;">
+                </label>
+            </div>
+            <button type="submit" class="btn">Save retention</button>
+        </form>
+        <span style="color:#6b7280;">|</span>
+        <a href="/admin/access-log/export.csv?{{ request.url.query }}" class="btn">Export filtered as CSV</a>
+    </div>
+</div>
+
 <form method="get" action="/admin/access-log" class="card">
     <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:end;">
         <div class="form-group" style="margin-bottom:0;">
