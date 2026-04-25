@@ -18,6 +18,7 @@
                 <th>Require approval to create</th>
                 <th>Require approval to update</th>
                 <th>Require approval to delete</th>
+                <th>Required approvers</th>
             </tr>
         </thead>
         <tbody>
@@ -35,6 +36,11 @@
                 <td>
                     <input type="checkbox" name="delete_{{ cfg.asset_type }}"
                         {% if cfg.require_approval_delete %}checked{% endif %}>
+                </td>
+                <td>
+                    <input type="number" name="required_{{ cfg.asset_type }}"
+                           min="1" max="10" value="{{ cfg.required_approvals or 1 }}"
+                           style="width:4rem;">
                 </td>
             </tr>
             {% endfor %}

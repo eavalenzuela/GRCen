@@ -66,6 +66,13 @@ async def approval_detail(
         target = await asset_svc.get_asset(
             pool, change.target_asset_id, organization_id=user.organization_id
         )
+    comments = await workflow_service.list_comments(pool, change.id)
+    approvals = await workflow_service.list_approvals(pool, change.id)
+    asset_type = AssetType(change.asset_type)
+    cfg = await workflow_service.get_config(
+        pool, asset_type, organization_id=user.organization_id
+    )
+    already_approved = any(a.approver_id == user.id for a in approvals)
     return _templates().TemplateResponse(
         request,
         "workflow/approvals_detail.html",
@@ -74,8 +81,35 @@ async def approval_detail(
             "change": change,
             "target": target,
             "just_submitted": bool(submitted),
+            "comments": comments,
+            "approvals": approvals,
+            "required_approvals": cfg.required_approvals,
+            "already_approved": already_approved,
         },
     )
+
+
+@router.post("/approvals/{change_id}/comment")
+async def approval_comment(
+    change_id: UUID,
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.VIEW)),
+):
+    change = await workflow_service.get(
+        pool, change_id, organization_id=user.organization_id
+    )
+    if not change:
+        raise HTTPException(status_code=404, detail="Pending change not found")
+    form = await request.form()
+    body = str(form.get("body", "")).strip()
+    if not body:
+        return RedirectResponse(f"/approvals/{change_id}", status_code=302)
+    try:
+        await workflow_service.add_comment(pool, change, user, body)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return RedirectResponse(f"/approvals/{change_id}", status_code=302)
 
 
 @router.post("/approvals/{change_id}/approve")
@@ -171,6 +205,11 @@ async def workflow_admin_save(
 ):
     form = await request.form()
     for at in AssetType:
+        raw = form.get(f"required_{at.value}", "1")
+        try:
+            required = max(1, int(str(raw)))
+        except (ValueError, TypeError):
+            required = 1
         await workflow_service.upsert_config(
             pool,
             at,
@@ -178,6 +217,7 @@ async def workflow_admin_save(
             require_approval_create=f"create_{at.value}" in form,
             require_approval_update=f"update_{at.value}" in form,
             require_approval_delete=f"delete_{at.value}" in form,
+            required_approvals=required,
         )
     return RedirectResponse("/admin/workflow", status_code=302)
 

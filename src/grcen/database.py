@@ -629,6 +629,36 @@ DO $$ BEGIN
         REFERENCES organizations(id) ON DELETE CASCADE;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
+-- Comment threads attached to a pending workflow change. A reviewer can ask
+-- a question without acting, the submitter can respond, and the audit row
+-- captures the back-and-forth.
+CREATE TABLE IF NOT EXISTS pending_change_comments (
+    id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    pending_change_id  UUID NOT NULL REFERENCES pending_changes(id) ON DELETE CASCADE,
+    author_id          UUID REFERENCES users(id) ON DELETE SET NULL,
+    author_username    VARCHAR(150) NOT NULL,
+    body               TEXT NOT NULL,
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_pending_change_comments_change
+    ON pending_change_comments(pending_change_id);
+
+-- Multi-step approvals. ``workflow_config.required_approvals`` (default 1)
+-- says how many distinct approvers must say yes before the change applies.
+DO $$ BEGIN
+    ALTER TABLE workflow_config
+        ADD COLUMN required_approvals INTEGER NOT NULL DEFAULT 1;
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS pending_change_approvals (
+    pending_change_id  UUID NOT NULL REFERENCES pending_changes(id) ON DELETE CASCADE,
+    approver_id        UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    approver_username  VARCHAR(150) NOT NULL,
+    note               TEXT,
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (pending_change_id, approver_id)
+);
+
 -- Allow system-generated notifications (no alert_id) so the session-cap eviction
 -- and similar UX events have somewhere to land.
 DO $$ BEGIN

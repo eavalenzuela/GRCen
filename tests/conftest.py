@@ -89,7 +89,7 @@ async def clean_tables(pool):
     from grcen.rate_limit import _reset as _reset_rate_limit
     _reset_rate_limit()
     yield
-    for table in ("sessions", "api_tokens", "app_settings", "audit_log", "data_access_log", "user_totp", "webhook_deliveries", "webhooks", "notification_deliveries", "notifications", "alerts", "attachments", "relationships", "risk_snapshots", "saved_searches", "pending_changes", "pending_email_digest", "workflow_config", "sensitive_field_overrides", "user_organizations", "assets", "users", "encryption_config"):
+    for table in ("sessions", "api_tokens", "app_settings", "audit_log", "data_access_log", "user_totp", "webhook_deliveries", "webhooks", "notification_deliveries", "notifications", "alerts", "attachments", "relationships", "risk_snapshots", "saved_searches", "pending_change_comments", "pending_change_approvals", "pending_changes", "pending_email_digest", "workflow_config", "sensitive_field_overrides", "user_organizations", "assets", "users", "encryption_config"):
         await pool.execute(f"DELETE FROM {table}")
     # Keep the default organization (slug='default'); drop any test-created ones.
     await pool.execute("DELETE FROM organizations WHERE slug != 'default'")
