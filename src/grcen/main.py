@@ -201,7 +201,7 @@ def cli():
     """CLI entrypoint for management commands."""
     if len(sys.argv) < 2:
         print("Usage: grcen <command>")
-        print("Commands: createadmin, createorg, listorgs, runserver, generate-key, rotate-keys")
+        print("Commands: createadmin, createorg, listorgs, runserver, generate-key, rotate-keys, backup, restore")
         sys.exit(1)
 
     command = sys.argv[1]
@@ -212,6 +212,10 @@ def cli():
         asyncio.run(_create_org())
     elif command == "listorgs":
         asyncio.run(_list_orgs())
+    elif command == "backup":
+        _backup()
+    elif command == "restore":
+        _restore()
     elif command == "runserver":
         import uvicorn
 
@@ -275,6 +279,46 @@ async def _create_org():
     org = await organization_service.create_organization(pool, slug=slug, name=name)
     print(f"Created organization '{org.slug}' (id={org.id}).")
     await close_pool()
+
+
+def _backup():
+    """`grcen backup PATH` — write an encrypted dump of the database."""
+    from pathlib import Path
+    from grcen.services import backup_service
+
+    if len(sys.argv) < 3:
+        print("Usage: grcen backup <output-file>")
+        sys.exit(1)
+    out = Path(sys.argv[2])
+    if out.exists():
+        print(f"Refusing to overwrite existing file: {out}")
+        sys.exit(1)
+    try:
+        n = backup_service.create_backup(out)
+    except backup_service.BackupError as e:
+        print(f"Backup failed: {e}")
+        sys.exit(1)
+    print(f"Wrote {n} encrypted bytes to {out}")
+
+
+def _restore():
+    """`grcen restore PATH` — decrypt and replay an encrypted dump via psql."""
+    from pathlib import Path
+    from grcen.services import backup_service
+
+    if len(sys.argv) < 3:
+        print("Usage: grcen restore <input-file>")
+        sys.exit(1)
+    src = Path(sys.argv[2])
+    if not src.exists():
+        print(f"File not found: {src}")
+        sys.exit(1)
+    try:
+        backup_service.restore_backup(src)
+    except backup_service.BackupError as e:
+        print(f"Restore failed: {e}")
+        sys.exit(1)
+    print(f"Restore complete from {src}")
 
 
 async def _list_orgs():

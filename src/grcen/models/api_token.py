@@ -15,6 +15,7 @@ class ApiToken:
     is_service_account: bool
     created_at: datetime
     revoked: bool
+    allowed_ips: list[str]
 
     @classmethod
     def from_row(cls, row) -> "ApiToken":
@@ -29,4 +30,5 @@ class ApiToken:
             is_service_account=row["is_service_account"],
             created_at=row["created_at"],
             revoked=row["revoked"],
+            allowed_ips=list(row.get("allowed_ips") or []),
         )

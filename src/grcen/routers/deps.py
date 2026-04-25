@@ -27,7 +27,8 @@ async def _resolve_bearer_token(request: Request, pool: asyncpg.Pool) -> tuple[s
 
     from grcen.services.token_service import validate_token
 
-    token = await validate_token(pool, raw_token)
+    client_ip = request.client.host if request.client else None
+    token = await validate_token(pool, raw_token, client_ip=client_ip)
     if token is None:
         return None
 

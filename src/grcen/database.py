@@ -629,6 +629,11 @@ DO $$ BEGIN
         REFERENCES organizations(id) ON DELETE CASCADE;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
+-- IP allowlist on API tokens. Empty array = no restriction.
+DO $$ BEGIN
+    ALTER TABLE api_tokens ADD COLUMN allowed_ips TEXT[] NOT NULL DEFAULT '{}';
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+
 -- risk_snapshots: switch to a (organization_id, snapshot_date) composite PK
 -- so each tenant has its own daily history.
 DO $$ BEGIN

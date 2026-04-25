@@ -63,6 +63,7 @@ async def create_token(
     permissions: list[str],
     expires_at: datetime | None = None,
     is_service_account: bool = False,
+    allowed_ips: list[str] | None = None,
 ) -> tuple[ApiToken, str]:
     """Create a new API token. Returns (token_record, raw_token)."""
     if not is_service_account:
@@ -81,8 +82,8 @@ async def create_token(
 
     row = await pool.fetchrow(
         """INSERT INTO api_tokens (user_id, name, token_hash, permissions,
-                                   expires_at, is_service_account, organization_id)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)
+                                   expires_at, is_service_account, organization_id, allowed_ips)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
            RETURNING *""",
         user_id,
         name,
@@ -91,12 +92,20 @@ async def create_token(
         expires_at,
         is_service_account,
         org_id,
+        allowed_ips or [],
     )
     return ApiToken.from_row(row), raw
 
 
-async def validate_token(pool: asyncpg.Pool, raw: str) -> ApiToken | None:
-    """Look up a raw token string, returning the record if valid."""
+async def validate_token(
+    pool: asyncpg.Pool, raw: str, *, client_ip: str | None = None
+) -> ApiToken | None:
+    """Look up a raw token string, returning the record if valid.
+
+    When the token has a non-empty ``allowed_ips`` list, the caller's IP must
+    appear in it. We accept exact-match strings for now — CIDR support can
+    layer on top later.
+    """
     token_hash = _hash_token(raw)
     row = await pool.fetchrow(
         "SELECT * FROM api_tokens WHERE token_hash = $1", token_hash
@@ -109,12 +118,23 @@ async def validate_token(pool: asyncpg.Pool, raw: str) -> ApiToken | None:
         return None
     if token.expires_at and token.expires_at < datetime.now(UTC):
         return None
+    if token.allowed_ips and (client_ip is None or client_ip not in token.allowed_ips):
+        return None
 
-    # Update last_used_at (fire-and-forget style)
     await pool.execute(
         "UPDATE api_tokens SET last_used_at = now() WHERE id = $1", token.id
     )
     return token
+
+
+async def update_allowed_ips(
+    pool: asyncpg.Pool, token_id: UUID, allowed_ips: list[str]
+) -> bool:
+    result = await pool.execute(
+        "UPDATE api_tokens SET allowed_ips = $1 WHERE id = $2 AND revoked = false",
+        allowed_ips, token_id,
+    )
+    return result == "UPDATE 1"
 
 
 async def list_tokens_for_user(
