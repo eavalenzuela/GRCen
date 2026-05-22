@@ -1,6 +1,11 @@
 # Local attachment storage
 uploads/
 
+# Local dev helper scripts
+build.sh
+cleanup_script.sh
+prep_for_tests.sh
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
