@@ -40,8 +40,6 @@ Create your first admin user:
 docker compose exec app grcen createadmin
 ```
 
-If you use containerd instead of Docker, substitute `nerdctl` for `docker`.
-
 ### Local Development
 
 Requirements: Python 3.12+, a running PostgreSQL instance.

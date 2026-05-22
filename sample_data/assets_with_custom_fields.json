@@ -2519,7 +2519,7 @@
       "risk_owner": "Hassan Ali",
       "identified_date": "2025-01-10",
       "last_reviewed": "2025-07-01",
-      "review_date": "2026-01-10"
+      "review_date": "2025-12-15"
     }
   },
   {
@@ -2741,7 +2741,7 @@
       "risk_owner": "Eve Novak",
       "identified_date": "2025-01-15",
       "last_reviewed": "2025-09-01",
-      "review_date": "2026-03-01"
+      "review_date": "2025-11-01"
     }
   },
   {
@@ -2764,6 +2764,261 @@
       "risk_owner": "Carol Davies",
       "identified_date": "2026-03-01",
       "review_date": "2026-06-01"
+    }
+  },
+  {
+    "name": "Revenue Concentration — Enterprise Accounts",
+    "type": "risk",
+    "description": "Top 3 customers represent 45% of ARR — loss of any would materially impact revenue",
+    "status": "active",
+    "owner": "James Wilson",
+    "metadata": {
+      "risk_category": "financial",
+      "threat_source": "customer churn",
+      "severity": "high",
+      "likelihood": "possible",
+      "impact": "major",
+      "inherent_risk_score": 12,
+      "residual_risk_score": 9,
+      "treatment": "mitigate",
+      "treatment_plan": "Expand SMB pipeline, multi-year contracts, dedicated CSM for top accounts",
+      "control_effectiveness": "partially_effective",
+      "risk_owner": "James Wilson",
+      "identified_date": "2025-06-01",
+      "last_reviewed": "2026-01-15",
+      "review_date": "2026-07-15"
+    }
+  },
+  {
+    "name": "Brand Damage — Public Security Incident",
+    "type": "risk",
+    "description": "Negative press coverage or social media backlash following a disclosed security event",
+    "status": "active",
+    "owner": "Sarah Thompson",
+    "metadata": {
+      "risk_category": "reputational",
+      "threat_source": "security incident disclosure",
+      "severity": "high",
+      "likelihood": "unlikely",
+      "impact": "catastrophic",
+      "inherent_risk_score": 10,
+      "residual_risk_score": 6,
+      "treatment": "mitigate",
+      "treatment_plan": "Incident communication playbook, retained PR firm, executive spokesperson training",
+      "control_effectiveness": "not_assessed",
+      "risk_owner": "Sarah Thompson",
+      "identified_date": "2025-09-01",
+      "last_reviewed": "2025-09-01",
+      "review_date": "2026-03-01"
+    }
+  },
+  {
+    "name": "Market Disruption — AI Competitor Entry",
+    "type": "risk",
+    "description": "Well-funded AI-native competitor captures market share in core product segment",
+    "status": "active",
+    "owner": "Lisa Chang",
+    "metadata": {
+      "risk_category": "strategic",
+      "threat_source": "competitive landscape",
+      "severity": "high",
+      "likelihood": "likely",
+      "impact": "major",
+      "inherent_risk_score": 16,
+      "residual_risk_score": 12,
+      "treatment": "mitigate",
+      "treatment_plan": "Accelerate AI roadmap, defensive patents, strategic partnership exploration",
+      "control_effectiveness": "ineffective",
+      "risk_owner": "Lisa Chang",
+      "identified_date": "2025-11-01",
+      "last_reviewed": "2026-02-15",
+      "review_date": "2026-05-15"
+    }
+  },
+  {
+    "name": "Foreign Exchange Exposure — EU Revenue",
+    "type": "risk",
+    "description": "EUR/USD fluctuations impacting 30% of revenue billed in euros",
+    "status": "active",
+    "owner": "Michael Foster",
+    "metadata": {
+      "risk_category": "financial",
+      "threat_source": "currency volatility",
+      "severity": "medium",
+      "likelihood": "almost_certain",
+      "impact": "minor",
+      "inherent_risk_score": 10,
+      "residual_risk_score": 4,
+      "treatment": "transfer",
+      "treatment_plan": "FX hedging via forward contracts, quarterly rebalancing",
+      "control_effectiveness": "effective",
+      "risk_owner": "Michael Foster",
+      "identified_date": "2025-04-01",
+      "last_reviewed": "2026-01-01",
+      "review_date": "2026-04-01"
+    }
+  },
+  {
+    "name": "Talent Attrition — Engineering Team",
+    "type": "risk",
+    "description": "Above-average turnover in engineering reducing delivery capacity",
+    "status": "active",
+    "owner": "Maria Santos",
+    "metadata": {
+      "risk_category": "operational",
+      "threat_source": "labor market competition",
+      "severity": "medium",
+      "likelihood": "likely",
+      "impact": "moderate",
+      "inherent_risk_score": 12,
+      "residual_risk_score": 8,
+      "treatment": "mitigate",
+      "treatment_plan": "Retention bonuses, career pathing, quarterly engagement surveys, competitive comp review",
+      "control_effectiveness": "partially_effective",
+      "risk_owner": "Maria Santos",
+      "identified_date": "2025-08-01",
+      "last_reviewed": "2025-11-01",
+      "review_date": "2025-10-01"
+    }
+  },
+  {
+    "name": "Intellectual Property Theft — Source Code",
+    "type": "risk",
+    "description": "Proprietary source code leaked to competitor or public repository",
+    "status": "active",
+    "owner": "Carol Davies",
+    "metadata": {
+      "risk_category": "security",
+      "threat_source": "insider / external attacker",
+      "risk_framework": "NIST",
+      "severity": "critical",
+      "likelihood": "rare",
+      "impact": "major",
+      "inherent_risk_score": 4,
+      "residual_risk_score": 2,
+      "treatment": "avoid",
+      "treatment_plan": "Strict repo access controls, code signing, GitHub secret scanning, NDA enforcement",
+      "control_effectiveness": "effective",
+      "risk_owner": "Carol Davies",
+      "identified_date": "2024-11-01",
+      "last_reviewed": "2026-02-01",
+      "review_date": "2026-08-01"
+    }
+  },
+  {
+    "name": "Cloud Cost Overrun — AWS Spend",
+    "type": "risk",
+    "description": "Uncontrolled cloud infrastructure spend exceeding budget by >20%",
+    "status": "active",
+    "owner": "Michael Foster",
+    "metadata": {
+      "risk_category": "financial",
+      "threat_source": "resource mismanagement",
+      "severity": "medium",
+      "likelihood": "likely",
+      "impact": "minor",
+      "inherent_risk_score": 8,
+      "residual_risk_score": 4,
+      "treatment": "mitigate",
+      "treatment_plan": "Budget alerts, reserved instances, FinOps reviews, rightsizing automation",
+      "control_effectiveness": "effective",
+      "risk_owner": "Frank Osei",
+      "identified_date": "2025-03-01",
+      "last_reviewed": "2026-03-01",
+      "review_date": "2026-09-01"
+    }
+  },
+  {
+    "name": "Contractual SLA Breach — Customer Portal",
+    "type": "risk",
+    "description": "Failure to meet 99.9% uptime SLA resulting in service credits or contract termination",
+    "status": "active",
+    "owner": "Frank Osei",
+    "metadata": {
+      "risk_category": "financial",
+      "threat_source": "infrastructure instability",
+      "severity": "high",
+      "likelihood": "unlikely",
+      "impact": "major",
+      "inherent_risk_score": 8,
+      "residual_risk_score": 4,
+      "treatment": "transfer",
+      "treatment_plan": "SLA-backed hosting agreement with cloud provider, error budget policy, cyber insurance",
+      "control_effectiveness": "effective",
+      "risk_owner": "Frank Osei",
+      "identified_date": "2025-01-01",
+      "last_reviewed": "2025-12-15",
+      "review_date": "2026-06-15"
+    }
+  },
+  {
+    "name": "Pandemic / Remote Work Disruption",
+    "type": "risk",
+    "description": "Global health event forcing extended remote operations affecting collaboration and delivery",
+    "status": "active",
+    "owner": "Maria Santos",
+    "metadata": {
+      "risk_category": "operational",
+      "threat_source": "global health event",
+      "severity": "medium",
+      "likelihood": "rare",
+      "impact": "moderate",
+      "inherent_risk_score": 3,
+      "residual_risk_score": 2,
+      "treatment": "accept",
+      "control_effectiveness": "effective",
+      "risk_owner": "Maria Santos",
+      "identified_date": "2024-01-01",
+      "last_reviewed": "2025-06-01",
+      "review_date": "2025-08-01",
+      "accepted_by": "Sarah Thompson",
+      "accepted_date": "2025-06-15"
+    }
+  },
+  {
+    "name": "SOC 2 Audit Failure",
+    "type": "risk",
+    "description": "Material findings in annual SOC 2 Type II audit threatening certification",
+    "status": "active",
+    "owner": "Eve Novak",
+    "metadata": {
+      "risk_category": "compliance",
+      "threat_source": "control gaps",
+      "risk_framework": "SOC 2",
+      "severity": "critical",
+      "likelihood": "unlikely",
+      "impact": "major",
+      "inherent_risk_score": 8,
+      "residual_risk_score": 3,
+      "control_effectiveness": "partially_effective",
+      "risk_owner": "Eve Novak",
+      "identified_date": "2025-04-01",
+      "last_reviewed": "2026-01-15",
+      "review_date": "2026-04-15"
+    }
+  },
+  {
+    "name": "Vendor Lock-In — Snowflake",
+    "type": "risk",
+    "description": "Deep dependency on Snowflake making migration prohibitively expensive",
+    "status": "active",
+    "owner": "Alice Chen",
+    "metadata": {
+      "risk_category": "strategic",
+      "threat_source": "vendor dependency",
+      "severity": "medium",
+      "likelihood": "almost_certain",
+      "impact": "moderate",
+      "inherent_risk_score": 15,
+      "residual_risk_score": 10,
+      "treatment": "accept",
+      "control_effectiveness": "not_assessed",
+      "risk_owner": "Alice Chen",
+      "identified_date": "2025-02-01",
+      "last_reviewed": "2025-08-01",
+      "review_date": "2025-11-01",
+      "accepted_by": "Alice Chen",
+      "accepted_date": "2025-08-15"
     }
   },
   {
