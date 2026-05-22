@@ -18,6 +18,7 @@ from grcen.routers.deps import (
 )
 from grcen.services import (
     alert_service as alert_svc,
+    answer_service,
     asset as asset_svc,
     audit_service as audit_svc,
     review_service as review_svc,
@@ -41,6 +42,9 @@ async def dashboard(
     heatmap = await risk_svc.get_risk_heatmap(pool, organization_id=user.organization_id)
     top_risks = await risk_svc.get_top_risks(pool, organization_id=user.organization_id)
     review_counts = await review_svc.get_review_counts(pool, organization_id=user.organization_id)
+    answers_needs_review = await answer_service.count_needs_review(
+        pool, organization_id=user.organization_id
+    )
     return templates.TemplateResponse(request, "dashboard.html", context={
             "user": user,
             "recent_assets": assets,
@@ -48,6 +52,7 @@ async def dashboard(
             "alerts": alerts[:5],
             "notif_count": notif_count,
             "asset_types": ORGANIZATIONAL_TYPES,
+            "answers_needs_review": answers_needs_review,
             "heatmap": heatmap,
             "top_risks": top_risks,
             "likelihood_levels": risk_svc.LIKELIHOOD_LEVELS,

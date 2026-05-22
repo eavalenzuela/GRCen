@@ -16,12 +16,18 @@
 {% if not answers %}
 <p style="color:#6b7280;">No answers yet. <a href="/assets/new?type=answer">Add the first one</a>.</p>
 {% else %}
+{% set review_count = answers | selectattr('needs_review') | list | length %}
+{% if review_count %}
+<p style="background:#fef3c7;border:1px solid #f59e0b;border-radius:4px;padding:0.5rem 0.75rem;">
+   ⚠ {{ review_count }} answer{{ 's' if review_count != 1 else '' }} need review — a substantiating asset has changed or is missing.</p>
+{% endif %}
 <table class="table">
     <thead>
         <tr>
             <th>Question</th>
             <th>Short answer</th>
             <th>Substantiated by</th>
+            <th>Review status</th>
             <th>Last reviewed</th>
         </tr>
     </thead>
@@ -47,6 +53,18 @@
                 </ul>
                 {% else %}
                 <em style="color:#b91c1c;">unsubstantiated</em>
+                {% endif %}
+            </td>
+            <td>
+                {% if a.needs_review %}
+                <span style="color:#b45309;font-weight:600;" title="{{ a.review_reasons | join('; ') }}">⚠ Needs review</span>
+                <ul style="margin:0.25rem 0 0;padding-left:1.1rem;color:#6b7280;font-size:0.8rem;">
+                {% for reason in a.review_reasons %}
+                    <li>{{ reason }}</li>
+                {% endfor %}
+                </ul>
+                {% else %}
+                <span style="color:#15803d;">✓ Current</span>
                 {% endif %}
             </td>
             <td>

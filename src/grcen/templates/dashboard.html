@@ -42,6 +42,17 @@
         {% endif %}
         <a href="/reviews" class="btn">View All</a>
     </div>
+
+    <div class="card">
+        <h2>Answer Library</h2>
+        {% if answers_needs_review and answers_needs_review > 0 %}
+        <p><span class="badge review-overdue">{{ answers_needs_review }} need review</span></p>
+        <p style="color:#6b7280;font-size:0.85rem;">A substantiating asset changed or is missing.</p>
+        {% else %}
+        <p>All answers current.</p>
+        {% endif %}
+        <a href="/answers" class="btn">View Answers</a>
+    </div>
 </div>
 
 <h2>Risk Heatmap</h2>

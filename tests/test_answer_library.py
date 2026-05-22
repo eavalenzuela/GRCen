@@ -120,6 +120,92 @@ async def test_count_answers(pool, admin_user):
     assert await answer_service.count_answers(pool) == 2
 
 
+# ── freshness engine (Phase 2) ──────────────────────────────────────────────
+
+
+async def _link(pool, answer, target):
+    from grcen.services import relationship as rel_svc
+
+    await rel_svc.create_relationship(
+        pool,
+        source_asset_id=answer.id,
+        target_asset_id=target.id,
+        relationship_type=answer_service.SUBSTANTIATES_REL,
+    )
+
+
+@pytest.mark.asyncio
+async def test_unsubstantiated_answer_needs_review(pool, admin_user):
+    await _mk_answer(pool, admin_user.id, "Q?", "A.")
+    answers = await answer_service.list_answers(pool)
+    assert answers[0]["needs_review"] is True
+    assert answers[0]["review_reasons"] == ["no substantiating assets"]
+
+
+@pytest.mark.asyncio
+async def test_answer_backed_by_effective_control_is_current(pool, admin_user):
+    control = await asset_svc.create_asset(
+        pool, type=AssetType.CONTROL, name="Encryption",
+        updated_by=admin_user.id, metadata_={"effectiveness": "effective"},
+    )
+    answer = await _mk_answer(pool, admin_user.id, "Encrypt?", "Yes.")
+    await _link(pool, answer, control)
+    answers = await answer_service.list_answers(pool)
+    assert answers[0]["needs_review"] is False
+    assert answers[0]["review_reasons"] == []
+
+
+@pytest.mark.asyncio
+async def test_ineffective_control_flags_answer(pool, admin_user):
+    control = await asset_svc.create_asset(
+        pool, type=AssetType.CONTROL, name="Backups",
+        updated_by=admin_user.id, metadata_={"effectiveness": "ineffective"},
+    )
+    answer = await _mk_answer(pool, admin_user.id, "Backups tested?", "Yes.")
+    await _link(pool, answer, control)
+    answers = await answer_service.list_answers(pool)
+    assert answers[0]["needs_review"] is True
+    assert any("Backups" in r for r in answers[0]["review_reasons"])
+
+
+@pytest.mark.asyncio
+async def test_archived_substantiator_flags_answer(pool, admin_user):
+    policy = await asset_svc.create_asset(
+        pool, type=AssetType.POLICY, name="Access Policy",
+        status="archived", updated_by=admin_user.id,
+    )
+    answer = await _mk_answer(pool, admin_user.id, "Have a policy?", "Yes.")
+    await _link(pool, answer, policy)
+    answers = await answer_service.list_answers(pool)
+    assert answers[0]["needs_review"] is True
+    assert any("archived" in r for r in answers[0]["review_reasons"])
+
+
+@pytest.mark.asyncio
+async def test_not_started_framework_flags_answer(pool, admin_user):
+    fw = await asset_svc.create_asset(
+        pool, type=AssetType.FRAMEWORK, name="ISO 27001",
+        updated_by=admin_user.id, metadata_={"certification_status": "not_started"},
+    )
+    answer = await _mk_answer(pool, admin_user.id, "ISO certified?", "Yes.")
+    await _link(pool, answer, fw)
+    answers = await answer_service.list_answers(pool)
+    assert answers[0]["needs_review"] is True
+
+
+@pytest.mark.asyncio
+async def test_count_needs_review(pool, admin_user):
+    # one current, one stale
+    control = await asset_svc.create_asset(
+        pool, type=AssetType.CONTROL, name="Good Control",
+        updated_by=admin_user.id, metadata_={"effectiveness": "effective"},
+    )
+    a1 = await _mk_answer(pool, admin_user.id, "Good?", "Yes.")
+    await _link(pool, a1, control)
+    await _mk_answer(pool, admin_user.id, "Orphan?", "Yes.")  # unsubstantiated
+    assert await answer_service.count_needs_review(pool) == 1
+
+
 # ── workspace + create flow (HTTP) ──────────────────────────────────────────
 
 

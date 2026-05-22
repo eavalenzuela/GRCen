@@ -27,6 +27,44 @@ def _as_dict(metadata: Any) -> dict:
     return metadata or {}
 
 
+# Substantiator states that make an answer's claim suspect. Because GRCen owns
+# control/posture state, this degradation is detectable here without any
+# external signal (feature_roadmap.md #21).
+_DEGRADED_STATUS = {"inactive", "archived"}
+_BAD_CONTROL_EFFECTIVENESS = {"ineffective", "not_tested"}
+_BAD_FRAMEWORK_STATUS = {"not_started", "not_applicable"}
+
+
+def _substantiator_issue(sub: dict[str, Any]) -> str | None:
+    """Return a human-readable reason this substantiator undermines an answer,
+    or None if it still supports the claim."""
+    status = sub.get("status")
+    if status in _DEGRADED_STATUS:
+        return f"{sub['name']} is {status}"
+    meta = sub.get("metadata") or {}
+    if sub["type"] == "control":
+        eff = meta.get("effectiveness")
+        if eff in _BAD_CONTROL_EFFECTIVENESS:
+            return f"control “{sub['name']}” is {eff.replace('_', ' ')}"
+    if sub["type"] == "framework":
+        cs = meta.get("certification_status")
+        if cs in _BAD_FRAMEWORK_STATUS:
+            return f"framework “{sub['name']}” is {cs.replace('_', ' ')}"
+    return None
+
+
+def _review_reasons(substantiators: list[dict[str, Any]]) -> list[str]:
+    """Why an answer needs review: unsubstantiated, or backed by degraded assets."""
+    if not substantiators:
+        return ["no substantiating assets"]
+    reasons = []
+    for s in substantiators:
+        issue = _substantiator_issue(s)
+        if issue:
+            reasons.append(issue)
+    return reasons
+
+
 async def list_answers(
     pool: asyncpg.Pool, *, organization_id: UUID | None = None
 ) -> list[dict[str, Any]]:
@@ -37,7 +75,8 @@ async def list_answers(
     """
     rows = await pool.fetch(
         """SELECT a.id, a.name, a.description, a.status, a.metadata, a.updated_at,
-                  s.id AS sub_id, s.name AS sub_name, s.type::text AS sub_type
+                  s.id AS sub_id, s.name AS sub_name, s.type::text AS sub_type,
+                  s.status AS sub_status, s.metadata AS sub_metadata
            FROM assets a
            LEFT JOIN relationships r
              ON r.source_asset_id = a.id AND r.relationship_type = $2
@@ -69,9 +108,32 @@ async def list_answers(
             by_answer[r["id"]] = entry
         if r["sub_id"] is not None:
             entry["substantiators"].append(
-                {"id": r["sub_id"], "name": r["sub_name"], "type": r["sub_type"]}
+                {
+                    "id": r["sub_id"],
+                    "name": r["sub_name"],
+                    "type": r["sub_type"],
+                    "status": r["sub_status"],
+                    "metadata": _as_dict(r["sub_metadata"]),
+                }
             )
-    return list(by_answer.values())
+
+    result = list(by_answer.values())
+    for entry in result:
+        entry["review_reasons"] = _review_reasons(entry["substantiators"])
+        entry["needs_review"] = bool(entry["review_reasons"])
+    return result
+
+
+async def count_needs_review(
+    pool: asyncpg.Pool, *, organization_id: UUID | None = None
+) -> int:
+    """How many answers currently need review (stale or unsubstantiated).
+
+    Computed from substantiating-asset state; modest library volume makes the
+    full walk cheap enough to avoid a bespoke aggregate query.
+    """
+    answers = await list_answers(pool, organization_id=organization_id)
+    return sum(1 for a in answers if a["needs_review"])
 
 
 async def count_answers(pool: asyncpg.Pool, *, organization_id: UUID | None = None) -> int:
