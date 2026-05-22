@@ -809,6 +809,37 @@ DO $$ BEGIN
         ADD CONSTRAINT risk_snapshots_pkey PRIMARY KEY (organization_id, snapshot_date);
 EXCEPTION WHEN invalid_table_definition THEN NULL; WHEN duplicate_object THEN NULL;
 END $$;
+
+-- Inbound security questionnaires (feature_roadmap.md #21 Phase 3): a
+-- questionnaire a customer/prospect sent us, plus one row per question. Filled
+-- answers can be mapped to an answer-library entry (answer_asset_id) or typed
+-- in directly.
+CREATE TABLE IF NOT EXISTS questionnaires (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    name            VARCHAR(255) NOT NULL,
+    source          VARCHAR(255) NOT NULL DEFAULT '',
+    due_date        DATE,
+    status          VARCHAR(20) NOT NULL DEFAULT 'draft',
+    created_by      UUID REFERENCES users(id) ON DELETE SET NULL,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_questionnaires_org ON questionnaires(organization_id);
+
+CREATE TABLE IF NOT EXISTS questionnaire_responses (
+    id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    questionnaire_id UUID NOT NULL REFERENCES questionnaires(id) ON DELETE CASCADE,
+    organization_id  UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    position         INTEGER NOT NULL DEFAULT 0,
+    question_text    TEXT NOT NULL,
+    answer_asset_id  UUID REFERENCES assets(id) ON DELETE SET NULL,
+    filled_answer    TEXT NOT NULL DEFAULT '',
+    status           VARCHAR(20) NOT NULL DEFAULT 'unanswered',
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_qresponses_questionnaire
+    ON questionnaire_responses(questionnaire_id);
 """
 
 

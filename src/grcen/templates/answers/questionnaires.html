@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Questionnaires - GRCen{% endblock %}
+
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;">
+    <h1>Incoming Questionnaires</h1>
+    <a href="/answers" class="btn">← Answer Library</a>
+</div>
+<p>Security questionnaires customers or prospects have sent us. Import the
+   questions, then answer each by mapping it to a library answer or typing one in.</p>
+
+{% if has_perm(user.role, Permission.EDIT) %}
+<div class="card">
+    <h3>New questionnaire</h3>
+    <form method="post" action="/questionnaires">
+        {% include "partials/csrf.html" %}
+        <div class="form-group">
+            <label for="name">Name</label>
+            <input type="text" id="name" name="name" required placeholder="e.g. Acme Corp SIG Lite 2026">
+        </div>
+        <div class="form-group">
+            <label for="source">Source <small>(customer / prospect)</small></label>
+            <input type="text" id="source" name="source" placeholder="e.g. Acme Corp">
+        </div>
+        <div class="form-group">
+            <label for="due_date">Due date</label>
+            <input type="date" id="due_date" name="due_date">
+        </div>
+        <button type="submit" class="btn btn-primary">Create</button>
+    </form>
+</div>
+{% endif %}
+
+{% if not questionnaires %}
+<p style="color:#6b7280;">No questionnaires yet.</p>
+{% else %}
+<table class="table">
+    <thead>
+        <tr><th>Name</th><th>Source</th><th>Progress</th><th>Status</th><th>Due</th></tr>
+    </thead>
+    <tbody>
+    {% for q in questionnaires %}
+        <tr>
+            <td><a href="/questionnaires/{{ q.id }}">{{ q.name }}</a></td>
+            <td>{{ q.source or "—" }}</td>
+            <td>{{ q.answered }} / {{ q.total }} answered</td>
+            <td>{{ q.status | replace('_', ' ') | title }}</td>
+            <td>{{ q.due_date or "—" }}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+{% endblock %}

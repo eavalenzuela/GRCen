@@ -4,9 +4,12 @@
 {% block content %}
 <div style="display:flex;justify-content:space-between;align-items:center;">
     <h1>Answer Library</h1>
-    {% if has_perm(user.role, Permission.CREATE) %}
-    <a href="/assets/new?type=answer" class="btn btn-primary">New Answer</a>
-    {% endif %}
+    <div style="display:flex;gap:0.5rem;">
+        <a href="/questionnaires" class="btn">Incoming Questionnaires</a>
+        {% if has_perm(user.role, Permission.CREATE) %}
+        <a href="/assets/new?type=answer" class="btn btn-primary">New Answer</a>
+        {% endif %}
+    </div>
 </div>
 <p>Canonical answers to security questionnaires customers send us. Each answer is
    backed by the Control / Policy / System / Framework / Audit assets that
