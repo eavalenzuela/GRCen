@@ -4,7 +4,13 @@
 {% block content %}
 <div style="display:flex;justify-content:space-between;align-items:center;">
     <h1>{{ questionnaire.name }}</h1>
-    <a href="/questionnaires" class="btn">← All Questionnaires</a>
+    <div style="display:flex;gap:0.5rem;">
+        {% if has_perm(user.role, Permission.EXPORT) %}
+        <a href="/questionnaires/{{ questionnaire.id }}/export.csv" class="btn">Export CSV</a>
+        <a href="/questionnaires/{{ questionnaire.id }}/export.pdf" class="btn">Export PDF</a>
+        {% endif %}
+        <a href="/questionnaires" class="btn">← All Questionnaires</a>
+    </div>
 </div>
 <p style="color:#6b7280;">
     {% if questionnaire.source %}From <strong>{{ questionnaire.source }}</strong> · {% endif %}

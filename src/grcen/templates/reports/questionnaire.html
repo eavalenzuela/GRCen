@@ -1,0 +1,23 @@
+{% extends "reports/_base.html" %}
+{% block title %}{{ questionnaire.name }}{% endblock %}
+{% block page_title %}{{ questionnaire.name }}{% endblock %}
+{% block heading %}{{ questionnaire.name }}{% endblock %}
+{% block cover %}{% include "reports/_cover.html" %}{% endblock %}
+{% block content %}
+<p>
+    {% if questionnaire.source %}Prepared for <strong>{{ questionnaire.source }}</strong>. {% endif %}
+    <span class="pill pill-ok">{{ answered_count }} answered</span>
+    out of {{ responses|length }} question{{ 's' if responses|length != 1 else '' }}.
+</p>
+
+{% for r in responses %}
+<div style="margin-bottom:0.9rem;">
+    <p style="font-weight:600;margin:0 0 0.2rem;">{{ loop.index }}. {{ r.question_text }}</p>
+    {% if r.filled_answer %}
+    <p style="margin:0;">{{ r.filled_answer }}</p>
+    {% else %}
+    <p class="muted" style="margin:0;"><em>Not answered.</em></p>
+    {% endif %}
+</div>
+{% endfor %}
+{% endblock %}

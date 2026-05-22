@@ -9,13 +9,19 @@ from uuid import UUID
 
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from grcen.models.user import User
 from grcen.permissions import Permission
 from grcen.routers._pages_shared import _csrf_check, templates
 from grcen.routers.deps import get_db, require_permission
-from grcen.services import alert_service as alert_svc, answer_service, questionnaire_service
+from grcen.services import (
+    access_log_service,
+    alert_service as alert_svc,
+    answer_service,
+    pdf_service,
+    questionnaire_service,
+)
 
 router = APIRouter(tags=["pages"], dependencies=[Depends(_csrf_check)])
 
@@ -206,3 +212,67 @@ async def questionnaire_delete(
         pool, questionnaire_id, organization_id=user.organization_id
     )
     return RedirectResponse("/questionnaires", status_code=302)
+
+
+@router.get("/questionnaires/{questionnaire_id}/export.csv")
+async def questionnaire_export_csv(
+    questionnaire_id: UUID,
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.EXPORT)),
+):
+    q = await questionnaire_service.get_questionnaire(
+        pool, questionnaire_id, organization_id=user.organization_id
+    )
+    if q is None:
+        raise HTTPException(status_code=404, detail="Questionnaire not found")
+    responses = await questionnaire_service.list_responses(
+        pool, questionnaire_id, organization_id=user.organization_id
+    )
+    import csv
+    import io
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["position", "question", "answer", "status"])
+    for r in responses:
+        writer.writerow([r["position"], r["question_text"], r["filled_answer"], r["status"]])
+    await access_log_service.record(
+        pool, user=user, action="export",
+        entity_type="questionnaire", entity_id=questionnaire_id,
+        entity_name=f"{q['name']}.csv",
+        path=str(request.url.path),
+        ip_address=request.client.host if request.client else None,
+    )
+    disposition = f'attachment; filename="questionnaire-{questionnaire_id}.csv"'
+    return Response(
+        content=buf.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": disposition},
+    )
+
+
+@router.get("/questionnaires/{questionnaire_id}/export.pdf")
+async def questionnaire_export_pdf(
+    questionnaire_id: UUID,
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.EXPORT)),
+):
+    pdf = await pdf_service.render_questionnaire_report(
+        pool, questionnaire_id, organization_id=user.organization_id
+    )
+    if pdf is None:
+        raise HTTPException(status_code=404, detail="Questionnaire not found")
+    await access_log_service.record(
+        pool, user=user, action="pdf_export",
+        entity_type="questionnaire", entity_id=questionnaire_id,
+        path=str(request.url.path),
+        ip_address=request.client.host if request.client else None,
+    )
+    disposition = f'attachment; filename="questionnaire-{questionnaire_id}.pdf"'
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": disposition},
+    )

@@ -5,9 +5,7 @@ import pytest
 
 from grcen.models.asset import AssetType
 from grcen.permissions import UserRole
-from grcen.services import answer_service
-from grcen.services import asset as asset_svc
-from grcen.services import questionnaire_service as qs
+from grcen.services import answer_service, asset as asset_svc, questionnaire_service as qs
 from grcen.services.auth import create_user
 
 
@@ -164,6 +162,68 @@ async def test_questionnaire_http_flow(auth_client, pool):
 
     listing = await auth_client.get("/questionnaires")
     assert "Vendor Review" in listing.text
+
+
+# ── export (Phase 4) ────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_export_csv(auth_client, pool):
+    from tests.conftest import get_csrf_token
+
+    csrf = await get_csrf_token(auth_client, "/questionnaires")
+    r = await auth_client.post(
+        "/questionnaires",
+        data={"name": "ExportMe", "csrf_token": csrf},
+        follow_redirects=False,
+    )
+    qid = r.headers["location"].rsplit("/", 1)[-1]
+    from uuid import UUID as _UUID
+
+    # Use the org the auth_client admin belongs to: fetch it from the questionnaire.
+    q_org = await pool.fetchval("SELECT organization_id FROM questionnaires WHERE id = $1", _UUID(qid))
+    await qs.import_questions(pool, _UUID(qid), ["Do you log?"], organization_id=q_org)
+    resp = (await qs.list_responses(pool, _UUID(qid), organization_id=q_org))[0]
+    await qs.set_response(pool, resp["id"], organization_id=q_org, filled_answer="Yes, we do.")
+
+    out = await auth_client.get(f"/questionnaires/{qid}/export.csv")
+    assert out.status_code == 200
+    assert "text/csv" in out.headers["content-type"]
+    assert "Do you log?" in out.text
+    assert "Yes, we do." in out.text
+    # Export is recorded in the access log
+    logged = await pool.fetchval(
+        "SELECT count(*) FROM data_access_log WHERE entity_type = 'questionnaire' AND action = 'export'"
+    )
+    assert logged >= 1
+
+
+@pytest.mark.asyncio
+async def test_export_pdf(auth_client, pool):
+    from uuid import UUID as _UUID
+
+    from tests.conftest import get_csrf_token
+
+    csrf = await get_csrf_token(auth_client, "/questionnaires")
+    r = await auth_client.post(
+        "/questionnaires",
+        data={"name": "PdfExport", "csrf_token": csrf},
+        follow_redirects=False,
+    )
+    qid = r.headers["location"].rsplit("/", 1)[-1]
+    q_org = await pool.fetchval("SELECT organization_id FROM questionnaires WHERE id = $1", _UUID(qid))
+    await qs.import_questions(pool, _UUID(qid), ["Q?"], organization_id=q_org)
+
+    out = await auth_client.get(f"/questionnaires/{qid}/export.pdf")
+    assert out.status_code == 200
+    assert out.headers["content-type"] == "application/pdf"
+    assert out.content[:5] == b"%PDF-"
+
+
+@pytest.mark.asyncio
+async def test_export_missing_questionnaire_404(auth_client):
+    out = await auth_client.get(f"/questionnaires/{uuid.uuid4()}/export.csv")
+    assert out.status_code == 404
 
 
 @pytest.mark.asyncio

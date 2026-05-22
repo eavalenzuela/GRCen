@@ -276,3 +276,37 @@ async def render_asset_report(
             **branding,
         },
     )
+
+
+async def render_questionnaire_report(
+    pool: asyncpg.Pool,
+    questionnaire_id: UUID,
+    *,
+    organization_id: UUID | None = None,
+) -> bytes | None:
+    """A filled-questionnaire PDF to send back to the requesting customer."""
+    from grcen.services import questionnaire_service
+
+    q = await questionnaire_service.get_questionnaire(
+        pool, questionnaire_id, organization_id=organization_id
+    )
+    if q is None:
+        return None
+    responses = await questionnaire_service.list_responses(
+        pool, questionnaire_id, organization_id=organization_id
+    )
+    branding = await _branding_context(pool, organization_id)
+    return _render(
+        "reports/questionnaire.html",
+        {
+            "questionnaire": q,
+            "responses": responses,
+            "answered_count": sum(
+                1 for r in responses if r["status"] in ("filled", "reviewed")
+            ),
+            "generated_at": datetime.now(UTC),
+            "cover_title": q["name"],
+            "cover_subtitle": "Security Questionnaire Response",
+            **branding,
+        },
+    )
