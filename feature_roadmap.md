@@ -72,6 +72,45 @@ Local users enroll TOTP from `/settings`: QR code, eight single-use recovery cod
 ### 20. HTML Email Templates — **SHIPPED (with branding + digest mode)**
 Outbound alert emails are `multipart/alternative` (plain-text + HTML). Templates: `_layout.html`, `alert.html`/`.txt`, `digest.html`/`.txt`. The HTML shell pulls `app_name`, `brand_color`, and `logo_url` from per-org branding when present (`organizations.email_from_name` / `email_brand_color` / `email_logo_url`), with per-field fallback to defaults. `List-Unsubscribe` + `List-Unsubscribe-Post: List-Unsubscribe=One-Click` headers point at `/settings`. **Digest mode**: users can pick `email_notification_mode = 'digest'` from `/settings`; alerts queue into `pending_email_digest` and an APScheduler hourly job (`_flush_email_digests`, `:15` past the hour) groups by user × org and sends one envelope per group. Falls back gracefully when a user opts out between queue and flush. Remaining: webhook-driven email previews in the admin UI.
 
+## Tier 5 — Net-New Features (Proposed)
+
+### 21. Security Questionnaire Answer Library (Inbound) — **PROPOSED**
+
+**Not yet implemented.** Design captured here for review before any build.
+
+**Problem.** When a customer or prospect sends *us* a security questionnaire (SIG, CAIQ, or a bespoke spreadsheet) during a sales cycle or vendor review, someone has to answer dozens to hundreds of questions about our own posture, consistently, and re-answer them every time. A flat answer bank (Loopio-style) solves the "type it once" problem but not the "is this answer still true?" problem — it goes stale silently, and you confidently tell a prospect "MFA is enforced on all admin accounts" months after someone disabled it.
+
+**Why it lives in GRCen, not the evidence-collection tool.** GRCen is the system of record for **control state** (Control `metadata.effectiveness`, asset status, framework coverage). The sibling tool only *collects evidence* upstream — it does not hold pass/fail state. Because the "is this answer still true" signal originates from control state that lives here, the feature is self-contained in GRCen: no cross-tool integration or webhook-in is required for freshness. (Evidence collected by the other tool already lands as attachments/assets — that is a separate, existing pathway.)
+
+The differentiator over a flat answer bank: answers are **graph-linked to the assets that substantiate them**, so freshness is a graph traversal, not manual bookkeeping.
+
+#### Data model
+
+Split by lifecycle: the **reusable library** is graph-native; **transactional questionnaire instances** are dedicated tables.
+
+- **Answer-library entries → graph (new `AssetType.ANSWER`).** Question text → asset `name`; canonical answer + answer-type (yes-no / scale / free-text) → custom fields (`custom_fields.py`); categorize with the existing tag vocabulary (#8). Modeling these as assets is deliberate: it makes substantiation a real `Relationship`, which unlocks the freshness traversal and reuses attachments (#6), audit, redaction (#14, for answers that quote sensitive detail), search, and the node graph for free.
+- **Substantiation links → relationships.** New relationship type `substantiated_by` (add to `RELATIONSHIP_LABELS` in `routers/_pages_shared.py`; `relationship_type` is already a free-text VARCHAR, so no schema change). An Answer links `substantiated_by` → one or more **Control / Policy / System / Framework / Audit** assets.
+- **Questionnaire documents → new tables.** `questionnaires` (an imported incoming questionnaire: name, source customer, due date, status) and `questionnaire_responses` (one row per question in that instance: question text, mapped `answer_asset_id` nullable, filled answer text, reviewer, status). These are point-in-time documents, not permanent graph nodes, so they stay out of the asset graph. Both carry `organization_id` per the multi-tenancy convention (#12).
+
+#### Freshness engine (the payoff)
+
+A traversal walks each Answer's outbound `substantiated_by` edges (reusing `services/graph.py`) and flags the answer **needs-review** when any substantiating asset has degraded — Control `effectiveness` of `ineffective`/`not_tested`, Policy/System status `inactive`/`archived`, or a Framework with open gaps. Mirrors the existing risk control-effectiveness rollup pattern (#7). Surfaced as a column in the library list and as a dashboard widget ("N answers need review"); optionally fires an alert (#1/#2) when an answer goes stale.
+
+#### Fill workflow
+
+1. Import an incoming questionnaire (CSV first; XLSX later) — each row becomes a `questionnaire_responses` question.
+2. Match questions against the library — manual mapping UI first (pick the library entry per question), fuzzy/semantic matching as a later enhancement.
+3. Auto-fill mapped questions from their library entries; flag any answer whose source is stale before sending.
+4. Export the filled questionnaire as CSV/PDF (reuse `pdf_service` + `templates/reports/_base.html`, with per-org branding). Record the export in the data-access log (#15) — who sent what to which customer matters for inbound reviews.
+
+#### Reuse summary
+Attachments (evidence on answers), tags (#8), RBAC (separate "edit library" vs "fill questionnaire" permissions), redaction (#14), PDF/CSV export (#11), access log (#15), alerts (#1/#2). New surface area is mainly: one asset type + custom fields, one relationship type (display only), two tables, the freshness traversal, and the import/fill UI.
+
+#### Open questions
+- Permission granularity: does filling a questionnaire need a distinct permission from editing the library?
+- Whether `AssetType.ANSWER` should appear in the general asset list/graph by default or be confined to a dedicated `/answers` surface (it is posture metadata, not an organizational asset like the other 16).
+- Outbound vendor-risk questionnaires (assessing *our* vendors — the original roadmap-review interpretation) share almost no code with this and are explicitly **out of scope** for #21; track separately if wanted.
+
 ---
 
 ## Known Stale / Cleanup
