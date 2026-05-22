@@ -28,7 +28,7 @@ GRCen (pronounced "gurken") is a free and open-source GRC (Governance, Risk, Com
 
 ## Asset Model
 
-16 asset types are implemented: Person, Policy, Product, System, Device, Data Category, Audit, Requirement, Process, Intellectual Property, Risk, Organizational Unit, Vendor, Control, Incident, Framework. Any asset can link to any other via a `Relationship` with a type and free-text description. Per-type custom fields are supported (`src/grcen/custom_fields.py`). Both assets AND relationships can have evidence/document/URL attachments (enforced by a CHECK constraint that an attachment has exactly one owner).
+17 asset types are implemented: Person, Policy, Product, System, Device, Data Category, Audit, Requirement, Process, Intellectual Property, Risk, Organizational Unit, Vendor, Control, Incident, Framework — plus Answer (a *posture* type, see below). Asset types split into `ORGANIZATIONAL_TYPES` (the 16) and `POSTURE_TYPES` (Answer) in `models/asset.py`; the general /assets list, dashboard counts, and framework in-scope panels iterate the organizational set only. Any asset can link to any other via a `Relationship` with a type and free-text description. Per-type custom fields are supported (`src/grcen/custom_fields.py`). Both assets AND relationships can have evidence/document/URL attachments (enforced by a CHECK constraint that an attachment has exactly one owner).
 
 ## Implemented Features
 
@@ -55,6 +55,7 @@ GRCen (pronounced "gurken") is a free and open-source GRC (Governance, Risk, Com
 - Saved searches: per-user bookmarks of current filters on `/assets` and `/risk-management` with optional sharing. REST: `/api/saved-searches/`
 - PDF reports: WeasyPrint-generated at `/frameworks/{id}/report.pdf` and `/assets/{id}/report.pdf` (shared print stylesheet in `templates/reports/_base.html`)
 - Compliance framework dashboards at `/frameworks` and `/frameworks/{id}` with coverage bars, gap highlighting, audit + vendor panels, and matching `GET /api/frameworks/` and `GET /api/frameworks/{id}` JSON endpoints
+- Inbound security questionnaire answer library (feature_roadmap.md #21) at `/answers`: canonical Q&A entries (`AssetType.ANSWER`) linked to substantiating Control/Policy/System/Framework/Audit assets via `substantiated_by`; a freshness engine (`answer_service`) flags answers as needing review when a substantiator degrades. Incoming questionnaires at `/questionnaires`: CSV import, per-question fill (map to a library answer with auto-fill, or manual), status tracking, CSV/PDF export (`questionnaire_service`, `routers/answer_pages.py`)
 - REST API: full CRUD for assets/relationships, `/api/graph/{id}` subgraph queries, bulk endpoints at `/api/imports/assets/bulk` and `/api/imports/relationships/bulk` (with `dry_run`), relationship preview at `/api/imports/relationships/preview`, authenticated `/docs` OpenAPI UI, Bearer token auth via `/api/tokens` with per-token permission scoping
 
 ## Known Gaps (see `feature_roadmap.md` for the full list)

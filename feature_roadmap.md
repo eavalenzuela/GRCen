@@ -72,11 +72,17 @@ Local users enroll TOTP from `/settings`: QR code, eight single-use recovery cod
 ### 20. HTML Email Templates — **SHIPPED (with branding + digest mode)**
 Outbound alert emails are `multipart/alternative` (plain-text + HTML). Templates: `_layout.html`, `alert.html`/`.txt`, `digest.html`/`.txt`. The HTML shell pulls `app_name`, `brand_color`, and `logo_url` from per-org branding when present (`organizations.email_from_name` / `email_brand_color` / `email_logo_url`), with per-field fallback to defaults. `List-Unsubscribe` + `List-Unsubscribe-Post: List-Unsubscribe=One-Click` headers point at `/settings`. **Digest mode**: users can pick `email_notification_mode = 'digest'` from `/settings`; alerts queue into `pending_email_digest` and an APScheduler hourly job (`_flush_email_digests`, `:15` past the hour) groups by user × org and sends one envelope per group. Falls back gracefully when a user opts out between queue and flush. Remaining: webhook-driven email previews in the admin UI.
 
-## Tier 5 — Net-New Features (Proposed)
+## Tier 5 — Net-New Features
 
-### 21. Security Questionnaire Answer Library (Inbound) — **PROPOSED**
+### 21. Security Questionnaire Answer Library (Inbound) — **SHIPPED**
 
-**Not yet implemented.** Design captured here for review before any build.
+Built in four phases (all on `main` once validated):
+- **Phase 1** — `AssetType.ANSWER` (question=name, canonical answer=description) + custom fields; the `POSTURE_TYPES`/`ORGANIZATIONAL_TYPES` taxonomy split excluding answers from the general /assets surfaces; the `substantiated_by` relationship; the `/answers` workspace and forced-type create flow.
+- **Phase 2** — freshness engine: `answer_service.list_answers` flags an answer needs-review when unsubstantiated or backed by a degraded asset (control ineffective/not_tested, asset inactive/archived, framework not_started/not_applicable); `/answers` review column + dashboard widget.
+- **Phase 3** — inbound questionnaires: `questionnaires` + `questionnaire_responses` tables, CSV question import, per-question fill (map to a library answer with auto-fill, or manual), status tracking; routes under `/questionnaires`.
+- **Phase 4** — export filled questionnaires to CSV + branded PDF (`reports/questionnaire.html`), recorded in the data-access log.
+
+Design notes below were the pre-build plan; they remain accurate.
 
 **Problem.** When a customer or prospect sends *us* a security questionnaire (SIG, CAIQ, or a bespoke spreadsheet) during a sales cycle or vendor review, someone has to answer dozens to hundreds of questions about our own posture, consistently, and re-answer them every time. A flat answer bank (Loopio-style) solves the "type it once" problem but not the "is this answer still true?" problem — it goes stale silently, and you confidently tell a prospect "MFA is enforced on all admin accounts" months after someone disabled it.
 
