@@ -92,6 +92,15 @@ Split by lifecycle: the **reusable library** is graph-native; **transactional qu
 - **Substantiation links → relationships.** New relationship type `substantiated_by` (add to `RELATIONSHIP_LABELS` in `routers/_pages_shared.py`; `relationship_type` is already a free-text VARCHAR, so no schema change). An Answer links `substantiated_by` → one or more **Control / Policy / System / Framework / Audit** assets.
 - **Questionnaire documents → new tables.** `questionnaires` (an imported incoming questionnaire: name, source customer, due date, status) and `questionnaire_responses` (one row per question in that instance: question text, mapped `answer_asset_id` nullable, filled answer text, reviewer, status). These are point-in-time documents, not permanent graph nodes, so they stay out of the asset graph. Both carry `organization_id` per the multi-tenancy convention (#12).
 
+#### Surfaces (decided)
+
+`AssetType.ANSWER` is a full member of the data model (real relationships, freshness traversal, attachment/audit/redaction reuse) but is *not* surfaced like the 16 organizational asset types. Decision:
+
+- **Home:** a dedicated `/answers` workspace (follows the `/risk-management` and `/controls` precedent) where import / fill / export / staleness-review live.
+- **Node graph + search:** answers **do** appear — seeing which customer-facing claims a Control/Policy substantiates is the traceability payoff; depth limits keep it bounded.
+- **General `/assets` list, dashboard asset counts, framework "in-scope assets" panels:** answers are **excluded by default** (answers are posture metadata, not org assets). A `?type=answer` filter on `/assets` is the escape hatch.
+- **Implementation of the carve-out:** introduce one taxonomy split at the model level — `ORGANIZATIONAL_TYPES` (the existing 16) vs `POSTURE_TYPES` (Answer) — and have the general surfaces iterate `ORGANIZATIONAL_TYPES`, rather than scattering `type != 'answer'` literals. Future metadata-style types slot in cleanly. (Library volume is expected to be modest, so this is a clarity/conceptual choice, not a scale one.)
+
 #### Freshness engine (the payoff)
 
 A traversal walks each Answer's outbound `substantiated_by` edges (reusing `services/graph.py`) and flags the answer **needs-review** when any substantiating asset has degraded — Control `effectiveness` of `ineffective`/`not_tested`, Policy/System status `inactive`/`archived`, or a Framework with open gaps. Mirrors the existing risk control-effectiveness rollup pattern (#7). Surfaced as a column in the library list and as a dashboard widget ("N answers need review"); optionally fires an alert (#1/#2) when an answer goes stale.
@@ -108,7 +117,7 @@ Attachments (evidence on answers), tags (#8), RBAC (separate "edit library" vs "
 
 #### Open questions
 - Permission granularity: does filling a questionnaire need a distinct permission from editing the library?
-- Whether `AssetType.ANSWER` should appear in the general asset list/graph by default or be confined to a dedicated `/answers` surface (it is posture metadata, not an organizational asset like the other 16).
+- ~~Whether `AssetType.ANSWER` should appear in the general asset list/graph by default~~ **Resolved** — see "Surfaces (decided)" above: dedicated `/answers` home, present in graph+search, excluded from the general `/assets` list and asset counts via an `ORGANIZATIONAL_TYPES` / `POSTURE_TYPES` taxonomy split.
 - Outbound vendor-risk questionnaires (assessing *our* vendors — the original roadmap-review interpretation) share almost no code with this and are explicitly **out of scope** for #21; track separately if wanted.
 
 ---
