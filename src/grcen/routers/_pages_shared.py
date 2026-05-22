@@ -58,6 +58,8 @@ RELATIONSHIP_LABELS: dict[str, tuple[str, str]] = {
     "certifies": ("certifies", "certified by"),
     "tested_by": ("tested by", "tests"),
     "parent_of": ("parent of", "child of"),
+    # Answer-library entry → the Control/Policy/System/Framework/Audit that backs it
+    "substantiated_by": ("substantiated by", "substantiates"),
 }
 
 

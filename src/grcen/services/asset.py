@@ -5,7 +5,7 @@ from uuid import UUID
 
 import asyncpg
 
-from grcen.models.asset import Asset, AssetType
+from grcen.models.asset import POSTURE_TYPES, Asset, AssetType
 
 _SELECT_WITH_OWNER = """
     SELECT a.*, o.name AS owner_name
@@ -115,6 +115,17 @@ async def list_assets(
         for at in asset_types:
             vals.append(at.value)
             idx += 1
+    else:
+        # No explicit type filter: hide posture/metadata types (e.g. answer
+        # library entries) from the general listing. They have their own
+        # surfaces; an explicit ?type=answer filter still reaches them.
+        posture = [t.value for t in POSTURE_TYPES]
+        if posture:
+            placeholders = ", ".join(f"${idx + i}" for i in range(len(posture)))
+            where_parts.append(f"a.type NOT IN ({placeholders})")
+            for pv in posture:
+                vals.append(pv)
+                idx += 1
 
     if q:
         where_parts.append(f"(a.name ILIKE ${idx} OR a.description ILIKE ${idx} OR o.name ILIKE ${idx})")

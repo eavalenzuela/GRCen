@@ -254,6 +254,9 @@ DO $$ BEGIN ALTER TYPE asset_type ADD VALUE 'incident';
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN ALTER TYPE asset_type ADD VALUE 'framework';
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+-- Answer-library entries (feature_roadmap.md #21): posture metadata modeled as assets
+DO $$ BEGIN ALTER TYPE asset_type ADD VALUE 'answer';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- Global tags and criticality columns
 DO $$ BEGIN

@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Answer Library - GRCen{% endblock %}
+
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;">
+    <h1>Answer Library</h1>
+    {% if has_perm(user.role, Permission.CREATE) %}
+    <a href="/assets/new?type=answer" class="btn btn-primary">New Answer</a>
+    {% endif %}
+</div>
+<p>Canonical answers to security questionnaires customers send us. Each answer is
+   backed by the Control / Policy / System / Framework / Audit assets that
+   substantiate it (a <code>substantiated_by</code> link), so when those assets
+   change you can tell which answers need a fresh look.</p>
+
+{% if not answers %}
+<p style="color:#6b7280;">No answers yet. <a href="/assets/new?type=answer">Add the first one</a>.</p>
+{% else %}
+<table class="table">
+    <thead>
+        <tr>
+            <th>Question</th>
+            <th>Short answer</th>
+            <th>Substantiated by</th>
+            <th>Last reviewed</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for a in answers %}
+        <tr>
+            <td>
+                <a href="/assets/{{ a.id }}">{{ a.question }}</a>
+                {% if a.answer %}
+                <br><small style="color:#6b7280;">{{ a.answer | truncate(120) }}</small>
+                {% endif %}
+            </td>
+            <td>
+                {% if a.short_answer %}{{ a.short_answer | replace('_', ' ') | title }}{% else %}<em style="color:#6b7280;">—</em>{% endif %}
+            </td>
+            <td>
+                {% if a.substantiators %}
+                <ul style="margin:0;padding-left:1.25rem;">
+                {% for s in a.substantiators %}
+                    <li><a href="/assets/{{ s.id }}">{{ s.name }}</a>
+                        <small style="color:#6b7280;">({{ s.type | replace('_', ' ') }})</small></li>
+                {% endfor %}
+                </ul>
+                {% else %}
+                <em style="color:#b91c1c;">unsubstantiated</em>
+                {% endif %}
+            </td>
+            <td>
+                {% if a.last_reviewed %}{{ a.last_reviewed }}{% else %}<em style="color:#6b7280;">never</em>{% endif %}
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+{% endblock %}

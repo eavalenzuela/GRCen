@@ -22,6 +22,21 @@ class AssetType(enum.StrEnum):
     CONTROL = "control"
     INCIDENT = "incident"
     FRAMEWORK = "framework"
+    ANSWER = "answer"
+
+
+# Posture / metadata asset types. These are modeled as assets so they get
+# first-class relationships, graph traceability, attachments, and search — but
+# they are NOT organizational assets like the other types, so the general
+# surfaces (the /assets list, dashboard asset counts, framework "in-scope
+# assets" panels) exclude them by default. See feature_roadmap.md #21.
+POSTURE_TYPES: frozenset[AssetType] = frozenset({AssetType.ANSWER})
+
+# The organizational asset types, sorted for stable menu/dropdown rendering.
+# Browse and create surfaces iterate this rather than the full AssetType enum.
+ORGANIZATIONAL_TYPES: list[AssetType] = sorted(
+    (t for t in AssetType if t not in POSTURE_TYPES), key=lambda t: t.value
+)
 
 
 class AssetStatus(enum.StrEnum):

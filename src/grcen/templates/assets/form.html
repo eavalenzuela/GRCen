@@ -5,7 +5,9 @@
 
 <form method="post" action="{% if asset %}/assets/{{ asset.id }}/edit{% else %}/assets/new{% endif %}">
     {% include "partials/csrf.html" %}
-    {% if not asset %}
+    {% if not asset and forced_type %}
+    <input type="hidden" name="type" value="{{ forced_type.value }}">
+    {% elif not asset %}
     <div class="form-group">
         <label for="type">Type</label>
         <select id="type" name="type" required>
@@ -17,12 +19,12 @@
     {% endif %}
 
     <div class="form-group">
-        <label for="name">Name</label>
+        <label for="name">{{ name_label | default("Name") }}</label>
         <input type="text" id="name" name="name" value="{{ asset.name if asset else '' }}" required>
     </div>
 
     <div class="form-group">
-        <label for="description">Description</label>
+        <label for="description">{{ description_label | default("Description") }}</label>
         <textarea id="description" name="description" rows="4">{{ asset.description if asset and asset.description else '' }}</textarea>
     </div>
 
@@ -113,6 +115,29 @@
                 {% endif %}
             </div>
             {% endfor %}
+        {% elif not asset and forced_type and asset_custom_fields %}
+            {# Create mode with a pinned type (e.g. answer library): show that type's fields directly #}
+            {% for f in asset_custom_fields %}
+            <div class="form-group">
+                <label for="meta_{{ f.name }}">{{ f.label }}{% if f.help_text %} <small>({{ f.help_text }})</small>{% endif %}</label>
+                {% if f.field_type == "enum" %}
+                <select id="meta_{{ f.name }}" name="metadata.{{ f.name }}">
+                    <option value="">— Select —</option>
+                    {% for c in f.choices %}
+                    <option value="{{ c }}">{{ c | replace('_', ' ') | title }}</option>
+                    {% endfor %}
+                </select>
+                {% elif f.field_type == "boolean" %}
+                <input type="checkbox" id="meta_{{ f.name }}" name="metadata.{{ f.name }}" value="on">
+                {% elif f.field_type == "date" %}
+                <input type="date" id="meta_{{ f.name }}" name="metadata.{{ f.name }}">
+                {% elif f.field_type == "integer" %}
+                <input type="number" id="meta_{{ f.name }}" name="metadata.{{ f.name }}">
+                {% else %}
+                <input type="text" id="meta_{{ f.name }}" name="metadata.{{ f.name }}">
+                {% endif %}
+            </div>
+            {% endfor %}
         {% elif not asset and custom_fields %}
             {# Create mode: render all fields, show/hide via JS based on selected type #}
             {% for type_key, fields in custom_fields.items() %}
@@ -159,7 +184,7 @@ document.getElementById('owner_search').addEventListener('input', function() {
     document.getElementById('owner_q').value = this.value;
 });
 
-{% if not asset %}
+{% if not asset and not forced_type %}
 (function() {
     var typeSelect = document.getElementById('type');
     var ownerLabel = document.getElementById('owner-label');

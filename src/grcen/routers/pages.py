@@ -10,6 +10,7 @@ from fastapi import APIRouter
 
 from grcen.routers import (
     admin_pages,
+    answer_pages,
     asset_pages,
     auth_pages,
     dashboard_pages,
@@ -29,6 +30,7 @@ for _sub in (
     tag_pages,
     framework_pages,
     settings_pages,
+    answer_pages,
     admin_pages,
 ):
     router.include_router(_sub.router)

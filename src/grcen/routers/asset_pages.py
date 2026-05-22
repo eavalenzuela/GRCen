@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from grcen.custom_fields import CUSTOM_FIELDS
-from grcen.models.asset import AssetType
+from grcen.models.asset import ORGANIZATIONAL_TYPES, AssetType
 from grcen.models.user import User
 from grcen.permissions import Permission
 from grcen.routers._pages_shared import (
@@ -107,7 +107,7 @@ async def asset_list(
             "page": page,
             "pages": (total + 24) // 25,
             "current_type": asset_type,
-            "asset_types": sorted(AssetType, key=lambda t: t.value),
+            "asset_types": ORGANIZATIONAL_TYPES,
             "notif_count": notif_count,
             "filter_q": q or "",
             "filter_status": status or "",
@@ -132,20 +132,35 @@ async def asset_list(
 @router.get("/assets/new", response_class=HTMLResponse)
 async def asset_new(
     request: Request,
+    type: str | None = None,
     user: User = Depends(require_permission(Permission.CREATE)),
     pool: asyncpg.Pool = Depends(get_db),
 ):
     notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     known_tags = await tag_service.list_tags_with_counts(pool, organization_id=user.organization_id)
-    return templates.TemplateResponse(request, "assets/form.html", context={
-            "user": user,
-            "asset": None,
-            "asset_types": sorted(AssetType, key=lambda t: t.value),
-            "notif_count": notif_count,
-            "custom_fields": CUSTOM_FIELDS,
-            "known_tags": known_tags,
-        },
-    )
+    # A ?type= query param pins the asset type (used by posture-type workspaces
+    # like /answers, whose type is hidden from the general create picker).
+    forced_type: AssetType | None = None
+    if type:
+        try:
+            forced_type = AssetType(type)
+        except ValueError:
+            forced_type = None
+    context = {
+        "user": user,
+        "asset": None,
+        "asset_types": ORGANIZATIONAL_TYPES,
+        "notif_count": notif_count,
+        "custom_fields": CUSTOM_FIELDS,
+        "known_tags": known_tags,
+        "forced_type": forced_type,
+    }
+    if forced_type is not None:
+        context["asset_custom_fields"] = CUSTOM_FIELDS.get(forced_type, [])
+        if forced_type == AssetType.ANSWER:
+            context["name_label"] = "Question"
+            context["description_label"] = "Canonical answer"
+    return templates.TemplateResponse(request, "assets/form.html", context=context)
 
 
 @router.post("/assets/new")
@@ -278,7 +293,7 @@ async def asset_detail(
             "relationships": rels,
             "attachments": atts,
             "alerts": alerts,
-            "asset_types": sorted(AssetType, key=lambda t: t.value),
+            "asset_types": ORGANIZATIONAL_TYPES,
             "notif_count": notif_count,
             "asset_custom_fields": CUSTOM_FIELDS.get(asset.type, []),
             "linked_user": linked_user,
@@ -303,7 +318,7 @@ async def asset_edit(
     return templates.TemplateResponse(request, "assets/form.html", context={
             "user": user,
             "asset": asset,
-            "asset_types": sorted(AssetType, key=lambda t: t.value),
+            "asset_types": ORGANIZATIONAL_TYPES,
             "notif_count": notif_count,
             "custom_fields": CUSTOM_FIELDS,
             "asset_custom_fields": CUSTOM_FIELDS.get(asset.type, []),

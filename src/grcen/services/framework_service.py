@@ -24,6 +24,8 @@ from uuid import UUID
 
 import asyncpg
 
+from grcen.models.asset import POSTURE_TYPES
+
 
 @dataclass
 class FrameworkSummary:
@@ -464,8 +466,10 @@ async def _in_scope_assets(
              OR (r.target_asset_id = ANY($1::uuid[]) AND r.source_asset_id = a.id)
            WHERE a.type <> 'requirement'
              AND a.type <> 'framework'
+             AND a.type::text <> ALL($2::text[])
            ORDER BY a.type::text, a.name""",
         req_ids,
+        [t.value for t in POSTURE_TYPES],
     )
     return [
         {"id": r["id"], "name": r["name"], "type": r["type"], "status": r["status"]}

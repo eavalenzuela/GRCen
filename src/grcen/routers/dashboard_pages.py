@@ -5,7 +5,7 @@ import asyncpg
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from grcen.models.asset import AssetType
+from grcen.models.asset import ORGANIZATIONAL_TYPES
 from grcen.models.user import User
 from grcen.permissions import Permission
 from grcen.routers._pages_shared import (
@@ -47,7 +47,7 @@ async def dashboard(
             "total_assets": total,
             "alerts": alerts[:5],
             "notif_count": notif_count,
-            "asset_types": sorted(AssetType, key=lambda t: t.value),
+            "asset_types": ORGANIZATIONAL_TYPES,
             "heatmap": heatmap,
             "top_risks": top_risks,
             "likelihood_levels": risk_svc.LIKELIHOOD_LEVELS,
@@ -84,7 +84,7 @@ async def export_page(
     notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     return templates.TemplateResponse(request, "exports/index.html", context={
             "user": user,
-            "asset_types": sorted(AssetType, key=lambda t: t.value),
+            "asset_types": ORGANIZATIONAL_TYPES,
             "notif_count": notif_count,
         },
     )
@@ -108,7 +108,7 @@ async def reviews_page(
     return templates.TemplateResponse(request, "reviews/index.html", context={
             "user": user,
             "reviews": reviews,
-            "asset_types": sorted(AssetType, key=lambda t: t.value),
+            "asset_types": ORGANIZATIONAL_TYPES,
             "current_type": type or "",
             "current_status": status or "",
             "notif_count": notif_count,

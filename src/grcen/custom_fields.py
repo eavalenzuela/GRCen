@@ -474,6 +474,26 @@ CUSTOM_FIELDS: dict[AssetType, list[FieldDef]] = {
             choices=["mandatory", "voluntary", "contractual"],
         ),
     ],
+    # Answer-library entries (feature_roadmap.md #21): the question lives in the
+    # asset name, the canonical prose answer in the asset description. These
+    # fields capture the structured/quick value and review metadata.
+    AssetType.ANSWER: [
+        FieldDef(
+            "short_answer",
+            "Short Answer",
+            "enum",
+            choices=["yes", "no", "partial", "not_applicable"],
+            help_text="Quick value for yes/no questionnaire columns",
+        ),
+        FieldDef(
+            "answer_format",
+            "Question Format",
+            "enum",
+            choices=["boolean", "scale", "free_text"],
+            help_text="Expected answer shape, used when matching incoming questionnaires",
+        ),
+        FieldDef("last_reviewed", "Last Reviewed", "date"),
+    ],
 }
 
 
