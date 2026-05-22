@@ -4,7 +4,7 @@ import asyncpg
 from fastapi import APIRouter, Depends, HTTPException
 
 from grcen.models.user import User
-from grcen.permissions import Permission, ROLE_PERMISSIONS, has_permission
+from grcen.permissions import ROLE_PERMISSIONS, Permission, has_permission
 from grcen.routers.deps import get_current_user, get_db, require_permission
 from grcen.schemas.api_token import (
     TokenConfigResponse,
@@ -13,8 +13,7 @@ from grcen.schemas.api_token import (
     TokenCreatedResponse,
     TokenResponse,
 )
-from grcen.services import audit_service as audit_svc
-from grcen.services import token_service
+from grcen.services import audit_service as audit_svc, token_service
 
 router = APIRouter(prefix="/api/tokens", tags=["tokens"])
 

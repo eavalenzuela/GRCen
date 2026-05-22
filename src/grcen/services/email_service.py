@@ -20,8 +20,7 @@ import asyncpg
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from grcen.config import settings as app_settings
-from grcen.services import encryption_config
-from grcen.services import smtp_settings as smtp_svc
+from grcen.services import encryption_config, smtp_settings as smtp_svc
 from grcen.services.encryption import decrypt_field
 
 log = logging.getLogger(__name__)

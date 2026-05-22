@@ -10,7 +10,6 @@ from grcen.config import settings
 from grcen.services import encryption_config
 from grcen.services.encryption import encrypt_field
 
-
 _ROLE_CAP_OVERRIDES = {
     "admin": "SESSION_MAX_CONCURRENT_ADMIN",
     "auditor": "SESSION_MAX_CONCURRENT_AUDITOR",

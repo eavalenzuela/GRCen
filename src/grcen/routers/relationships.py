@@ -2,7 +2,9 @@ from uuid import UUID
 
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import JSONResponse
 
+from grcen.models.asset import AssetType
 from grcen.models.user import User
 from grcen.permissions import Permission
 from grcen.routers.deps import get_db, require_permission
@@ -11,13 +13,12 @@ from grcen.schemas.relationship import (
     RelationshipResponse,
     RelationshipUpdate,
 )
-from grcen.models.asset import AssetType
-from fastapi.responses import JSONResponse
-
-from grcen.services import asset as asset_svc
-from grcen.services import relationship as rel_svc
-from grcen.services import audit_service as audit_svc
-from grcen.services import workflow_service
+from grcen.services import (
+    asset as asset_svc,
+    audit_service as audit_svc,
+    relationship as rel_svc,
+    workflow_service,
+)
 
 router = APIRouter(prefix="/api/relationships", tags=["relationships"])
 

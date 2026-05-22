@@ -16,6 +16,8 @@ class Relationship:
     updated_at: datetime
     source_asset: Asset | None = None
     target_asset: Asset | None = None
+    # Transient display field, populated by list views; not persisted.
+    attachment_count: int = 0
 
     @classmethod
     def from_row(cls, row, prefix: str = "") -> "Relationship":

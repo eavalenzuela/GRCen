@@ -5,14 +5,13 @@ from grcen.config import settings
 from grcen.rate_limit import check_login_rate_limit
 from grcen.routers.deps import get_db
 from grcen.schemas.user import UserCreate, UserResponse
+from grcen.services import audit_service as audit_svc, session_service
 from grcen.services.auth import (
     authenticate_user,
     check_lockout,
     record_failed_login,
     record_successful_login,
 )
-from grcen.services import audit_service as audit_svc
-from grcen.services import session_service
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 

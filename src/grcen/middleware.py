@@ -7,7 +7,7 @@ from fastapi import HTTPException, Request
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import JSONResponse, RedirectResponse, Response
 
-from grcen.rate_limit import check_api_rate_limit, refresh_db_settings, _cache_fresh
+from grcen.rate_limit import _cache_fresh, check_api_rate_limit, refresh_db_settings
 
 # ---------------------------------------------------------------------------
 # Security headers middleware

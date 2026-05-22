@@ -14,10 +14,12 @@ from grcen.schemas.asset import (
     AssetResponse,
     AssetUpdate,
 )
-from grcen.services import asset as asset_svc
-from grcen.services import audit_service as audit_svc
-from grcen.services import redaction
-from grcen.services import workflow_service
+from grcen.services import (
+    asset as asset_svc,
+    audit_service as audit_svc,
+    redaction,
+    workflow_service,
+)
 
 router = APIRouter(prefix="/api/assets", tags=["assets"])
 

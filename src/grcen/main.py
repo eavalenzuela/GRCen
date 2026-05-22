@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -80,8 +80,19 @@ async def _purge_access_log():
     await purge_expired(pool)
 
 
+_DEFAULT_SECRET_KEY = "change-me-to-a-random-secret-key"
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Refuse to start the server with the shipped default SECRET_KEY outside of
+    # local development — it underpins session signing and CSRF tokens.
+    if not settings.DEBUG and settings.SECRET_KEY == _DEFAULT_SECRET_KEY:
+        raise RuntimeError(
+            "SECRET_KEY is still set to the insecure default. Set a strong, random "
+            "SECRET_KEY (e.g. `python -c \"import secrets; print(secrets.token_urlsafe(48))\"`) "
+            "before running with DEBUG=false."
+        )
     await init_pool()
     await init_schema()
     scheduler.add_job(_tick_alerts, "interval", minutes=1, id="alert_ticker")
@@ -198,7 +209,13 @@ def create_app() -> FastAPI:
 
     @app.get("/health")
     async def health():
-        return {"status": "ok"}
+        """Liveness + DB readiness probe."""
+        try:
+            pool = await get_pool()
+            await pool.fetchval("SELECT 1")
+        except Exception:
+            return JSONResponse({"status": "error", "db": "unreachable"}, status_code=503)
+        return {"status": "ok", "db": "ok"}
 
     # Add Bearer token security scheme to the OpenAPI spec
     _original_openapi = app.openapi
@@ -338,6 +355,7 @@ async def _create_superadmin():
 def _backup():
     """`grcen backup PATH` — write an encrypted dump of the database."""
     from pathlib import Path
+
     from grcen.services import backup_service
 
     if len(sys.argv) < 3:
@@ -358,6 +376,7 @@ def _backup():
 def _restore():
     """`grcen restore PATH` — decrypt and replay an encrypted dump via psql."""
     from pathlib import Path
+
     from grcen.services import backup_service
 
     if len(sys.argv) < 3:

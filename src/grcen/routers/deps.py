@@ -7,8 +7,8 @@ from grcen.config import settings
 from grcen.database import get_pool
 from grcen.models.user import User
 from grcen.permissions import Permission, has_permission
-from grcen.services.auth import get_user_by_id
 from grcen.services import session_service
+from grcen.services.auth import get_user_by_id
 
 
 async def get_db(pool: asyncpg.Pool = Depends(get_pool)) -> asyncpg.Pool:

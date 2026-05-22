@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import Iterable
+from collections.abc import Iterable
 from uuid import UUID
 
 import asyncpg

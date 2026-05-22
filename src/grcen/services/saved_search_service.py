@@ -28,7 +28,7 @@ class SavedSearch:
         return self.path
 
     @classmethod
-    def from_row(cls, row) -> "SavedSearch":
+    def from_row(cls, row) -> SavedSearch:
         return cls(
             id=row["id"],
             user_id=row["user_id"],

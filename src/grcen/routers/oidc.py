@@ -105,8 +105,7 @@ async def oidc_login(request: Request, pool: asyncpg.Pool = Depends(get_db), _=D
 
 @router.get("/callback")
 async def oidc_callback(request: Request, pool: asyncpg.Pool = Depends(get_db), _=Depends(_require_oidc)):
-    from grcen.services import asset as asset_svc
-    from grcen.services import auth as auth_svc
+    from grcen.services import asset as asset_svc, auth as auth_svc
 
     oauth = await get_oauth(pool)
     cfg = await oidc_settings.get_settings(pool)

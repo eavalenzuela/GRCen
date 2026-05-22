@@ -85,3 +85,72 @@ GRCen supports both OIDC and SAML 2.0 identity providers. Both are configured en
 5. Register GRCen with your IdP using the SP metadata URL shown on the settings page (`/auth/saml/metadata`)
 
 Both protocols support automatic user provisioning and Person asset creation on first login, role synchronization on each login, and can be enabled simultaneously. Admins can manage linked user accounts from the user edit page.
+
+## REST API
+
+GRCen exposes a full REST API alongside the web UI. Interactive OpenAPI docs are served (behind authentication) at `/docs` and `/redoc`; the raw schema is at `/api/openapi.json`.
+
+Authenticate with a Bearer token. Create one from **Settings > API Tokens** in the UI (or `POST /api/tokens`), scope it to the permissions it needs, and optionally restrict it to an IP allowlist. Tokens are shown once at creation and are prefixed `grcen_`.
+
+```bash
+# List assets (filter by type, tag, status, etc.)
+curl -H "Authorization: Bearer grcen_..." \
+  "http://localhost:8000/api/assets/?type=system&status=active"
+
+# Create an asset
+curl -X POST -H "Authorization: Bearer grcen_..." -H "Content-Type: application/json" \
+  -d '{"type": "risk", "name": "Vendor outage", "description": "Key SaaS dependency"}' \
+  http://localhost:8000/api/assets/
+
+# Link two assets with a described relationship
+curl -X POST -H "Authorization: Bearer grcen_..." -H "Content-Type: application/json" \
+  -d '{"source_asset_id": "<uuid>", "target_asset_id": "<uuid>", "relationship_type": "mitigated_by", "description": "Covered by DR plan"}' \
+  http://localhost:8000/api/relationships/
+
+# Fetch the subgraph reachable from a node
+curl -H "Authorization: Bearer grcen_..." \
+  "http://localhost:8000/api/graph/<uuid>?depth=2"
+
+# Bulk import (use ?dry_run=true to preview without writing)
+curl -X POST -H "Authorization: Bearer grcen_..." -H "Content-Type: application/json" \
+  -d '{"assets": [{"type": "control", "name": "MFA enforced"}]}' \
+  "http://localhost:8000/api/imports/assets/bulk?dry_run=true"
+```
+
+Note: when an asset type has workflow approval gating enabled, mutating REST calls return `202 Accepted` with a `pending_change_id` instead of applying the change immediately. Rate-limited responses return `429` with a `Retry-After` header.
+
+## CLI Reference
+
+Management commands are available via the `grcen` entrypoint (prefix with `docker compose exec app` when running under Docker Compose):
+
+| Command | Description |
+|---------|-------------|
+| `grcen runserver` | Start the web server (port 8000, or 8443 when TLS is configured). |
+| `grcen createadmin` | Create an admin user (prompts for org slug). |
+| `grcen createsuperadmin` | Create a cross-org superadmin. |
+| `grcen createorg` | Create an organization. |
+| `grcen listorgs` | List organizations. |
+| `grcen generate-key` | Generate a base64url encryption key for `ENCRYPTION_KEY`. |
+| `grcen rotate-keys` | Re-encrypt data under a new key (zero-downtime rotation). |
+| `grcen backup <out>` | Write an encrypted backup (AES-256-GCM, keyed off `ENCRYPTION_KEY`). |
+| `grcen restore <in>` | Restore from an encrypted backup. |
+
+## Running Tests
+
+Tests use pytest and require a PostgreSQL instance. They connect to the database named by `TEST_DATABASE_URL` (default `postgresql://grcen:grcen@localhost:5432/grcen_test`); the suite creates its own schema and resets tables between tests.
+
+```bash
+# With the compose db running, create the test database once:
+docker compose exec -T db psql -U grcen -c "CREATE DATABASE grcen_test"
+
+# Run the suite:
+.venv/bin/pytest
+```
+
+## Contributing
+
+Contributions are welcome — see **[CONTRIBUTING.md](CONTRIBUTING.md)** for development setup, coding standards, and the security review expectations for auth/crypto/input-handling changes.
+
+## License
+
+GRCen is released under the MIT License. See **[LICENSE](LICENSE)**.

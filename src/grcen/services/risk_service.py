@@ -29,11 +29,11 @@ def compute_risk_score(likelihood: str | None, impact: str | None) -> int | None
     """Compute risk score (1-25) from likelihood x impact. Returns None if either is missing."""
     if not likelihood or not impact:
         return None
-    l = likelihood_value(likelihood)
-    i = impact_value(impact)
-    if l == 0 or i == 0:
+    lik = likelihood_value(likelihood)
+    imp = impact_value(impact)
+    if lik == 0 or imp == 0:
         return None
-    return l * i
+    return lik * imp
 
 
 def score_color(score: int) -> str:
@@ -68,12 +68,12 @@ async def get_risk_heatmap(
             meta = json.loads(meta)
         if not meta:
             continue
-        l = likelihood_value(meta.get("likelihood", ""))
-        i = impact_value(meta.get("impact", ""))
-        if l == 0 or i == 0:
+        lik = likelihood_value(meta.get("likelihood", ""))
+        imp = impact_value(meta.get("impact", ""))
+        if lik == 0 or imp == 0:
             continue
-        score = l * i
-        key = (l, i)
+        score = lik * imp
+        key = (lik, imp)
         heatmap.setdefault(key, [])
         heatmap[key].append({"id": row["id"], "name": row["name"], "score": score})
     return heatmap

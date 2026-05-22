@@ -13,10 +13,12 @@ from grcen.models.user import User
 from grcen.permissions import Permission
 from grcen.routers.deps import get_db, require_permission
 from grcen.schemas.attachment import AttachmentCreate, AttachmentResponse
-from grcen.services import access_log_service
-from grcen.services import attachment as att_svc
-from grcen.services import audit_service as audit_svc
-from grcen.services import encryption_config
+from grcen.services import (
+    access_log_service,
+    attachment as att_svc,
+    audit_service as audit_svc,
+    encryption_config,
+)
 from grcen.services.encryption import decrypt_bytes, encrypt_bytes
 
 router = APIRouter(prefix="/api/assets/{asset_id}/attachments", tags=["attachments"])

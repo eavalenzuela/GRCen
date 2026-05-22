@@ -17,8 +17,7 @@ import asyncpg
 
 from grcen.models.asset import Asset, AssetType
 from grcen.models.user import User
-from grcen.services import asset as asset_svc
-from grcen.services import audit_service as audit_svc
+from grcen.services import asset as asset_svc, audit_service as audit_svc
 
 # Asset fields tracked by the audit log — kept in sync with routers.assets._ASSET_FIELDS
 _ASSET_FIELDS = ["name", "description", "status", "owner", "metadata"]

@@ -3,12 +3,11 @@ import uuid
 from uuid import UUID
 
 import asyncpg
-
-from grcen.config import settings
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
+from grcen.config import settings
 from grcen.custom_fields import CUSTOM_FIELDS, coerce_value
 from grcen.models.asset import AssetType
 from grcen.models.user import User
@@ -20,28 +19,28 @@ from grcen.routers.deps import (
     get_db,
     require_permission,
 )
-from grcen.services import alert_service as alert_svc
-from grcen.services import asset as asset_svc
-from grcen.services import attachment as att_svc
-from grcen.services import audit_service as audit_svc
-from grcen.services import auth as auth_svc
 from grcen.services import (
     access_log_service,
+    alert_service as alert_svc,
+    asset as asset_svc,
+    attachment as att_svc,
+    audit_service as audit_svc,
+    auth as auth_svc,
     encryption_config,
     framework_service,
     oidc_settings,
+    organization_service,
     pdf_service,
     redaction,
+    relationship as rel_svc,
+    review_service as review_svc,
+    risk_service as risk_svc,
     saml_settings,
     saved_search_service,
     smtp_settings,
     tag_service,
+    workflow_service,
 )
-from grcen.services import relationship as rel_svc
-from grcen.services import review_service as review_svc
-from grcen.services import risk_service as risk_svc
-from grcen.services import organization_service
-from grcen.services import workflow_service
 from grcen.services.encryption import is_encryption_enabled
 from grcen.services.encryption_scopes import ALL_PROFILES, ALL_SCOPES
 
@@ -2728,7 +2727,6 @@ async def user_session_revoke(
     so cookie-bearing strangers can't terminate someone else's session by
     guessing an id.
     """
-    from grcen.services import session_service
     await pool.execute(
         "DELETE FROM sessions WHERE session_id = $1 AND user_id = $2",
         session_id, user.id,
@@ -2851,8 +2849,7 @@ async def my_tokens_page(
     max_expiry_days = await token_service.get_max_expiry_days(pool)
     available_permissions = sorted(ROLE_PERMISSIONS.get(user.role, set()), key=lambda p: p.value)
     notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
-    from datetime import UTC
-    from datetime import datetime as dt
+    from datetime import UTC, datetime as dt
 
     return templates.TemplateResponse(request, "tokens/my_tokens.html", context={
             "user": user,
@@ -2874,8 +2871,7 @@ async def my_tokens_create(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    from datetime import UTC
-    from datetime import datetime as dt
+    from datetime import UTC, datetime as dt
 
     from grcen.permissions import ROLE_PERMISSIONS
     from grcen.services import token_service
@@ -2945,7 +2941,6 @@ async def my_token_update_ips(
 ):
     """Update the IP allowlist on one of the user's own tokens."""
     from grcen.services import token_service
-    from grcen.services.token_service import _ip_matches_allowlist  # imports ipaddress
 
     token = await token_service.get_token_by_id(pool, token_id)
     if not token or token.user_id != user.id:
@@ -3023,8 +3018,7 @@ async def admin_tokens_page(
     users = await auth_svc.list_users(pool, organization_id=user.organization_id)
     users_by_id = {u.id: u for u in users}
     notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
-    from datetime import UTC
-    from datetime import datetime as dt
+    from datetime import UTC, datetime as dt
 
     return templates.TemplateResponse(request, "admin/tokens.html", context={
             "user": user,

@@ -9,8 +9,7 @@ from grcen.permissions import Permission
 from grcen.routers.deps import get_db, require_permission
 from grcen.schemas.alert import AlertCreate, AlertResponse, AlertUpdate
 from grcen.schemas.notification import NotificationResponse
-from grcen.services import alert_service as alert_svc
-from grcen.services import audit_service as audit_svc
+from grcen.services import alert_service as alert_svc, audit_service as audit_svc
 
 router = APIRouter(prefix="/api/alerts", tags=["alerts"])
 

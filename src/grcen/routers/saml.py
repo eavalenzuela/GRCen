@@ -177,8 +177,7 @@ async def saml_acs(
     """Assertion Consumer Service — processes the IdP's SAML Response."""
     from onelogin.saml2.auth import OneLogin_Saml2_Auth
 
-    from grcen.services import asset as asset_svc
-    from grcen.services import auth as auth_svc
+    from grcen.services import asset as asset_svc, auth as auth_svc
 
     cfg = await saml_settings.get_settings(pool)
     if not cfg.enabled:

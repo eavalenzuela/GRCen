@@ -168,8 +168,7 @@ async def fire_alert(pool: asyncpg.Pool, alert_id: UUID) -> None:
 async def _deliver_email(
     pool: asyncpg.Pool, alert: Alert, asset_name: str, link: str
 ) -> None:
-    from grcen.services import email_service
-    from grcen.services import smtp_settings as smtp_svc
+    from grcen.services import email_service, smtp_settings as smtp_svc
 
     smtp = await smtp_svc.get_settings(pool)
     if not smtp.is_enabled:

@@ -48,7 +48,7 @@ def _backup_key() -> AESGCM:
 
 def _dsn_to_pg_args() -> tuple[list[str], dict[str, str]]:
     """Translate the configured DATABASE_URL into pg_dump CLI args + env."""
-    from urllib.parse import urlparse, parse_qs
+    from urllib.parse import urlparse
 
     raw = settings.DATABASE_URL
     if raw.startswith("postgresql+asyncpg://"):

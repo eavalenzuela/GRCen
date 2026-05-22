@@ -2,7 +2,6 @@
 
 import json
 from datetime import date, timedelta
-from uuid import UUID
 
 import asyncpg
 

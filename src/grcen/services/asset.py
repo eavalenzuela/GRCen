@@ -1,6 +1,6 @@
 import json
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from uuid import UUID
 
 import asyncpg
