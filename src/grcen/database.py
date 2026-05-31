@@ -840,6 +840,35 @@ CREATE TABLE IF NOT EXISTS questionnaire_responses (
 );
 CREATE INDEX IF NOT EXISTS idx_qresponses_questionnaire
     ON questionnaire_responses(questionnaire_id);
+
+-- Catalog provenance. Assets and relationships synced from an external
+-- system-of-record (e.g. autocomply's controls catalog) carry a stable
+-- (source, source_ref) pair so re-syncs upsert in place rather than
+-- duplicating. source IS NULL means the row was authored by a human inside
+-- GRCen (the default for everything created via the UI/import). The partial
+-- unique index gives each external object exactly one row per org and never
+-- collides with hand-authored, source-less rows.
+DO $$ BEGIN
+    ALTER TABLE assets ADD COLUMN source VARCHAR(64);
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN
+    ALTER TABLE assets ADD COLUMN source_ref VARCHAR(255);
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+CREATE UNIQUE INDEX IF NOT EXISTS ux_assets_source_ref
+    ON assets (organization_id, source, source_ref)
+    WHERE source IS NOT NULL;
+
+DO $$ BEGIN
+    ALTER TABLE relationships ADD COLUMN source VARCHAR(64);
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN
+    ALTER TABLE relationships ADD COLUMN source_ref VARCHAR(255);
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+-- relationships predate org scoping in some installs; the column is added by
+-- the multi-tenancy backfill loop above, so it exists by the time we get here.
+CREATE UNIQUE INDEX IF NOT EXISTS ux_relationships_source_ref
+    ON relationships (organization_id, source, source_ref)
+    WHERE source IS NOT NULL;
 """
 
 

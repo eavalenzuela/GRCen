@@ -245,7 +245,7 @@ def cli():
     """CLI entrypoint for management commands."""
     if len(sys.argv) < 2:
         print("Usage: grcen <command>")
-        print("Commands: createadmin, createsuperadmin, createorg, listorgs, runserver, generate-key, rotate-keys, backup, restore")
+        print("Commands: createadmin, createsuperadmin, createorg, listorgs, runserver, generate-key, rotate-keys, backup, restore, sync-catalog")
         sys.exit(1)
 
     command = sys.argv[1]
@@ -275,6 +275,8 @@ def cli():
         _generate_key()
     elif command == "rotate-keys":
         asyncio.run(_rotate_keys())
+    elif command == "sync-catalog":
+        asyncio.run(_sync_catalog())
     else:
         print(f"Unknown command: {command}")
         sys.exit(1)
@@ -392,6 +394,81 @@ def _restore():
         print(f"Restore failed: {e}")
         sys.exit(1)
     print(f"Restore complete from {src}")
+
+
+async def _sync_catalog():
+    """`grcen sync-catalog <file> [--org SLUG] [--dry-run] [--prune] [--source NAME]`.
+
+    Idempotently project an external controls-catalog export (frameworks,
+    requirements, and the controls that satisfy them) into the asset graph.
+    See grcen.services.catalog_sync for the mapping and the autocomply repo's
+    GRCEN_CATALOG_EXPORT.md for the export contract.
+    """
+    import json
+    from pathlib import Path
+
+    from grcen.services import catalog_sync, organization_service
+
+    argv = sys.argv[2:]
+    positional = [a for a in argv if not a.startswith("--")]
+    if not positional:
+        print("Usage: grcen sync-catalog <file> [--org SLUG] [--dry-run] [--prune] [--source NAME]")
+        sys.exit(1)
+    path = Path(positional[0])
+    if not path.exists():
+        print(f"File not found: {path}")
+        sys.exit(1)
+
+    dry_run = "--dry-run" in argv
+    prune = "--prune" in argv
+    org_slug = next((a.split("=", 1)[1] for a in argv if a.startswith("--org=")), None)
+    source = next(
+        (a.split("=", 1)[1] for a in argv if a.startswith("--source=")),
+        catalog_sync.DEFAULT_SOURCE,
+    )
+
+    try:
+        catalog = json.loads(path.read_text())
+    except json.JSONDecodeError as e:
+        print(f"Invalid JSON in {path}: {e}")
+        sys.exit(1)
+
+    pool = await init_pool()
+    await init_schema()
+
+    org_id = None
+    if org_slug:
+        org = await organization_service.get_by_slug(pool, org_slug)
+        if org is None:
+            print(f"Organization '{org_slug}' not found.")
+            await close_pool()
+            sys.exit(1)
+        org_id = org.id
+
+    result = await catalog_sync.sync_catalog(
+        pool, catalog, organization_id=org_id, source=source,
+        dry_run=dry_run, prune=prune,
+    )
+
+    if result.errors:
+        print(f"Catalog invalid — {len(result.errors)} error(s), nothing written:")
+        for err in result.errors[:50]:
+            print(f"  - {err}")
+        await close_pool()
+        sys.exit(1)
+
+    tag = " (dry run — rolled back)" if dry_run else ""
+    print(f"Catalog sync from '{source}'{tag}:")
+    print(f"  frameworks={result.frameworks} requirements={result.requirements} controls={result.controls}")
+    print(f"  assets:        {result.assets_created} created, {result.assets_updated} updated")
+    print(f"  relationships: {result.edges_created} created, {result.edges_updated} updated, {result.edges_pruned} pruned")
+    if result.stale_assets:
+        verb = "deleted" if prune else "orphaned upstream (kept; pass --prune to delete)"
+        print(f"  stale assets:  {len(result.stale_assets)} {verb}")
+        if not prune:
+            for sref in result.stale_assets[:20]:
+                print(f"      {sref}")
+    await close_pool()
 
 
 async def _list_orgs():
