@@ -109,12 +109,21 @@ Set `DOMAIN` to whichever you chose; it's used in nginx + the cert + `APP_BASE_U
 ssh -i ~/.ssh/$KEY_NAME.pem ec2-user@$DOMAIN
 sudo dnf -y install docker git && sudo systemctl enable --now docker
 sudo usermod -aG docker ec2-user && newgrp docker   # re-login if needed
-# Compose v2 plugin
+# Compose v2 + buildx plugins. NOTE: AL2023's docker package ships neither;
+# `docker compose build` fails with "requires buildx 0.17.0 or later" without
+# buildx, so install BOTH. Use the API to resolve the real latest asset name —
+# the "latest/download/<versioned-file>" path 404s and silently writes an HTML
+# page that then fails with "exec format error".
 sudo mkdir -p /usr/libexec/docker/cli-plugins
-sudo curl -sSL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 \
+sudo curl -fsSL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 \
   -o /usr/libexec/docker/cli-plugins/docker-compose && sudo chmod +x /usr/libexec/docker/cli-plugins/docker-compose
+BUILDX_URL=$(curl -s https://api.github.com/repos/docker/buildx/releases/latest \
+  | grep -o 'https://[^"]*buildx-v[0-9.]*\.linux-amd64' | head -1)
+sudo curl -fsSL "$BUILDX_URL" -o /usr/libexec/docker/cli-plugins/docker-buildx \
+  && sudo chmod +x /usr/libexec/docker/cli-plugins/docker-buildx
+sudo docker buildx version   # sanity-check it's a real ELF binary
 
-git clone <this-repo-url> grcen && cd grcen
+git clone https://github.com/eavalenzuela/GRCen.git grcen && cd grcen
 ```
 
 ## Step 4 — Configure `.env`
@@ -165,9 +174,27 @@ curl -skI https://$DOMAIN/ # expect 200 / redirect; schema auto-inits on first a
 
 ## Step 8 — Bootstrap the first admin + org
 
+`grcen createadmin` is **interactive** (`input()` prompts) and does NOT survive piped
+stdin over a non-TTY SSH `bash -s` heredoc — it silently consumes the script and nothing
+runs. Two clean options:
+
 ```bash
-docker compose exec app grcen createadmin
+# (a) Interactive — allocate a TTY:
+ssh -t -i ~/.ssh/$KEY_NAME.pem ec2-user@$DOMAIN \
+  'cd ~/grcen && sudo docker compose exec app grcen createadmin'
 #   Username: admin     Password: <strong>     Org slug: (blank = default)
+
+# (b) Non-interactive — create via the service directly (scriptable, idempotent-ish):
+sudo docker compose exec -T app python -c "
+import asyncio
+from grcen.database import init_pool, init_schema, close_pool
+from grcen.services.auth import create_user
+from grcen.permissions import UserRole
+async def m():
+    pool = await init_pool(); await init_schema()
+    u = await create_user(pool, 'admin', 'CHANGE-ME-strong', role=UserRole.ADMIN)
+    print('created', u.username, u.role.value); await close_pool()
+asyncio.run(m())"
 ```
 
 ## Step 9 — Seed realistic data
