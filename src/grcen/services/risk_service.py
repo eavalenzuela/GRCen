@@ -296,10 +296,15 @@ async def get_risk_register(
             "effectiveness_label": "none",
         })
 
-    # Sort
+    # Sort. "score" is numeric; the other keys are text. Keep the sort key
+    # type-consistent — a mix of scored (int) and unscored risks would otherwise
+    # compare int against "" (from `x or ""`) and raise TypeError, 500-ing the page.
     sort_key = sort if sort in ("score", "name", "risk_category", "treatment", "owner") else "score"
     reverse = order == "desc"
-    risks.sort(key=lambda r: (r.get(sort_key) or ""), reverse=reverse)
+    if sort_key == "score":
+        risks.sort(key=lambda r: r.get("score") or 0, reverse=reverse)
+    else:
+        risks.sort(key=lambda r: str(r.get(sort_key) or "").lower(), reverse=reverse)
 
     return risks
 

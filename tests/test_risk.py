@@ -184,3 +184,30 @@ async def test_top_risks_sorted(pool):
     assert top[0]["score"] == 25
     assert top[1]["name"] == "Low Risk"
     assert top[1]["score"] == 1
+
+
+@pytest.mark.asyncio
+async def test_risk_register_mixed_scored_and_unscored_does_not_crash(pool):
+    """Regression for the register 500: a scored risk (score int) alongside an
+    unscored one (score 0) must not crash the sort with a str-vs-int TypeError."""
+    from grcen.models.asset import AssetType
+    from grcen.services import asset as asset_svc
+    from grcen.services.risk_service import get_risk_register
+
+    await asset_svc.create_asset(
+        pool, type=AssetType.RISK, name="Scored Risk", status="active",
+        metadata_={"likelihood": "likely", "impact": "major"},  # score 16
+    )
+    await asset_svc.create_asset(
+        pool, type=AssetType.RISK, name="Unscored Risk", status="active",
+        metadata_={},  # no likelihood/impact -> score 0
+    )
+
+    # Default sort is by score (numeric) — must not raise on the mixed set.
+    by_score = await get_risk_register(pool)
+    assert {r["name"] for r in by_score} == {"Scored Risk", "Unscored Risk"}
+    assert by_score[0]["name"] == "Scored Risk"  # 16 before 0, desc
+
+    # The text-column sort path must also tolerate the mix.
+    by_name = await get_risk_register(pool, sort="name", order="asc")
+    assert [r["name"] for r in by_name] == ["Scored Risk", "Unscored Risk"]
