@@ -101,8 +101,20 @@ NOTIFICATIONS = [
 async def main():
     pool = await asyncpg.create_pool(DATABASE_URL)
 
-    # Build name+type -> id lookup
-    rows = await pool.fetch("SELECT id, name, type FROM assets")
+    # Resolve the target org (alerts/notifications are per-tenant, NOT NULL).
+    org_slug = os.getenv("GRCEN_ORG_SLUG", "").strip()
+    if org_slug:
+        org_id = await pool.fetchval("SELECT id FROM organizations WHERE slug = $1", org_slug)
+        if org_id is None:
+            print(f"Organization '{org_slug}' not found. Run `grcen createorg` first.")
+            await pool.close()
+            return
+    else:
+        org_id = await pool.fetchval("SELECT id FROM organizations WHERE slug = 'default'")
+    print(f"Seeding alerts into organization_id={org_id}")
+
+    # Build name+type -> id lookup (scoped to the target org)
+    rows = await pool.fetch("SELECT id, name, type FROM assets WHERE organization_id = $1", org_id)
     asset_lookup: dict[tuple[str, str], uuid.UUID] = {}
     for r in rows:
         asset_lookup[(r["name"], r["type"])] = r["id"]
@@ -128,10 +140,10 @@ async def main():
         next_fire = now + timedelta(days=offset_days)
         aid = uuid.uuid4()
         await pool.execute(
-            """INSERT INTO alerts (id, asset_id, title, message, schedule_type, cron_expression, next_fire_at, enabled)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            """INSERT INTO alerts (id, asset_id, title, message, schedule_type, cron_expression, next_fire_at, enabled, organization_id)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                ON CONFLICT DO NOTHING""",
-            aid, asset_id, title, message, sched_type, cron_expr, next_fire, enabled,
+            aid, asset_id, title, message, sched_type, cron_expr, next_fire, enabled, org_id,
         )
         alert_ids.append(aid)
         created_alerts += 1
@@ -141,9 +153,9 @@ async def main():
         if not aid:
             continue
         await pool.execute(
-            """INSERT INTO notifications (id, alert_id, title, message, read)
-               VALUES ($1, $2, $3, $4, $5)""",
-            uuid.uuid4(), aid, title, message, is_read,
+            """INSERT INTO notifications (id, alert_id, title, message, read, organization_id)
+               VALUES ($1, $2, $3, $4, $5, $6)""",
+            uuid.uuid4(), aid, title, message, is_read, org_id,
         )
         created_notifs += 1
 
