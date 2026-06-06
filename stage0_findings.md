@@ -11,7 +11,12 @@ Severity (Nielsen): 4 catastrophic · 3 major · 2 minor · 1 cosmetic.
   Re-verified live — creating a scored risk now keeps /risk-management at 200 (was 500).
 - **F5 [sev3] FIXED**: seed_data.py enrich() scores all 16 risks across the heatmap (some overdue).
 - **F7 [sev2] FIXED**: seed_data.py enrich() keyword-tags 46 assets (pci/gdpr/pii/crown-jewel/soc2).
-- **F2, F3, F6 OPEN** — UX/robustness items, not yet changed (detailed below).
+- **F2 [sev3] FIXED** (commit dbdf193): relationship_type input now offers a datalist of existing
+  types (suggestions only, any new type still allowed). Verified live: 47 suggestions rendered.
+- **F3 [sev2] FIXED** (dbdf193): interactive create no longer rewrites owns→manages; uses the type
+  as entered. Verified live (owns→Person stays "owns") + regression test. Bulk import left as-is.
+- **F6 [sev2] FIXED** (dbdf193): invalid attachment kind now returns 400, not 500. Verified live + test.
+- **ALL 7 FINDINGS RESOLVED. Full suite: 601 passed.**
 
 ## F1 [SEV 3] Detail-page "Add Relationship" form silently fails (422)
 - Task 2. The inline form on /assets/{id} htmx-POSTs **form-urlencoded** to /api/relationships/,
