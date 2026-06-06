@@ -287,10 +287,14 @@ async def asset_detail(
         organization_id=user.organization_id,
     )
     sensitive_overrides = await redaction.list_asset_overrides(pool, asset_id)
+    relationship_types = await rel_svc.list_relationship_types(
+        pool, organization_id=user.organization_id
+    )
     return templates.TemplateResponse(request, "assets/detail.html", context={
             "user": user,
             "asset": asset,
             "relationships": rels,
+            "relationship_types": relationship_types,
             "attachments": atts,
             "alerts": alerts,
             "asset_types": ORGANIZATIONAL_TYPES,

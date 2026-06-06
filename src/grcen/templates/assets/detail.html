@@ -196,7 +196,11 @@
                    autocomplete="off">
             <div id="target-results" class="autocomplete-results"></div>
             <input type="hidden" name="target_asset_id" id="target_asset_id">
-            <input type="text" name="relationship_type" placeholder="Relationship type" required>
+            <input type="text" name="relationship_type" placeholder="Relationship type" required
+                   list="rel-type-options" autocomplete="off">
+            <datalist id="rel-type-options">
+                {% for rt in relationship_types %}<option value="{{ rt }}"></option>{% endfor %}
+            </datalist>
             <input type="text" name="description" placeholder="Description">
             <button type="submit" class="btn btn-primary">Add</button>
         </div>

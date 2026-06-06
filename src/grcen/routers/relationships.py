@@ -50,12 +50,9 @@ async def create_relationship(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.CREATE)),
 ):
-    # Auto-convert owns→manages when target is a Person
+    # Use the relationship type as the user entered it — the tool maps relationships
+    # as they actually are and does not silently rewrite them (e.g. owns→manages).
     rel_type = data.relationship_type
-    if rel_type == "owns":
-        target = await asset_svc.get_asset(pool, data.target_asset_id, organization_id=user.organization_id)
-        if target and target.type == AssetType.PERSON:
-            rel_type = "manages"
 
     # If the workflow gates relationship_create on the source asset's type,
     # park the request in pending_changes instead of writing it.

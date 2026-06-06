@@ -151,6 +151,24 @@ async def delete_relationship(
     return result == "DELETE 1"
 
 
+async def list_relationship_types(
+    pool: asyncpg.Pool, *, organization_id: UUID | None = None
+) -> list[str]:
+    """Distinct relationship_type values already in use, for autocomplete
+    suggestions. Suggestions only — users can still enter any new type."""
+    if organization_id is not None:
+        rows = await pool.fetch(
+            """SELECT DISTINCT relationship_type FROM relationships
+               WHERE organization_id = $1 ORDER BY relationship_type""",
+            organization_id,
+        )
+    else:
+        rows = await pool.fetch(
+            "SELECT DISTINCT relationship_type FROM relationships ORDER BY relationship_type"
+        )
+    return [r["relationship_type"] for r in rows]
+
+
 def _asset_from_prefixed(row, prefix: str) -> Asset:
     import json
 

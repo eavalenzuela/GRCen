@@ -46,3 +46,21 @@ async def test_delete_relationship(auth_client):
 
     resp = await auth_client.delete(f"/api/relationships/{rel_id}")
     assert resp.status_code == 204
+
+
+@pytest.mark.asyncio
+async def test_relationship_type_not_silently_rewritten(auth_client):
+    """Regression (F3): the interactive create must NOT rewrite owns->manages.
+    The tool maps relationships as the user enters them."""
+    r1 = await auth_client.post("/api/assets/", json={"type": "system", "name": "Sys Z"})
+    r2 = await auth_client.post("/api/assets/", json={"type": "person", "name": "Pat Q"})
+    resp = await auth_client.post(
+        "/api/relationships/",
+        json={
+            "source_asset_id": r1.json()["id"],
+            "target_asset_id": r2.json()["id"],
+            "relationship_type": "owns",
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["relationship_type"] == "owns"

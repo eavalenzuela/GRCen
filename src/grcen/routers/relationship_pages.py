@@ -66,7 +66,11 @@ async def relationship_evidence_create(
     from grcen.models.attachment import AttachmentKind
 
     form = await request.form()
-    kind = AttachmentKind(str(form.get("kind", "url")))
+    raw_kind = str(form.get("kind", "url"))
+    try:
+        kind = AttachmentKind(raw_kind)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid attachment kind: {raw_kind!r}")
     name = str(form.get("name", "")).strip()
     url_or_path = str(form.get("url_or_path", "")).strip()
     if not name or not url_or_path:

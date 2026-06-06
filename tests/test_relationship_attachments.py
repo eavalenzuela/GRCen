@@ -271,3 +271,20 @@ async def test_asset_detail_shows_evidence_count(auth_client, pool, two_assets_a
     )
     resp = await auth_client.get(f"/assets/{src.id}")
     assert "2 files" in resp.text
+
+
+@pytest.mark.asyncio
+async def test_relationship_evidence_invalid_kind_returns_400(auth_client, two_assets_and_rel):
+    """Regression (F6): an invalid attachment kind from a form is a 400, not a 500."""
+    _src, _tgt, rel = two_assets_and_rel
+    resp = await auth_client.post(
+        f"/relationships/{rel.id}/evidence",
+        data={"kind": "bogus", "name": "x", "url_or_path": "https://e.com"},
+    )
+    assert resp.status_code == 400
+    # And a valid kind still works.
+    ok = await auth_client.post(
+        f"/relationships/{rel.id}/evidence",
+        data={"kind": "url", "name": "ref", "url_or_path": "https://e.com/x"},
+    )
+    assert ok.status_code in (200, 302), ok.text
