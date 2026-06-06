@@ -190,19 +190,17 @@
 
     {% if has_perm(user.role, Permission.CREATE) %}
     <h4>Add Relationship</h4>
-    <form hx-post="/api/relationships/" hx-target="#relationships" hx-swap="innerHTML"
-          hx-on::after-request="if(event.detail.successful) location.reload()">
-        <input type="hidden" name="source_asset_id" value="{{ asset.id }}">
+    <form id="add-relationship-form" data-source-id="{{ asset.id }}">
         <div class="form-row">
-            <input type="text" name="target_search" placeholder="Search target asset..."
-                   hx-get="/api/assets/search" hx-trigger="keyup changed delay:300ms"
-                   hx-target="#target-results" autocomplete="off">
+            <input type="text" id="rel-target-search" placeholder="Search target asset..."
+                   autocomplete="off">
             <div id="target-results" class="autocomplete-results"></div>
             <input type="hidden" name="target_asset_id" id="target_asset_id">
             <input type="text" name="relationship_type" placeholder="Relationship type" required>
             <input type="text" name="description" placeholder="Description">
             <button type="submit" class="btn btn-primary">Add</button>
         </div>
+        <div id="rel-form-status" class="form-error" role="alert" style="color:#c0392b;margin-top:0.4rem;"></div>
     </form>
     {% endif %}
 </div>
@@ -274,5 +272,11 @@
 </table>
 {% else %}
 <p>No alerts for this asset.</p>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if has_perm(user.role, Permission.CREATE) %}
+<script src="/static/js/relationship_form.js" defer></script>
 {% endif %}
 {% endblock %}
