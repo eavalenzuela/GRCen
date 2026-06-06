@@ -2,6 +2,13 @@
 Instance: https://grc.eevn.io · Method: scripted web + API walkthrough of the 10 task scenarios.
 Severity (Nielsen): 4 catastrophic · 3 major · 2 minor · 1 cosmetic.
 
+## Resolution status (updated post-pass)
+- **F4 [sev4] FIXED** (commit fe95dfe): type-consistent sort in get_risk_register + regression test.
+  Re-verified live — creating a scored risk now keeps /risk-management at 200 (was 500).
+- **F5 [sev3] FIXED**: seed_data.py enrich() scores all 16 risks across the heatmap (some overdue).
+- **F7 [sev2] FIXED**: seed_data.py enrich() keyword-tags 46 assets (pci/gdpr/pii/crown-jewel/soc2).
+- **F1, F2, F3, F6 OPEN** — UX/robustness items, not yet changed (detailed below).
+
 ## F1 [SEV 3] Detail-page "Add Relationship" form silently fails (422)
 - Task 2. The inline form on /assets/{id} htmx-POSTs **form-urlencoded** to /api/relationships/,
   but that route requires a JSON body (RelationshipCreate). Result: HTTP 422, and htmx shows
