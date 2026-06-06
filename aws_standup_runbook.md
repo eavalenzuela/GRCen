@@ -180,20 +180,21 @@ them inside the app container (where `grcen` is installed and `DATABASE_URL` poi
 docker compose cp ./sample_data app:/app/sample_data
 docker compose exec app python sample_data/seed_data.py     # 187 assets + 366 relationships
 docker compose exec app python sample_data/seed_alerts.py   # 44 alerts + 7 notifications
+docker compose exec app python sample_data/seed_answers.py  # 8 answers + 1 questionnaire
 ```
 
 This lights up the dashboard, asset graph, risk heatmap (16 risks + `mitigated_by`
-control rollups), and the **Frameworks** dashboard (4 frameworks / 7 requirements /
-7 controls / `satisfies` edges) — covering plan Tasks 1–7, 9.
+control rollups), the **Frameworks** dashboard (4 frameworks / 7 requirements /
+7 controls / `satisfies` edges), and the **answer library + one inbound questionnaire** —
+covering all plan Tasks 1–10.
 
-**Seed gap — answer library (plan Task 8):** the sample data has **no Answer assets or
-questionnaires** (it predates feature #21). As-is, `/answers` and `/questionnaires` start
-empty. Choose one:
-- (a) Leave empty and reframe Task 8 as "build your first answer + map a questionnaire
-  from scratch" (a legitimate onboarding test, but doesn't exercise *reuse/auto-fill*), or
-- (b) Add a small answer-library seed (a handful of Answer assets with `substantiated_by`
-  links to existing Control/Policy assets + one inbound questionnaire) so the
-  reuse/auto-fill/freshness flow is testable. *(Not yet built — flag if you want it.)*
+**Answer library (plan Task 8):** `seed_answers.py` adds 8 canonical Q&A entries wired to
+existing Control/Policy/Framework/Audit assets via `substantiated_by`, plus one
+questionnaire ("Acme Corp — Vendor Security Assessment 2026") with 2 questions pre-mapped
+(auto-filled) and 4 left blank for the participant to map/fill. It deliberately seeds
+three freshness states so the engine visibly flags review work: 5 fresh, and 3 needing
+review (one unbacked, one backed by a decommissioned control, one whose policy
+substantiator is `archived`). This exercises reuse + auto-fill + freshness end-to-end.
 
 **Frameworks via external catalog (optional):** if you have an autocomply catalog export,
 `docker compose exec app grcen sync-catalog /app/<export>.json` adds more framework
