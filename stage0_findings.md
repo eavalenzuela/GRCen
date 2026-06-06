@@ -3,11 +3,15 @@ Instance: https://grc.eevn.io · Method: scripted web + API walkthrough of the 1
 Severity (Nielsen): 4 catastrophic · 3 major · 2 minor · 1 cosmetic.
 
 ## Resolution status (updated post-pass)
+- **F1 [sev3] FIXED** (commit d7c2453): the inline Add-Relationship form was doubly broken (JSON
+  search swapped as raw text + form-encoded POST -> silent 422). Replaced with relationship_form.js
+  (live search, clickable pick, JSON POST, visible errors). Verified with a real headless-browser
+  click-through: error path shows a message, search→pick sets the target, submit creates the link.
 - **F4 [sev4] FIXED** (commit fe95dfe): type-consistent sort in get_risk_register + regression test.
   Re-verified live — creating a scored risk now keeps /risk-management at 200 (was 500).
 - **F5 [sev3] FIXED**: seed_data.py enrich() scores all 16 risks across the heatmap (some overdue).
 - **F7 [sev2] FIXED**: seed_data.py enrich() keyword-tags 46 assets (pci/gdpr/pii/crown-jewel/soc2).
-- **F1, F2, F3, F6 OPEN** — UX/robustness items, not yet changed (detailed below).
+- **F2, F3, F6 OPEN** — UX/robustness items, not yet changed (detailed below).
 
 ## F1 [SEV 3] Detail-page "Add Relationship" form silently fails (422)
 - Task 2. The inline form on /assets/{id} htmx-POSTs **form-urlencoded** to /api/relationships/,
