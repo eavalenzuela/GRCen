@@ -248,17 +248,27 @@ in another pane: `docker compose logs -f app`. Log defects with the §9 severity
 ## Step 12 — Reset between participants
 
 Each participant should start from the same seeded state. Snapshot after seeding, restore
-before the next session:
+before the next session.
+
+> ⚠️ **`grcen backup` does NOT work from the app container in this image** — it shells out
+> to `pg_dump`, which isn't installed there (`FileNotFoundError: 'pg_dump'`). Dump from the
+> **db** container instead (postgres:16-alpine ships `pg_dump`/`pg_restore`). This is the
+> verified path used on the live box.
 
 ```bash
-# Capture the golden state once (after Step 10):
-docker compose exec app grcen backup /app/uploads/golden.grcen   # encrypted (ENCRYPTION_KEY)
+PC="sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml"
+
+# Capture the golden state once, after seeding + Step 10 prep:
+$PC exec -T db pg_dump -U grcen -Fc grcen > ~/golden.dump
+
 # ...participant does their session (creates/edits data)...
-# Reset:
-docker compose exec app grcen restore /app/uploads/golden.grcen
+
+# Reset before the next participant:
+$PC exec -T db pg_restore -U grcen -d grcen --clean --if-exists --no-owner < ~/golden.dump
 ```
-Alternatively, snapshot the `pgdata` volume / EBS volume between sessions. (`grcen backup`
-needs `ENCRYPTION_KEY` set; if you skipped it, use a raw `pg_dump`/volume snapshot instead.)
+
+A ready-made `~/reset-grcen.sh` wrapping the restore is on the live host. Alternatively,
+snapshot the `pgdata`/EBS volume between sessions.
 
 ## Step 13 — Teardown
 
