@@ -7,9 +7,23 @@ from grcen.models.user import User
 from grcen.permissions import Permission
 from grcen.routers.deps import get_db, require_permission
 from grcen.schemas.graph import GraphResponse
-from grcen.services.graph import get_asset_graph
+from grcen.services.graph import get_asset_graph, get_org_graph
 
 router = APIRouter(prefix="/api/graph", tags=["graph"])
+
+
+@router.get(
+    "",
+    response_model=GraphResponse,
+    summary="Fetch the whole-organization graph (capped at `limit` nodes)",
+)
+async def org_graph(
+    limit: int = 500,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.VIEW_GRAPH)),
+):
+    limit = max(1, min(limit, 1000))
+    return await get_org_graph(pool, user.organization_id, limit=limit)
 
 
 @router.get(

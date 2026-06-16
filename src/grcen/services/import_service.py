@@ -150,10 +150,19 @@ def _validate_relationship_row(row: dict, idx: int) -> list[str]:
 
 
 async def preview_relationship_import(
-    pool: asyncpg.Pool, content: str, format: str
+    pool: asyncpg.Pool, content: str, format: str, *, organization_id=None
 ) -> ImportPreview:
-    """Validate relationship rows and confirm source/target assets exist."""
+    """Validate relationship rows and confirm source/target assets exist.
+
+    Existence checks are scoped to ``organization_id`` so preview agrees with
+    execute (which is org-scoped) and never confirms assets in another tenant.
+    """
     rows = _parse_csv(content) if format == "csv" else _parse_json(content)
+    org = organization_id
+    if org is None:
+        from grcen.services import organization_service
+
+        org = await organization_service.get_default_org_id(pool)
     preview = ImportPreview(total_rows=len(rows))
     for idx, row in enumerate(rows, 1):
         errs = _validate_relationship_row(row, idx)
@@ -161,9 +170,10 @@ async def preview_relationship_import(
             preview.errors.extend(errs)
             continue
         source = await pool.fetchrow(
-            "SELECT 1 FROM assets WHERE name = $1 AND type = $2",
+            "SELECT 1 FROM assets WHERE name = $1 AND type = $2 AND organization_id = $3",
             row["source_name"],
             row["source_type"],
+            org,
         )
         if not source:
             preview.errors.append(
@@ -171,9 +181,10 @@ async def preview_relationship_import(
             )
             continue
         target = await pool.fetchrow(
-            "SELECT 1 FROM assets WHERE name = $1 AND type = $2",
+            "SELECT 1 FROM assets WHERE name = $1 AND type = $2 AND organization_id = $3",
             row["target_name"],
             row["target_type"],
+            org,
         )
         if not target:
             preview.errors.append(

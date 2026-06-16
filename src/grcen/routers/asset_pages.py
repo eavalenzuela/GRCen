@@ -514,6 +514,27 @@ async def owner_search(
 # --- Graph page ---
 
 
+@router.get("/graph", response_class=HTMLResponse)
+async def graph_overview_page(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.VIEW_GRAPH)),
+):
+    node_limit = 500
+    total_assets = await pool.fetchval(
+        "SELECT count(*) FROM assets WHERE organization_id = $1",
+        user.organization_id,
+    )
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
+    return templates.TemplateResponse(request, "graph/overview.html", context={
+            "user": user,
+            "total_assets": total_assets,
+            "node_limit": node_limit,
+            "notif_count": notif_count,
+        },
+    )
+
+
 @router.get("/graph/{asset_id}", response_class=HTMLResponse)
 async def graph_page(
     request: Request,

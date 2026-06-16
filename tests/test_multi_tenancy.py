@@ -192,6 +192,98 @@ async def test_pending_changes_isolated_between_orgs(two_orgs):
 
 
 @pytest.mark.asyncio
+async def test_org_views_isolated_between_orgs(pool, two_orgs):
+    """Org Views (org chart, business structure, products) must not leak across tenants."""
+    org_a = two_orgs["org_a"]
+    ca, cb = two_orgs["ca"], two_orgs["cb"]
+    # Two persons linked by 'manages' + a product, all in org A
+    p1 = await asset_svc.create_asset(
+        pool, organization_id=org_a.id, type=AssetType.PERSON, name="A-Mgr"
+    )
+    p2 = await asset_svc.create_asset(
+        pool, organization_id=org_a.id, type=AssetType.PERSON, name="A-Report"
+    )
+    await ca.post(
+        "/api/relationships/",
+        json={
+            "source_asset_id": str(p1.id),
+            "target_asset_id": str(p2.id),
+            "relationship_type": "manages",
+        },
+    )
+    await asset_svc.create_asset(
+        pool, organization_id=org_a.id, type=AssetType.PRODUCT, name="A-Product"
+    )
+
+    # Org A sees its own people and product
+    a_chart = (await ca.get("/api/org-views/org-chart")).json()
+    a_products = (await ca.get("/api/org-views/products")).json()
+    assert len(a_chart["nodes"]) == 2
+    assert len(a_products) == 1
+
+    # Org B sees none of it
+    b_chart = (await cb.get("/api/org-views/org-chart")).json()
+    b_products = (await cb.get("/api/org-views/products")).json()
+    b_struct = (await cb.get("/api/org-views/business-structure")).json()
+    assert b_chart["nodes"] == []
+    assert b_products == []
+    assert b_struct["nodes"] == []
+
+    # Org B cannot fetch the product view of org A's product
+    prod_id = a_products[0]["id"]
+    b_product_view = (await cb.get(f"/api/org-views/product/{prod_id}")).json()
+    a_product_view = (await ca.get(f"/api/org-views/product/{prod_id}")).json()
+    assert b_product_view["nodes"] == []
+    assert any(n["id"] == prod_id for n in a_product_view["nodes"])
+
+
+@pytest.mark.asyncio
+async def test_org_graph_isolated_between_orgs(pool, two_orgs):
+    """The whole-organization graph endpoint must only return the caller's org."""
+    org_a = two_orgs["org_a"]
+    ca, cb = two_orgs["ca"], two_orgs["cb"]
+    a = await asset_svc.create_asset(
+        pool, organization_id=org_a.id, type=AssetType.SYSTEM, name="OnlyA"
+    )
+    a_graph = (await ca.get("/api/graph")).json()
+    b_graph = (await cb.get("/api/graph")).json()
+    assert any(n["id"] == str(a.id) for n in a_graph["nodes"])
+    assert not any(n["id"] == str(a.id) for n in b_graph["nodes"])
+
+
+@pytest.mark.asyncio
+async def test_relationship_import_preview_isolated_between_orgs(pool, two_orgs):
+    """Preview must not confirm assets that live in another org (matches execute scoping)."""
+    from grcen.services.import_service import preview_relationship_import
+
+    org_a = two_orgs["org_a"]
+    org_b = two_orgs["org_b"]
+    await asset_svc.create_asset(
+        pool, organization_id=org_a.id, type=AssetType.SYSTEM, name="PSrc"
+    )
+    await asset_svc.create_asset(
+        pool, organization_id=org_a.id, type=AssetType.SYSTEM, name="PTgt"
+    )
+    content = (
+        '[{"source_name":"PSrc","source_type":"system",'
+        '"target_name":"PTgt","target_type":"system",'
+        '"relationship_type":"depends_on"}]'
+    )
+    # Org B's preview cannot resolve org A's assets
+    b_preview = await preview_relationship_import(
+        pool, content, "json", organization_id=org_b.id
+    )
+    assert b_preview.valid_rows == 0
+    assert any("not found" in e for e in b_preview.errors)
+    # Org A's preview resolves them
+    a_preview = await preview_relationship_import(
+        pool, content, "json", organization_id=org_a.id
+    )
+    assert a_preview.valid_rows == 1
+    assert a_preview.errors == []
+
+
+@pytest.mark.asyncio
 async def test_user_listing_isolated_between_orgs(two_orgs):
     """Org A admin sees only org A users."""
     ca, cb = two_orgs["ca"], two_orgs["cb"]

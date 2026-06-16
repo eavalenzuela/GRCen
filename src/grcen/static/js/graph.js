@@ -20,9 +20,26 @@ const TYPE_COLORS = {
 let cyInstance = null;
 let linkMode = false;
 let cleanupLinkMode = null;
+// The render currently on screen, so drag-to-link can refresh after creating
+// an edge regardless of which view (per-asset or whole-org) we're in.
+let lastRenderFn = null;
+let centerId = null;
 
+// Per-asset N-hop subgraph centered on one node.
 function initGraph(assetId, depth) {
-    fetch(`/api/graph/${assetId}?depth=${depth}`)
+    renderGraph(`/api/graph/${assetId}?depth=${depth}`, assetId);
+}
+
+// Whole-organization graph (no center node), capped at `limit` nodes.
+function initOrgGraph(limit) {
+    renderGraph(`/api/graph?limit=${limit}`, null);
+}
+
+function renderGraph(url, focusId) {
+    lastRenderFn = () => renderGraph(url, focusId);
+    centerId = focusId;
+    if (cyInstance) { cyInstance.destroy(); cyInstance = null; }
+    fetch(url)
         .then(r => r.json())
         .then(data => {
             const elements = [];
@@ -65,7 +82,7 @@ function initGraph(assetId, depth) {
                                 return TYPE_COLORS[ele.data('type')] || '#94a3b8';
                             },
                             'border-width': function(ele) {
-                                return ele.data('id') === assetId ? 3 : 1;
+                                return ele.data('id') === centerId ? 3 : 1;
                             },
                             'border-color': '#1e293b',
                         }
@@ -128,15 +145,32 @@ function initGraph(assetId, depth) {
             cyInstance.on('tap', 'node', function(evt) {
                 if (linkMode) return;
                 const nodeId = evt.target.data('id');
-                if (nodeId !== assetId) {
+                if (nodeId !== centerId) {
                     window.location.href = `/assets/${nodeId}`;
                 }
             });
 
             if (linkMode) {
-                cleanupLinkMode = enableDragLink(cyInstance, assetId, depth);
+                cleanupLinkMode = enableDragLink(cyInstance);
             }
         });
+}
+
+// Populate a legend element (#graph-legend) with the asset-type colour key.
+function renderLegend(containerId) {
+    const el = document.getElementById(containerId || 'graph-legend');
+    if (!el) return;
+    el.innerHTML = '';
+    Object.keys(TYPE_COLORS).forEach(type => {
+        const item = document.createElement('span');
+        item.className = 'legend-item';
+        const swatch = document.createElement('span');
+        swatch.className = 'legend-swatch';
+        swatch.style.backgroundColor = TYPE_COLORS[type];
+        item.appendChild(swatch);
+        item.appendChild(document.createTextNode(type.replace(/_/g, ' ')));
+        el.appendChild(item);
+    });
 }
 
 function toggleLinkMode() {
@@ -148,7 +182,7 @@ function toggleLinkMode() {
         btn.classList.add('btn-primary');
         status.textContent = 'Drag from a source node onto a target node to create a relationship.';
         status.style.display = 'inline';
-        if (cyInstance) cleanupLinkMode = enableDragLink(cyInstance, currentAssetId(), currentDepth());
+        if (cyInstance) cleanupLinkMode = enableDragLink(cyInstance);
     } else {
         btn.textContent = 'Link Mode';
         btn.classList.remove('btn-primary');
@@ -157,21 +191,11 @@ function toggleLinkMode() {
     }
 }
 
-function currentAssetId() {
-    // Pulled off the body for simplicity — set by the template.
-    return document.body.dataset.assetId;
-}
-
-function currentDepth() {
-    const sel = document.getElementById('depth-select');
-    return sel ? parseInt(sel.value) : 1;
-}
-
 // ---------------------------------------------------------------------------
 // Drag-to-link
 // ---------------------------------------------------------------------------
 
-function enableDragLink(cy, assetId, depth) {
+function enableDragLink(cy) {
     let source = null;
     let ghostNode = null;
     let ghostEdge = null;
@@ -234,7 +258,7 @@ function enableDragLink(cy, assetId, depth) {
             updateStatus('Drag from a source node onto a target node to create a relationship.');
             return;
         }
-        createLink(src.id(), target.id(), assetId, depth);
+        createLink(src.id(), target.id());
     }
 
     cy.on('mousedown', 'node', onDown);
@@ -259,7 +283,7 @@ function updateStatus(msg) {
     if (status) status.textContent = msg;
 }
 
-function createLink(sourceId, targetId, assetId, depth) {
+function createLink(sourceId, targetId) {
     const relType = prompt('Relationship type:');
     if (!relType) {
         updateStatus('Cancelled.');
@@ -282,9 +306,9 @@ function createLink(sourceId, targetId, assetId, depth) {
     })
     .then(() => {
         updateStatus('Created. Drag another pair or click Cancel Link Mode to navigate.');
-        // Re-render to show the new edge. The mode stays on so the user can
-        // keep building relationships without a second click.
-        initGraph(assetId, depth);
+        // Re-render the current view to show the new edge. The mode stays on so
+        // the user can keep building relationships without a second click.
+        if (lastRenderFn) lastRenderFn();
     })
     .catch(err => {
         updateStatus('Error: ' + err.message);

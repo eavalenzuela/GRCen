@@ -63,11 +63,13 @@ async def execute_import(
 async def preview_rel_import(
     file: UploadFile,
     pool: asyncpg.Pool = Depends(get_db),
-    _user: User = Depends(require_permission(Permission.IMPORT)),
+    user: User = Depends(require_permission(Permission.IMPORT)),
 ):
     content = (await file.read()).decode("utf-8")
     fmt = "json" if file.filename and file.filename.endswith(".json") else "csv"
-    preview = await preview_relationship_import(pool, content, fmt)
+    preview = await preview_relationship_import(
+        pool, content, fmt, organization_id=user.organization_id
+    )
     return {
         "total_rows": preview.total_rows,
         "valid_rows": preview.valid_rows,

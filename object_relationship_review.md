@@ -11,6 +11,27 @@ were verified directly in source.
 
 ---
 
+## Resolution status (first implementation block)
+
+- **G1 [FIXED]** — `services/org_views.py` now requires `organization_id` on all four
+  functions and filters every query; `routers/org_views.py` passes the caller's org.
+  Regression test: `test_org_views_isolated_between_orgs`.
+- **R3 [FIXED]** — `preview_relationship_import` is now org-scoped (matches execute),
+  threaded from `routers/imports.py`. Regression: `test_relationship_import_preview_isolated_between_orgs`.
+- **S1 [SHIPPED]** — global search box added to the nav (`base.html`), GETs `/assets?q=`.
+- **G3 [SHIPPED]** — whole-org graph: new `get_org_graph` service (capped at 500 nodes,
+  addressing part of G5), `GET /api/graph`, `GET /graph` page (`graph/overview.html`)
+  with a colour legend (addresses part of G4), and a **Graph** link in the nav.
+  `graph.js` refactored to drive both per-asset and whole-org views; drag-to-link
+  re-renders the current view. Tests: `test_org_graph_endpoint_and_page`,
+  `test_org_graph_isolated_between_orgs`. Full suite: 605 passed.
+- **Still open (next blocks):** G2 (expand-in-place), S2 (unlinked-asset filter),
+  O1/O2 (type columns + custom-field sort), R1 (relationship edit UI), R2/R5
+  (vocabulary suggestions + replace graph `prompt()`), R4 (import rewrite/gating),
+  G6 (unify the two `TYPE_COLORS` tables, fix doc URL).
+
+---
+
 ## Verdict
 
 GRCen's pitch is "a graph of assets and relationships, searchable and visualizable

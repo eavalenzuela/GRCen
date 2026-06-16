@@ -101,3 +101,58 @@ async def get_asset_graph(
         for r in edges_rows
     ]
     return GraphResponse(nodes=nodes, edges=edges)
+
+
+async def get_org_graph(
+    pool: asyncpg.Pool,
+    organization_id: UUID,
+    *,
+    limit: int = 500,
+) -> GraphResponse:
+    """Whole-organization graph, capped at ``limit`` nodes (newest first).
+
+    The cap bounds the payload and the client-side force layout: a dense org
+    graph at no limit can ship thousands of nodes and stall the browser. Edges
+    are restricted to the returned node set so no edge dangles off-screen.
+    """
+    node_rows = await pool.fetch(
+        """
+        SELECT a.id, a.name, a.type::text AS asset_type
+        FROM assets a
+        WHERE a.organization_id = $1
+        ORDER BY a.created_at DESC
+        LIMIT $2
+        """,
+        organization_id,
+        limit,
+    )
+    node_ids = [r["id"] for r in node_rows]
+
+    edges: list[GraphEdge] = []
+    if node_ids:
+        edge_rows = await pool.fetch(
+            """
+            SELECT r.id, r.source_asset_id, r.target_asset_id, r.relationship_type
+            FROM relationships r
+            WHERE r.organization_id = $1
+              AND r.source_asset_id = ANY($2::uuid[])
+              AND r.target_asset_id = ANY($2::uuid[])
+            """,
+            organization_id,
+            node_ids,
+        )
+        edges = [
+            GraphEdge(
+                id=str(r["id"]),
+                source=str(r["source_asset_id"]),
+                target=str(r["target_asset_id"]),
+                label=r["relationship_type"],
+            )
+            for r in edge_rows
+        ]
+
+    nodes = [
+        GraphNode(id=str(r["id"]), label=r["name"], type=r["asset_type"])
+        for r in node_rows
+    ]
+    return GraphResponse(nodes=nodes, edges=edges)

@@ -1,4 +1,9 @@
-"""Service functions for Org Views: org chart, business structure, product view."""
+"""Service functions for Org Views: org chart, business structure, product view.
+
+All queries are scoped to a single organization. Org Views render Persons, OUs,
+and Products, so an unscoped query would leak those across tenants — every
+function therefore requires the caller's ``organization_id``.
+"""
 
 from uuid import UUID
 
@@ -7,7 +12,7 @@ import asyncpg
 from grcen.schemas.graph import GraphEdge, GraphNode, GraphResponse
 
 
-async def get_org_chart(pool: asyncpg.Pool) -> GraphResponse:
+async def get_org_chart(pool: asyncpg.Pool, organization_id: UUID) -> GraphResponse:
     """Build an org chart from Person assets linked by 'manages' relationships.
 
     Nodes are Person assets. Edges are 'manages' relationships between persons.
@@ -21,8 +26,10 @@ async def get_org_chart(pool: asyncpg.Pool) -> GraphResponse:
                COALESCE(a.metadata->>'title', a.description, '') AS subtitle
         FROM assets a
         WHERE a.type = 'person' AND a.status = 'active'
+          AND a.organization_id = $1
         ORDER BY a.name
-        """
+        """,
+        organization_id,
     )
 
     edges_rows = await pool.fetch(
@@ -32,7 +39,11 @@ async def get_org_chart(pool: asyncpg.Pool) -> GraphResponse:
         JOIN assets src ON src.id = r.source_asset_id AND src.type = 'person'
         JOIN assets tgt ON tgt.id = r.target_asset_id AND tgt.type = 'person'
         WHERE r.relationship_type = 'manages'
-        """
+          AND r.organization_id = $1
+          AND src.organization_id = $1
+          AND tgt.organization_id = $1
+        """,
+        organization_id,
     )
 
     person_ids = {r["id"] for r in nodes_rows}
@@ -76,7 +87,9 @@ async def get_org_chart(pool: asyncpg.Pool) -> GraphResponse:
     return GraphResponse(nodes=nodes, edges=edges)
 
 
-async def get_business_structure(pool: asyncpg.Pool) -> GraphResponse:
+async def get_business_structure(
+    pool: asyncpg.Pool, organization_id: UUID
+) -> GraphResponse:
     """Build OU hierarchy from Organizational Unit assets.
 
     Uses 'parent_of' relationships and owner_id links between OUs.
@@ -91,8 +104,10 @@ async def get_business_structure(pool: asyncpg.Pool) -> GraphResponse:
         FROM assets a
         LEFT JOIN assets owner ON owner.id = a.owner_id
         WHERE a.type = 'organizational_unit' AND a.status = 'active'
+          AND a.organization_id = $1
         ORDER BY a.name
-        """
+        """,
+        organization_id,
     )
 
     edges_rows = await pool.fetch(
@@ -102,7 +117,11 @@ async def get_business_structure(pool: asyncpg.Pool) -> GraphResponse:
         JOIN assets src ON src.id = r.source_asset_id AND src.type = 'organizational_unit'
         JOIN assets tgt ON tgt.id = r.target_asset_id AND tgt.type = 'organizational_unit'
         WHERE r.relationship_type IN ('parent_of', 'owns', 'manages')
-        """
+          AND r.organization_id = $1
+          AND src.organization_id = $1
+          AND tgt.organization_id = $1
+        """,
+        organization_id,
     )
 
     ou_ids = {r["id"] for r in ou_rows}
@@ -146,7 +165,9 @@ async def get_business_structure(pool: asyncpg.Pool) -> GraphResponse:
     return GraphResponse(nodes=nodes, edges=edges)
 
 
-async def get_product_view(pool: asyncpg.Pool, product_id: UUID) -> GraphResponse:
+async def get_product_view(
+    pool: asyncpg.Pool, product_id: UUID, organization_id: UUID
+) -> GraphResponse:
     """Build a product-centric tree.
 
     Above the product: Owner (Person) and Owner's OU.
@@ -157,9 +178,10 @@ async def get_product_view(pool: asyncpg.Pool, product_id: UUID) -> GraphRespons
         """
         SELECT a.id, a.name, a.type::text AS asset_type, a.owner_id
         FROM assets a
-        WHERE a.id = $1 AND a.type = 'product'
+        WHERE a.id = $1 AND a.type = 'product' AND a.organization_id = $2
         """,
         product_id,
+        organization_id,
     )
     if not product:
         return GraphResponse(nodes=[], edges=[])
@@ -179,9 +201,10 @@ async def get_product_view(pool: asyncpg.Pool, product_id: UUID) -> GraphRespons
         owner = await pool.fetchrow(
             """
             SELECT a.id, a.name, a.type::text AS asset_type, a.owner_id
-            FROM assets a WHERE a.id = $1
+            FROM assets a WHERE a.id = $1 AND a.organization_id = $2
             """,
             product["owner_id"],
+            organization_id,
         )
         if owner:
             owner_id_str = str(owner["id"])
@@ -211,17 +234,23 @@ async def get_product_view(pool: asyncpg.Pool, product_id: UUID) -> GraphRespons
                      AND r.relationship_type IN ('manages', 'owns', 'parent_of'))
                 )
                 WHERE a.type = 'organizational_unit'
+                  AND a.organization_id = $2
+                  AND r.organization_id = $2
                 LIMIT 1
                 """,
                 owner["id"],
+                organization_id,
             )
             if not ou_row and owner["owner_id"]:
                 ou_row = await pool.fetchrow(
                     """
                     SELECT a.id, a.name, a.type::text AS asset_type
-                    FROM assets a WHERE a.id = $1 AND a.type = 'organizational_unit'
+                    FROM assets a
+                    WHERE a.id = $1 AND a.type = 'organizational_unit'
+                      AND a.organization_id = $2
                     """,
                     owner["owner_id"],
+                    organization_id,
                 )
             if ou_row:
                 ou_id_str = str(ou_row["id"])
@@ -252,8 +281,11 @@ async def get_product_view(pool: asyncpg.Pool, product_id: UUID) -> GraphRespons
         END
         WHERE (r.source_asset_id = $1 OR r.target_asset_id = $1)
           AND a.status = 'active'
+          AND a.organization_id = $2
+          AND r.organization_id = $2
         """,
         product_id,
+        organization_id,
     )
 
     for r in related_rows:
@@ -279,13 +311,15 @@ async def get_product_view(pool: asyncpg.Pool, product_id: UUID) -> GraphRespons
     )
 
 
-async def list_products(pool: asyncpg.Pool) -> list[dict]:
+async def list_products(pool: asyncpg.Pool, organization_id: UUID) -> list[dict]:
     """Return all active products for the dropdown selector."""
     rows = await pool.fetch(
         """
         SELECT id, name FROM assets
         WHERE type = 'product' AND status = 'active'
+          AND organization_id = $1
         ORDER BY name
-        """
+        """,
+        organization_id,
     )
     return [{"id": str(r["id"]), "name": r["name"]} for r in rows]

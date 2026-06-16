@@ -15,31 +15,31 @@ router = APIRouter(prefix="/api/org-views", tags=["org-views"])
 @router.get("/org-chart", response_model=GraphResponse)
 async def org_chart(
     pool: asyncpg.Pool = Depends(get_db),
-    _user: User = Depends(require_permission(Permission.VIEW)),
+    user: User = Depends(require_permission(Permission.VIEW)),
 ):
-    return await org_views_svc.get_org_chart(pool)
+    return await org_views_svc.get_org_chart(pool, user.organization_id)
 
 
 @router.get("/business-structure", response_model=GraphResponse)
 async def business_structure(
     pool: asyncpg.Pool = Depends(get_db),
-    _user: User = Depends(require_permission(Permission.VIEW)),
+    user: User = Depends(require_permission(Permission.VIEW)),
 ):
-    return await org_views_svc.get_business_structure(pool)
+    return await org_views_svc.get_business_structure(pool, user.organization_id)
 
 
 @router.get("/products")
 async def list_products(
     pool: asyncpg.Pool = Depends(get_db),
-    _user: User = Depends(require_permission(Permission.VIEW)),
+    user: User = Depends(require_permission(Permission.VIEW)),
 ):
-    return await org_views_svc.list_products(pool)
+    return await org_views_svc.list_products(pool, user.organization_id)
 
 
 @router.get("/product/{product_id}", response_model=GraphResponse)
 async def product_view(
     product_id: UUID,
     pool: asyncpg.Pool = Depends(get_db),
-    _user: User = Depends(require_permission(Permission.VIEW)),
+    user: User = Depends(require_permission(Permission.VIEW)),
 ):
-    return await org_views_svc.get_product_view(pool, product_id)
+    return await org_views_svc.get_product_view(pool, product_id, user.organization_id)

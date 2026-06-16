@@ -11,8 +11,14 @@
     {% if user %}
     <nav class="navbar">
         <div class="nav-brand"><a href="/">GRCen</a></div>
+        <form class="nav-search" action="/assets" method="get" role="search">
+            <input type="search" name="q" placeholder="Search assets…"
+                   aria-label="Search assets"
+                   value="{{ request.query_params.get('q', '') if request else '' }}">
+        </form>
         <div class="nav-links">
             <a href="/assets">Assets</a>
+            <a href="/graph">Graph</a>
             <a href="/org-views">Org Views</a>
             <a href="/reviews">Reviews</a>
             <a href="/risk-management">Risk Management</a>
