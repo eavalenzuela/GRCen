@@ -137,7 +137,7 @@ async def update_relationship(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.EDIT)),
 ):
-    old = await rel_svc.get_relationship(pool, rel_id)
+    old = await rel_svc.get_relationship(pool, rel_id, organization_id=user.organization_id)
     if not old:
         raise HTTPException(status_code=404, detail="Relationship not found")
     kwargs = data.model_dump(exclude_unset=True)
@@ -165,7 +165,7 @@ async def delete_relationship(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.DELETE)),
 ):
-    old = await rel_svc.get_relationship(pool, rel_id)
+    old = await rel_svc.get_relationship(pool, rel_id, organization_id=user.organization_id)
     if not old:
         raise HTTPException(status_code=404, detail="Relationship not found")
     # If the gate is on for the source asset's type, queue the delete instead.

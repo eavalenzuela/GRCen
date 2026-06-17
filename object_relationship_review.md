@@ -36,10 +36,23 @@ were verified directly in source.
   show/hide each asset type (and its edges); the legend was also added to the
   per-asset view. Render smoke tests in `test_graph.py`.
 
-- **Still open (next blocks):** S2 (unlinked-asset filter), O1/O2 (type columns +
-  custom-field sort), R1 (relationship edit UI), R2/R5 (vocabulary suggestions +
-  replace graph `prompt()`), R4 (import rewrite/gating), G5 (single-CTE traversal),
-  G6 (unify the two `TYPE_COLORS` tables, fix doc URL).
+### Third block
+
+- **S2 [SHIPPED]** — find **unlinked assets**. `list_assets` gained an `unlinked`
+  flag (`NOT EXISTS` over relationships); wired to an "Unlinked only" checkbox on
+  `/assets` (page + REST `?unlinked=`). Tests: `test_list_assets_unlinked_filter`,
+  `test_assets_page_unlinked_filter`.
+- **R1 [SHIPPED]** — relationship **edit UI**. New `GET/POST /relationships/{id}/edit`
+  page (`relationships/edit.html`) with a relationship-type datalist; reachable via an
+  **Edit** link on each detail-page relationship row. Audited like the API PUT. Tests:
+  `test_relationship_edit_page_and_submit`, `test_relationship_edit_requires_type`.
+- **Tenancy nit [FIXED]** — the API relationship PUT/DELETE pre-read (`old = get_relationship`)
+  now passes `organization_id` instead of reading cross-org.
+
+- **Still open (next blocks):** O1/O2 (type columns + custom-field sort), R2/R5
+  (vocabulary suggestions + replace graph `prompt()`), R4 (import rewrite/gating),
+  G5 (single-CTE traversal), G6 (unify the two `TYPE_COLORS` tables, fix doc URL),
+  S3/S4/S5 (search depth: descriptions/metadata, name-only `/search`, FTS).
 
 ---
 

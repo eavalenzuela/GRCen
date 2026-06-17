@@ -39,6 +39,7 @@ async def list_assets(
     created_after: str | None = None,
     created_before: str | None = None,
     tag: str | None = None,
+    unlinked: bool = False,
     page: int = 1,
     page_size: int = 25,
     pool: asyncpg.Pool = Depends(get_db),
@@ -48,7 +49,7 @@ async def list_assets(
         pool, asset_type=type, page=page, page_size=page_size,
         q=q, status=status, owner=owner,
         created_after=created_after, created_before=created_before,
-        tag=tag, organization_id=user.organization_id,
+        tag=tag, unlinked=unlinked, organization_id=user.organization_id,
     )
     for a in items:
         a.metadata_ = redaction.redact_metadata(a.metadata_, a.type, user)

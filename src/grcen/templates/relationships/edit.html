@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Edit Relationship - GRCen{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Edit Relationship</h1>
+    <a href="/assets/{{ return_to }}" class="btn">Cancel</a>
+</div>
+
+<p class="muted">
+    <a href="/assets/{{ rel.source_asset.id }}">{{ rel.source_asset.name }}</a>
+    &nbsp;→&nbsp;
+    <a href="/assets/{{ rel.target_asset.id }}">{{ rel.target_asset.name }}</a>
+</p>
+
+<div class="card" style="margin-top:1rem;">
+    <form method="post" action="/relationships/{{ rel.id }}/edit">
+        {% include "partials/csrf.html" %}
+        <input type="hidden" name="return_to" value="{{ return_to }}">
+        <div class="form-group">
+            <label for="relationship_type">Relationship type</label>
+            <input type="text" id="relationship_type" name="relationship_type"
+                   value="{{ rel.relationship_type }}" list="rel-types" required>
+            <datalist id="rel-types">
+                {% for t in rel_types %}<option value="{{ t }}"></option>{% endfor %}
+            </datalist>
+            <small class="muted">The verb reads source → target (e.g. "manages", "depends_on").</small>
+        </div>
+        <div class="form-group">
+            <label for="description">Description</label>
+            <textarea id="description" name="description" rows="3">{{ rel.description or '' }}</textarea>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Save</button>
+            <a href="/assets/{{ return_to }}" class="btn">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

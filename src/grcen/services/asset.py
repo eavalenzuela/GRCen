@@ -92,6 +92,7 @@ async def list_assets(
     created_before: str | None = None,
     metadata_filters: dict[str, str] | None = None,
     tag: str | None = None,
+    unlinked: bool = False,
     sort: str = "name",
     order: str = "asc",
     organization_id: UUID | None = None,
@@ -156,6 +157,14 @@ async def list_assets(
         where_parts.append(f"${idx} = ANY(a.tags)")
         vals.append(tag)
         idx += 1
+
+    if unlinked:
+        # Assets with no relationship on either end — the disconnected nodes a
+        # user most needs to find and wire up. Parameterless (matches on a.id).
+        where_parts.append(
+            "NOT EXISTS (SELECT 1 FROM relationships r "
+            "WHERE r.source_asset_id = a.id OR r.target_asset_id = a.id)"
+        )
 
     if metadata_filters:
         import re

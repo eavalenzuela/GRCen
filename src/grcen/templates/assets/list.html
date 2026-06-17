@@ -78,11 +78,23 @@
                     {% for t in all_tags %}<option value="{{ t.name }}"></option>{% endfor %}
                 </datalist>
             </div>
+            <div class="form-group" style="margin-bottom:0;min-width:160px;align-self:end;">
+                <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;">
+                    <input type="checkbox" name="unlinked" value="on" {% if filter_unlinked %}checked{% endif %}>
+                    Unlinked only
+                </label>
+            </div>
         </div>
     </div>
     {% if filter_tag %}
     <div style="margin-bottom:0.5rem;">
         Filtering by tag: <span class="badge">{{ filter_tag }}</span>
+        <a href="/assets" style="margin-left:0.5rem; font-size:0.85rem;">Clear</a>
+    </div>
+    {% endif %}
+    {% if filter_unlinked %}
+    <div style="margin-bottom:0.5rem;">
+        Showing only <span class="badge">unlinked</span> assets (no relationships)
         <a href="/assets" style="margin-left:0.5rem; font-size:0.85rem;">Clear</a>
     </div>
     {% endif %}
@@ -149,7 +161,7 @@ function toggleAdvanced() {
 }
 // Auto-show advanced filters if any filter is active
 (function() {
-    var hasFilter = {{ 'true' if (current_type or filter_status or filter_owner or filter_created_after or filter_created_before or filter_meta_key or filter_tag) else 'false' }};
+    var hasFilter = {{ 'true' if (current_type or filter_status or filter_owner or filter_created_after or filter_created_before or filter_meta_key or filter_tag or filter_unlinked) else 'false' }};
     if (hasFilter) {
         document.getElementById('advanced-filters').style.display = '';
     }

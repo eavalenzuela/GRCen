@@ -153,7 +153,7 @@
 <div id="relationships">
     {% if relationships %}
     <table>
-        <thead><tr><th>Relationship</th><th>Related Asset</th><th>Description</th><th>Evidence</th>{% if has_perm(user.role, Permission.DELETE) %}<th></th>{% endif %}</tr></thead>
+        <thead><tr><th>Relationship</th><th>Related Asset</th><th>Description</th><th>Evidence</th>{% if has_perm(user.role, Permission.EDIT) or has_perm(user.role, Permission.DELETE) %}<th></th>{% endif %}</tr></thead>
         <tbody>
             {% for rel in relationships %}
             {% set is_outgoing = rel.source_asset_id == asset.id %}
@@ -172,12 +172,17 @@
                         {% if rel.attachment_count %}{{ rel.attachment_count }} file{{ 's' if rel.attachment_count != 1 }}{% else %}+ add{% endif %}
                     </a>
                 </td>
-                {% if has_perm(user.role, Permission.DELETE) %}
+                {% if has_perm(user.role, Permission.EDIT) or has_perm(user.role, Permission.DELETE) %}
                 <td>
+                    {% if has_perm(user.role, Permission.EDIT) %}
+                    <a class="btn btn-sm" href="/relationships/{{ rel.id }}/edit?from={{ asset.id }}">Edit</a>
+                    {% endif %}
+                    {% if has_perm(user.role, Permission.DELETE) %}
                     <button hx-delete="/api/relationships/{{ rel.id }}"
                             hx-confirm="Remove this relationship?"
                             hx-target="closest tr" hx-swap="outerHTML"
                             class="btn btn-sm btn-danger">Remove</button>
+                    {% endif %}
                 </td>
                 {% endif %}
             </tr>

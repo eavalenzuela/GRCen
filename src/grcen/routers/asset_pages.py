@@ -47,6 +47,7 @@ async def asset_list(
     meta_key: str | None = None,
     meta_value: str | None = None,
     tag: str | None = None,
+    unlinked: str | None = None,
     sort: str = "name",
     order: str = "asc",
     page: int = 1,
@@ -57,6 +58,7 @@ async def asset_list(
     metadata_filters = None
     if meta_key and meta_value:
         metadata_filters = {meta_key: meta_value}
+    unlinked_flag = (unlinked or "").lower() in ("on", "1", "true", "yes")
     items, total = await asset_svc.list_assets(
         pool,
         asset_type=asset_type,
@@ -69,6 +71,7 @@ async def asset_list(
         created_before=created_before,
         metadata_filters=metadata_filters,
         tag=tag,
+        unlinked=unlinked_flag,
         sort=sort,
         order=order,
         organization_id=user.organization_id,
@@ -96,6 +99,8 @@ async def asset_list(
         filter_params += f"&meta_key={meta_key}&meta_value={meta_value}"
     if tag:
         filter_params += f"&tag={tag}"
+    if unlinked_flag:
+        filter_params += "&unlinked=on"
     if sort != "name":
         filter_params += f"&sort={sort}"
     if order != "asc":
@@ -117,6 +122,7 @@ async def asset_list(
             "filter_meta_key": meta_key or "",
             "filter_meta_value": meta_value or "",
             "filter_tag": tag or "",
+            "filter_unlinked": unlinked_flag,
             "all_tags": all_tags,
             "saved_searches": saved_searches,
             "current_path": "/assets",

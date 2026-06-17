@@ -4,7 +4,7 @@ import uuid
 from uuid import UUID
 
 import asyncpg
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from grcen.config import settings
@@ -27,6 +27,74 @@ from grcen.services import (
 )
 
 router = APIRouter(tags=["pages"], dependencies=[Depends(_csrf_check)])
+
+@router.get("/relationships/{rel_id}/edit", response_class=HTMLResponse)
+async def relationship_edit_page(
+    request: Request,
+    rel_id: UUID,
+    from_: str | None = Query(None, alias="from"),
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.EDIT)),
+):
+    rel = await rel_svc.get_relationship(pool, rel_id, organization_id=user.organization_id)
+    if not rel:
+        raise HTTPException(status_code=404, detail="Relationship not found")
+    rel_types = await rel_svc.list_relationship_types(pool, organization_id=user.organization_id)
+    notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
+    return templates.TemplateResponse(
+        request,
+        "relationships/edit.html",
+        context={
+            "user": user,
+            "rel": rel,
+            "rel_types": rel_types,
+            "return_to": from_ or str(rel.source_asset_id),
+            "notif_count": notif_count,
+        },
+    )
+
+
+@router.post("/relationships/{rel_id}/edit")
+async def relationship_edit_submit(
+    request: Request,
+    rel_id: UUID,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.EDIT)),
+):
+    form = await request.form()
+    rel_type = str(form.get("relationship_type", "")).strip()
+    description = str(form.get("description", "")).strip()
+    return_to = str(form.get("return_to", "")).strip()
+    if not rel_type:
+        raise HTTPException(status_code=400, detail="Relationship type is required")
+    old = await rel_svc.get_relationship(pool, rel_id, organization_id=user.organization_id)
+    if not old:
+        raise HTTPException(status_code=404, detail="Relationship not found")
+    rel = await rel_svc.update_relationship(
+        pool, rel_id,
+        relationship_type=rel_type,
+        description=description,
+        organization_id=user.organization_id,
+    )
+    if not rel:
+        raise HTTPException(status_code=404, detail="Relationship not found")
+    diff = audit_svc.compute_diff(
+        old.__dict__, rel.__dict__, ["relationship_type", "description"]
+    )
+    if diff:
+        await audit_svc.log_audit_event(
+            pool,
+            user_id=user.id,
+            username=user.username,
+            action="update",
+            entity_type="relationship",
+            entity_id=rel.id,
+            entity_name=rel.relationship_type,
+            changes=diff,
+        )
+    dest = return_to or str(rel.source_asset_id)
+    return RedirectResponse(f"/assets/{dest}", status_code=302)
+
 
 @router.get("/relationships/{rel_id}/evidence", response_class=HTMLResponse)
 async def relationship_evidence_page(
