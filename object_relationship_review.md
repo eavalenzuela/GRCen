@@ -98,10 +98,18 @@ were verified directly in source.
   vendor/control now match across both). Documented graph URL in `CLAUDE.md` corrected
   (`/graph/{id}` + whole-org `/graph`).
 
-- **Still open:** G5 (single-CTE traversal + result-size cap — perf), S5 (real FTS /
-  `pg_trgm` — everything is still leading-wildcard `ILIKE`, no ranking/fuzzy, non-indexable
-  at scale). Note O2 custom-field sort is text-order (numeric fields like score sort
-  lexically) — a documented limitation.
+### Eighth block
+
+- **G5 [SHIPPED]** — graph traversal now runs **one** recursive CTE (was two — once for
+  nodes, once for edges) and caps the result to `max_nodes` (default 600, nearest-first
+  by level), so a dense hub at depth 3 can't ship the whole org graph or stall the
+  client layout. Edges are restricted to the (capped) node set, no dangles. Test in
+  `test_graph.py`.
+
+- **Still open:** S5 (real FTS / `pg_trgm` — everything is still leading-wildcard `ILIKE`,
+  no ranking/fuzzy, non-indexable at scale). The one larger, separate investment.
+  Note O2 custom-field sort is text-order (numeric fields like score sort lexically) —
+  a documented limitation.
 
 ---
 

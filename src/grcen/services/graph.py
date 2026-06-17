@@ -11,10 +11,14 @@ async def get_asset_graph(
     depth: int = 1,
     *,
     organization_id: UUID | None = None,
+    max_nodes: int = 600,
 ) -> GraphResponse:
     depth = min(depth, 3)
 
-    nodes_rows = await pool.fetch(
+    # One recursive traversal (was two — once for nodes, once for edges). Keep
+    # the lowest level each node is reached at, then cap to `max_nodes` nearest
+    # so a dense hub at depth 3 can't ship the whole org graph to the client.
+    node_rows = await pool.fetch(
         """
         WITH RECURSIVE graph AS (
             SELECT a.id AS asset_id, a.name, a.type::text AS asset_type, 0 AS lvl
@@ -42,63 +46,49 @@ async def get_asset_graph(
                 AND ($3::uuid IS NULL OR a2.organization_id = $3)
             WHERE g.lvl < $2
         )
-        SELECT DISTINCT asset_id, name, asset_type FROM graph
+        SELECT asset_id, name, asset_type
+        FROM (
+            SELECT asset_id, name, asset_type, min(lvl) AS lvl
+            FROM graph
+            GROUP BY asset_id, name, asset_type
+        ) g
+        ORDER BY lvl
+        LIMIT $4
         """,
         asset_id,
         depth,
         organization_id,
+        max_nodes,
     )
 
-    edges_rows = await pool.fetch(
-        """
-        WITH RECURSIVE graph AS (
-            SELECT a.id AS asset_id, 0 AS lvl
-            FROM assets a WHERE a.id = $1
-              AND ($3::uuid IS NULL OR a.organization_id = $3)
+    node_ids = [r["asset_id"] for r in node_rows]
 
-            UNION
-
-            SELECT
-                CASE
-                    WHEN r.source_asset_id = g.asset_id THEN r.target_asset_id
-                    ELSE r.source_asset_id
-                END AS asset_id,
-                g.lvl + 1 AS lvl
-            FROM graph g
-            JOIN relationships r ON (r.source_asset_id = g.asset_id
-                                  OR r.target_asset_id = g.asset_id)
-                                 AND ($3::uuid IS NULL OR r.organization_id = $3)
-            JOIN assets a2 ON a2.id = CASE
-                WHEN r.source_asset_id = g.asset_id THEN r.target_asset_id
-                ELSE r.source_asset_id
-            END
-                AND ($3::uuid IS NULL OR a2.organization_id = $3)
-            WHERE g.lvl < $2
-        ),
-        node_ids AS (SELECT DISTINCT asset_id FROM graph)
-        SELECT r.id, r.source_asset_id, r.target_asset_id, r.relationship_type
-        FROM relationships r
-        WHERE r.source_asset_id IN (SELECT asset_id FROM node_ids)
-          AND r.target_asset_id IN (SELECT asset_id FROM node_ids)
-          AND ($3::uuid IS NULL OR r.organization_id = $3)
-        """,
-        asset_id,
-        depth,
-        organization_id,
-    )
+    edges: list[GraphEdge] = []
+    if node_ids:
+        edge_rows = await pool.fetch(
+            """
+            SELECT r.id, r.source_asset_id, r.target_asset_id, r.relationship_type
+            FROM relationships r
+            WHERE r.source_asset_id = ANY($1::uuid[])
+              AND r.target_asset_id = ANY($1::uuid[])
+              AND ($2::uuid IS NULL OR r.organization_id = $2)
+            """,
+            node_ids,
+            organization_id,
+        )
+        edges = [
+            GraphEdge(
+                id=str(r["id"]),
+                source=str(r["source_asset_id"]),
+                target=str(r["target_asset_id"]),
+                label=r["relationship_type"],
+            )
+            for r in edge_rows
+        ]
 
     nodes = [
         GraphNode(id=str(r["asset_id"]), label=r["name"], type=r["asset_type"])
-        for r in nodes_rows
-    ]
-    edges = [
-        GraphEdge(
-            id=str(r["id"]),
-            source=str(r["source_asset_id"]),
-            target=str(r["target_asset_id"]),
-            label=r["relationship_type"],
-        )
-        for r in edges_rows
+        for r in node_rows
     ]
     return GraphResponse(nodes=nodes, edges=edges)
 
