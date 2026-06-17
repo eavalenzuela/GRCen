@@ -5,7 +5,15 @@ from uuid import UUID
 
 import asyncpg
 
+from grcen.custom_fields import CUSTOM_FIELDS
 from grcen.models.asset import POSTURE_TYPES, Asset, AssetType
+
+# Custom-field names flagged sensitive in any asset type. Free-text search
+# excludes these metadata values so it can't become a PII side channel (a user
+# without VIEW_PII shouldn't be able to confirm e.g. an email/SSN by probing).
+SENSITIVE_FIELD_NAMES: list[str] = sorted(
+    {f.name for fields in CUSTOM_FIELDS.values() for f in fields if f.sensitive}
+)
 
 _SELECT_WITH_OWNER = """
     SELECT a.*, o.name AS owner_name
@@ -129,9 +137,22 @@ async def list_assets(
                 idx += 1
 
     if q:
-        where_parts.append(f"(a.name ILIKE ${idx} OR a.description ILIKE ${idx} OR o.name ILIKE ${idx})")
+        qph = idx
         vals.append(f"%{q}%")
         idx += 1
+        sens_ph = idx
+        vals.append(SENSITIVE_FIELD_NAMES)
+        idx += 1
+        where_parts.append(
+            f"(a.name ILIKE ${qph} OR a.description ILIKE ${qph} OR o.name ILIKE ${qph}"
+            # non-sensitive custom-field values
+            f" OR EXISTS (SELECT 1 FROM jsonb_each_text(COALESCE(a.metadata, '{{}}'::jsonb)) kv"
+            f"            WHERE kv.value ILIKE ${qph} AND kv.key <> ALL(${sens_ph}::text[]))"
+            # free-text notes on relationships touching this asset
+            f" OR EXISTS (SELECT 1 FROM relationships r"
+            f"            WHERE (r.source_asset_id = a.id OR r.target_asset_id = a.id)"
+            f"              AND r.description ILIKE ${qph}))"
+        )
 
     if status:
         where_parts.append(f"a.status = ${idx}")
@@ -384,7 +405,7 @@ async def search_assets(
         placeholders = ", ".join(f"${i}" for i in range(4, 4 + len(types)))
         rows = await pool.fetch(
             f"""{_SELECT_WITH_OWNER}
-                WHERE a.name ILIKE $1 AND a.type IN ({placeholders})
+                WHERE (a.name ILIKE $1 OR a.description ILIKE $1) AND a.type IN ({placeholders})
                   AND ($2::uuid IS NULL OR a.organization_id = $2)
                 ORDER BY a.name LIMIT $3""",
             f"%{query_str}%",
@@ -394,7 +415,7 @@ async def search_assets(
         )
     else:
         rows = await pool.fetch(
-            _SELECT_WITH_OWNER + """ WHERE a.name ILIKE $1
+            _SELECT_WITH_OWNER + """ WHERE (a.name ILIKE $1 OR a.description ILIKE $1)
                   AND ($3::uuid IS NULL OR a.organization_id = $3)
                   ORDER BY a.name LIMIT $2""",
             f"%{query_str}%",

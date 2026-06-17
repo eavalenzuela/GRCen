@@ -75,10 +75,21 @@ were verified directly in source.
   Browser-verified: 50 datalist options incl. canonical `mitigated_by`, Create → 201,
   edge persisted. Tests in `test_rel_vocabulary.py`.
 
+### Sixth block
+
+- **S3 [SHIPPED]** — `/assets` free-text `q` now also matches **relationship
+  descriptions** (free-text notes on edges touching the asset) and **non-sensitive
+  custom-field values** (via `jsonb_each_text`, excluding keys flagged `sensitive` so
+  search can't become a PII side channel). So "find the asset where we noted X" works.
+- **S4 [SHIPPED]** — `search_assets` (and `/api/assets/search`, which backs the
+  relationship target picker) now matches **descriptions**, not just names — aligning
+  the implementation with its long-standing docstring. Tests in `test_search_depth.py`.
+
 - **Still open (next blocks):** R4 (import rewrite/gating), G5 (single-CTE traversal),
-  G6 (unify the two `TYPE_COLORS` tables, fix doc URL), S3/S4/S5 (search depth:
-  descriptions/metadata, name-only `/search`, FTS). Note O2 custom-field sort is
-  text-order (numeric fields like score sort lexically) — a documented limitation.
+  G6 (unify the two `TYPE_COLORS` tables, fix doc URL), S5 (real FTS / `pg_trgm` —
+  everything is still leading-wildcard `ILIKE`, no ranking/fuzzy, non-indexable at
+  scale). Note O2 custom-field sort is text-order (numeric fields like score sort
+  lexically) — a documented limitation.
 
 ---
 
