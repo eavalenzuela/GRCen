@@ -227,3 +227,27 @@ async def test_bearer_token_without_import_perm_rejected(client, pool):
         headers={"Authorization": f"Bearer {raw}"},
     )
     assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_relationship_import_does_not_rewrite_owns(pool):
+    # Bulk import must store the relationship type exactly as given — the old
+    # silent owns→manages rewrite for person targets is gone (matches the API).
+    admin = await create_user(
+        pool, f"u_{uuid.uuid4().hex[:8]}", "pw", role=UserRole.ADMIN
+    )
+    await asset_svc.create_asset(
+        pool, type=AssetType.SYSTEM, name="OwnerCo", status="active", updated_by=admin.id
+    )
+    await asset_svc.create_asset(
+        pool, type=AssetType.PERSON, name="PatPerson", status="active", updated_by=admin.id
+    )
+    content = (
+        '[{"source_name":"OwnerCo","source_type":"system",'
+        '"target_name":"PatPerson","target_type":"person",'
+        '"relationship_type":"owns"}]'
+    )
+    result = await execute_relationship_import(pool, content, "json")
+    assert result.created == 1
+    row = await pool.fetchrow("SELECT relationship_type FROM relationships LIMIT 1")
+    assert row["relationship_type"] == "owns"

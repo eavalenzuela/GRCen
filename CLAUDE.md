@@ -33,7 +33,7 @@ GRCen (pronounced "gurken") is a free and open-source GRC (Governance, Risk, Com
 ## Implemented Features
 
 - Asset and relationship graph (recursive SQL CTE traversal in `services/graph.py`)
-- Visual node graphs (Cytoscape.js) at `/assets/{id}/graph` with a drag-to-link mode for creating relationships inline
+- Visual node graphs (Cytoscape.js) at `/graph/{id}` (per-asset) and a whole-org graph at `/graph`, with a drag-to-link mode for creating relationships inline and node expand-in-place
 - Bulk CSV/JSON import of assets with preview; filterable column-selectable export (CSV/JSON)
 - Schedulable alerts and review reminders with three delivery channels: in-app notifications, SMTP email (admin config at `/admin/smtp-settings`, user opt-in at `/settings`, log in `notification_deliveries`), and outbound webhooks (manage at `/admin/webhooks`, HMAC-SHA256 signed, log in `webhook_deliveries`).
 - RBAC with four roles: Admin, Editor, Viewer, Auditor (`permissions.py`), plus field-level redaction of fields marked `sensitive=True` in `custom_fields.py` for users without `VIEW_PII` permission

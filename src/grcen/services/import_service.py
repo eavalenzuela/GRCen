@@ -239,9 +239,11 @@ async def execute_relationship_import(
                     )
                     continue
 
+                # Use the relationship type exactly as given — no silent rewrite
+                # (e.g. owns→manages for person targets). Mapping relationships as
+                # they actually are is the product's design principle, and the API
+                # create path already honours it; import now matches.
                 rel_type = row["relationship_type"]
-                if rel_type == "owns" and row.get("target_type") == "person":
-                    rel_type = "manages"
 
                 if not dry_run:
                     await conn.execute(

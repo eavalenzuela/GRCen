@@ -85,10 +85,22 @@ were verified directly in source.
   relationship target picker) now matches **descriptions**, not just names — aligning
   the implementation with its long-standing docstring. Tests in `test_search_depth.py`.
 
-- **Still open (next blocks):** R4 (import rewrite/gating), G5 (single-CTE traversal),
-  G6 (unify the two `TYPE_COLORS` tables, fix doc URL), S5 (real FTS / `pg_trgm` —
-  everything is still leading-wildcard `ILIKE`, no ranking/fuzzy, non-indexable at
-  scale). Note O2 custom-field sort is text-order (numeric fields like score sort
+### Seventh block
+
+- **R4 [SHIPPED]** — bulk import **no longer silently rewrites** `owns`→`manages` for
+  person targets; it stores the type exactly as given, matching the API path and the
+  "map relationships as they actually are" principle. Test in `test_bulk_api.py`.
+  (Import's workflow-gating bypass is left as a deliberate, documented behaviour —
+  bulk import is a privileged `IMPORT`-permission operation.)
+- **G6 [SHIPPED]** — the two divergent `TYPE_COLORS` tables are unified into one shared
+  `static/js/type_colors.js` (`window.TYPE_COLORS`), referenced by both `graph.js` and
+  `org_tree.js`, so the graph and Org Views colour every type identically (browser-verified:
+  vendor/control now match across both). Documented graph URL in `CLAUDE.md` corrected
+  (`/graph/{id}` + whole-org `/graph`).
+
+- **Still open:** G5 (single-CTE traversal + result-size cap — perf), S5 (real FTS /
+  `pg_trgm` — everything is still leading-wildcard `ILIKE`, no ranking/fuzzy, non-indexable
+  at scale). Note O2 custom-field sort is text-order (numeric fields like score sort
   lexically) — a documented limitation.
 
 ---

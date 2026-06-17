@@ -5,24 +5,9 @@
  * where source is the parent and target is the child.
  */
 
-const TYPE_COLORS = {
-    person: '#3b82f6',
-    policy: '#8b5cf6',
-    product: '#ec4899',
-    system: '#f59e0b',
-    device: '#10b981',
-    data_category: '#06b6d4',
-    audit: '#ef4444',
-    requirement: '#84cc16',
-    process: '#f97316',
-    intellectual_property: '#6366f1',
-    risk: '#dc2626',
-    organizational_unit: '#14b8a6',
-    vendor: '#a855f7',
-    control: '#0ea5e9',
-    incident: '#e11d48',
-    framework: '#65a30d',
-};
+// Shared asset-type palette (see type_colors.js, loaded first) so the tree and
+// the Cytoscape graph colour each type identically.
+const TYPE_COLORS = window.TYPE_COLORS || {};
 
 const NODE_W = 160;
 const NODE_H = 56;
