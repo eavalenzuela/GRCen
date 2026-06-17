@@ -57,8 +57,36 @@ body {
     font-size: 0.8rem;
     color: var(--text-muted);
 }
-.legend-item { display: inline-flex; align-items: center; gap: 0.35rem; text-transform: capitalize; }
+.legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    text-transform: capitalize;
+    background: none;
+    border: none;
+    padding: 2px 4px;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+    border-radius: 4px;
+}
+.legend-item:hover { background: var(--border); }
+.legend-item.legend-off { opacity: 0.35; text-decoration: line-through; }
 .legend-swatch { width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--border); }
+.graph-node-panel {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin: 0.5rem 0;
+    padding: 0.4rem 0.65rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    width: fit-content;
+}
+.gnp-name { font-weight: 600; }
+.btn-small { padding: 0.2rem 0.55rem; font-size: 0.8rem; }
+.graph-status { font-size: 0.85rem; color: var(--text-muted); margin-left: 0.5rem; }
 .notif-link { position: relative; }
 .nav-separator { border-left: 1px solid var(--border); height: 1.25rem; }
 

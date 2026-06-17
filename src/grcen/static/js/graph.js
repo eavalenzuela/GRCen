@@ -24,6 +24,8 @@ let cleanupLinkMode = null;
 // an edge regardless of which view (per-asset or whole-org) we're in.
 let lastRenderFn = null;
 let centerId = null;
+// Asset types currently hidden via the legend filter (applies across renders).
+const hiddenTypes = new Set();
 
 // Per-asset N-hop subgraph centered on one node.
 function initGraph(assetId, depth) {
@@ -87,6 +89,14 @@ function renderGraph(url, focusId) {
                             'border-color': '#1e293b',
                         }
                     },
+                    // A node whose neighbours have been pulled in (expand-in-place).
+                    {
+                        selector: 'node.expanded',
+                        style: {
+                            'border-width': 3,
+                            'border-color': '#16a34a',
+                        }
+                    },
                     // Target-hover highlight while dragging a new link.
                     {
                         selector: 'node.link-target',
@@ -141,14 +151,24 @@ function renderGraph(url, focusId) {
                 }
             });
 
-            // Click a node to navigate — unless we're in link mode.
+            // Tap a node to select it (panel offers Expand / Open). Double-tap
+            // expands its neighbours in place. Navigation moved to the panel so
+            // walking the graph no longer reloads the page and loses position.
             cyInstance.on('tap', 'node', function(evt) {
                 if (linkMode) return;
-                const nodeId = evt.target.data('id');
-                if (nodeId !== centerId) {
-                    window.location.href = `/assets/${nodeId}`;
-                }
+                const node = evt.target;
+                renderNodePanel(node.data('id'), node.data('label'));
             });
+            cyInstance.on('dbltap', 'node', function(evt) {
+                if (linkMode) return;
+                expandNode(evt.target.data('id'));
+            });
+            // Tap blank canvas clears the selection panel.
+            cyInstance.on('tap', function(evt) {
+                if (evt.target === cyInstance) hideNodePanel();
+            });
+
+            applyTypeFilter();
 
             if (linkMode) {
                 cleanupLinkMode = enableDragLink(cyInstance);
@@ -156,19 +176,120 @@ function renderGraph(url, focusId) {
         });
 }
 
-// Populate a legend element (#graph-legend) with the asset-type colour key.
+// Pull a node's direct neighbours into the current graph without reloading.
+function expandNode(nodeId) {
+    fetch(`/api/graph/${nodeId}?depth=1`)
+        .then(r => r.json())
+        .then(data => {
+            if (!cyInstance) return;
+            const src = cyInstance.getElementById(nodeId);
+            const base = (src && src.position) ? src.position() : { x: 0, y: 0 };
+            let added = 0;
+            data.nodes.forEach(n => {
+                if (cyInstance.getElementById(n.id).empty()) {
+                    cyInstance.add({
+                        group: 'nodes',
+                        data: { id: n.id, label: n.label, type: n.type },
+                        position: {
+                            x: base.x + (Math.random() * 160 - 80),
+                            y: base.y + (Math.random() * 160 - 80),
+                        },
+                    });
+                    added++;
+                }
+            });
+            data.edges.forEach(e => {
+                if (cyInstance.getElementById(e.id).empty()) {
+                    cyInstance.add({
+                        group: 'edges',
+                        data: { id: e.id, source: e.source, target: e.target, label: e.label },
+                    });
+                }
+            });
+            if (src) src.addClass('expanded');
+            applyTypeFilter();
+            if (added > 0) {
+                // randomize:false + fit:false keeps existing nodes roughly in
+                // place so the user doesn't lose their bearings.
+                cyInstance.layout({
+                    name: 'cose', animate: true, animationDuration: 400,
+                    randomize: false, fit: false, nodeRepulsion: 8000, idealEdgeLength: 120,
+                }).run();
+            }
+            updateStatus(added > 0 ? `Expanded ${added} neighbour(s).` : 'No new neighbours.');
+        })
+        .catch(() => updateStatus('Failed to expand node.'));
+}
+
+// Floating panel for the selected node: name + Expand + Open actions.
+function renderNodePanel(id, label) {
+    const panel = document.getElementById('graph-node-panel');
+    if (!panel) return;
+    panel.innerHTML = '';
+    const name = document.createElement('span');
+    name.className = 'gnp-name';
+    name.textContent = label;            // textContent: node labels are user data
+    const expand = document.createElement('button');
+    expand.type = 'button';
+    expand.className = 'btn btn-small';
+    expand.textContent = 'Expand';
+    expand.addEventListener('click', () => expandNode(id));
+    const open = document.createElement('a');
+    open.className = 'btn btn-small';
+    open.href = '/assets/' + id;
+    open.textContent = 'Open ↗';
+    panel.appendChild(name);
+    panel.appendChild(expand);
+    panel.appendChild(open);
+    panel.style.display = 'flex';
+}
+
+function hideNodePanel() {
+    const panel = document.getElementById('graph-node-panel');
+    if (panel) panel.style.display = 'none';
+}
+
+// Show/hide nodes (and their edges) per the legend's hiddenTypes set.
+function applyTypeFilter() {
+    if (!cyInstance) return;
+    cyInstance.batch(function() {
+        cyInstance.nodes().forEach(function(n) {
+            n.style('display', hiddenTypes.has(n.data('type')) ? 'none' : 'element');
+        });
+        cyInstance.edges().forEach(function(e) {
+            const hide = hiddenTypes.has(e.source().data('type'))
+                      || hiddenTypes.has(e.target().data('type'));
+            e.style('display', hide ? 'none' : 'element');
+        });
+    });
+}
+
+// Populate a legend (#graph-legend) with the asset-type colour key. Each entry
+// is a toggle that shows/hides that type in the graph (type filter).
 function renderLegend(containerId) {
     const el = document.getElementById(containerId || 'graph-legend');
     if (!el) return;
     el.innerHTML = '';
     Object.keys(TYPE_COLORS).forEach(type => {
-        const item = document.createElement('span');
-        item.className = 'legend-item';
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'legend-item' + (hiddenTypes.has(type) ? ' legend-off' : '');
+        item.title = 'Toggle ' + type.replace(/_/g, ' ');
         const swatch = document.createElement('span');
         swatch.className = 'legend-swatch';
         swatch.style.backgroundColor = TYPE_COLORS[type];
         item.appendChild(swatch);
         item.appendChild(document.createTextNode(type.replace(/_/g, ' ')));
+        item.addEventListener('click', () => {
+            if (hiddenTypes.has(type)) {
+                hiddenTypes.delete(type);
+                item.classList.remove('legend-off');
+            } else {
+                hiddenTypes.add(type);
+                item.classList.add('legend-off');
+            }
+            applyTypeFilter();
+        });
         el.appendChild(item);
     });
 }
@@ -176,17 +297,15 @@ function renderLegend(containerId) {
 function toggleLinkMode() {
     linkMode = !linkMode;
     const btn = document.getElementById('link-mode-btn');
-    const status = document.getElementById('link-status');
     if (linkMode) {
         btn.textContent = 'Cancel Link Mode';
         btn.classList.add('btn-primary');
-        status.textContent = 'Drag from a source node onto a target node to create a relationship.';
-        status.style.display = 'inline';
+        updateStatus('Drag from a source node onto a target node to create a relationship.');
         if (cyInstance) cleanupLinkMode = enableDragLink(cyInstance);
     } else {
         btn.textContent = 'Link Mode';
         btn.classList.remove('btn-primary');
-        status.style.display = 'none';
+        updateStatus('');
         if (cleanupLinkMode) { cleanupLinkMode(); cleanupLinkMode = null; }
     }
 }
@@ -279,7 +398,7 @@ function enableDragLink(cy) {
 }
 
 function updateStatus(msg) {
-    const status = document.getElementById('link-status');
+    const status = document.getElementById('graph-status');
     if (status) status.textContent = msg;
 }
 

@@ -25,9 +25,20 @@ were verified directly in source.
   `graph.js` refactored to drive both per-asset and whole-org views; drag-to-link
   re-renders the current view. Tests: `test_org_graph_endpoint_and_page`,
   `test_org_graph_isolated_between_orgs`. Full suite: 605 passed.
-- **Still open (next blocks):** G2 (expand-in-place), S2 (unlinked-asset filter),
-  O1/O2 (type columns + custom-field sort), R1 (relationship edit UI), R2/R5
-  (vocabulary suggestions + replace graph `prompt()`), R4 (import rewrite/gating),
+### Second block
+
+- **G2 [SHIPPED]** — node **expand-in-place**. Tapping a node now selects it (panel
+  with **Expand** / **Open ↗**) instead of navigating; Expand (or double-tap) merges
+  the node's depth-1 neighbours into the live graph via `cy.add` + an in-place `cose`
+  relayout (`randomize:false, fit:false`) — no page reload, position preserved.
+  Works in both the per-asset and whole-org views. (`static/js/graph.js`)
+- **G4 [SHIPPED]** — graph **type filter**: legend entries are now toggles that
+  show/hide each asset type (and its edges); the legend was also added to the
+  per-asset view. Render smoke tests in `test_graph.py`.
+
+- **Still open (next blocks):** S2 (unlinked-asset filter), O1/O2 (type columns +
+  custom-field sort), R1 (relationship edit UI), R2/R5 (vocabulary suggestions +
+  replace graph `prompt()`), R4 (import rewrite/gating), G5 (single-CTE traversal),
   G6 (unify the two `TYPE_COLORS` tables, fix doc URL).
 
 ---

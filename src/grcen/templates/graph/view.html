@@ -16,9 +16,17 @@
     </select>
     {% if has_perm(user.role, Permission.CREATE) %}
     <button id="link-mode-btn" class="btn" onclick="toggleLinkMode()">Link Mode</button>
-    <span id="link-status" style="display:none;font-size:0.85rem;color:var(--text-muted);"></span>
     {% endif %}
+    <span id="graph-status" class="graph-status"></span>
 </div>
+
+<p class="muted" style="font-size:0.85rem;">
+    Tap a node to select it, then Expand to pull in its neighbours without
+    leaving the page (or double-tap a node). Toggle a legend entry to hide that type.
+</p>
+
+<div id="graph-legend" class="graph-legend"></div>
+<div id="graph-node-panel" class="graph-node-panel" style="display:none;"></div>
 
 <div id="cy" style="width:100%; height:600px; border:1px solid #ddd; border-radius:8px;"></div>
 {% endblock %}
@@ -27,6 +35,7 @@
 <script src="/static/js/cytoscape.min.js"></script>
 <script src="/static/js/graph.js"></script>
 <script nonce="{{ request.state.csp_nonce }}">
+    renderLegend('graph-legend');
     initGraph('{{ asset.id }}', 1);
     document.getElementById('depth-select').addEventListener('change', function() {
         initGraph('{{ asset.id }}', parseInt(this.value));

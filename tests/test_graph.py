@@ -24,6 +24,12 @@ async def test_graph_endpoint(auth_client):
     assert len(data["nodes"]) == 2
     assert len(data["edges"]) == 1
 
+    # Per-asset graph page renders (legend + expand panel markup present).
+    page = await auth_client.get(f"/graph/{a1}")
+    assert page.status_code == 200
+    assert 'id="graph-legend"' in page.text
+    assert 'id="graph-node-panel"' in page.text
+
 
 @pytest.mark.asyncio
 async def test_org_graph_endpoint_and_page(auth_client):
