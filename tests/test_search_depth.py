@@ -68,3 +68,40 @@ async def test_api_search_matches_description(auth_client):
     res = await auth_client.get("/api/assets/search?q=billing engine")
     assert res.status_code == 200
     assert any(x["name"] == "Onyx" for x in res.json())
+
+
+@pytest.mark.asyncio
+async def test_search_assets_fuzzy_typo(pool):
+    admin = await _admin(pool)
+    await asset_svc.create_asset(
+        pool, type=AssetType.SYSTEM, name="Kubernetes Cluster", updated_by=admin.id
+    )
+    # "kubernets" is NOT a substring of "Kubernetes Cluster" — only fuzzy
+    # (pg_trgm word similarity) can match it.
+    res = await asset_svc.search_assets(pool, "kubernets")
+    assert any(a.name == "Kubernetes Cluster" for a in res)
+
+
+@pytest.mark.asyncio
+async def test_search_assets_ranks_exact_substring_first(pool):
+    admin = await _admin(pool)
+    await asset_svc.create_asset(
+        pool, type=AssetType.SYSTEM, name="Payment Gateway", updated_by=admin.id
+    )
+    await asset_svc.create_asset(
+        pool, type=AssetType.SYSTEM, name="Payment Gatewy", updated_by=admin.id
+    )
+    res = await asset_svc.search_assets(pool, "Payment Gateway")
+    names = [a.name for a in res]
+    assert names[0] == "Payment Gateway"   # exact-substring match ranks first
+    assert "Payment Gatewy" in names       # fuzzy match still returned
+
+
+@pytest.mark.asyncio
+async def test_api_search_fuzzy(auth_client):
+    # The relationship target picker calls /api/assets/search — it should be
+    # typo-tolerant, not just exact-substring.
+    await auth_client.post("/api/assets/", json={"type": "system", "name": "Kubernetes Cluster"})
+    res = await auth_client.get("/api/assets/search?q=kubernets")
+    assert res.status_code == 200
+    assert any(x["name"] == "Kubernetes Cluster" for x in res.json())

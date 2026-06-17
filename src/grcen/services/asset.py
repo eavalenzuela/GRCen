@@ -401,25 +401,35 @@ async def search_assets(
     types: list[AssetType] | None = None,
     organization_id: UUID | None = None,
 ) -> list[Asset]:
+    # $1 = substring pattern (indexable via the name/description trigram GINs),
+    # $2 = raw query for fuzzy matching. `$2 <% a.name` is pg_trgm word-similarity
+    # (typo tolerance, also index-accelerated). Results are ranked: exact-substring
+    # name hits first, then by descending similarity — relevance, not alphabetical.
+    like = f"%{query_str}%"
+    match = "(a.name ILIKE $1 OR a.description ILIKE $1 OR $2 <% a.name)"
+    order = "ORDER BY (a.name ILIKE $1) DESC, word_similarity($2, a.name) DESC, a.name"
     if types:
-        placeholders = ", ".join(f"${i}" for i in range(4, 4 + len(types)))
+        placeholders = ", ".join(f"${i}" for i in range(5, 5 + len(types)))
         rows = await pool.fetch(
             f"""{_SELECT_WITH_OWNER}
-                WHERE (a.name ILIKE $1 OR a.description ILIKE $1) AND a.type IN ({placeholders})
-                  AND ($2::uuid IS NULL OR a.organization_id = $2)
-                ORDER BY a.name LIMIT $3""",
-            f"%{query_str}%",
+                WHERE {match} AND a.type IN ({placeholders})
+                  AND ($3::uuid IS NULL OR a.organization_id = $3)
+                {order} LIMIT $4""",
+            like,
+            query_str,
             organization_id,
             limit,
             *[t.value for t in types],
         )
     else:
         rows = await pool.fetch(
-            _SELECT_WITH_OWNER + """ WHERE (a.name ILIKE $1 OR a.description ILIKE $1)
+            f"""{_SELECT_WITH_OWNER}
+                WHERE {match}
                   AND ($3::uuid IS NULL OR a.organization_id = $3)
-                  ORDER BY a.name LIMIT $2""",
-            f"%{query_str}%",
-            limit,
+                {order} LIMIT $4""",
+            like,
+            query_str,
             organization_id,
+            limit,
         )
     return [Asset.from_row(r) for r in rows]

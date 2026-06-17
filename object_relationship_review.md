@@ -106,10 +106,20 @@ were verified directly in source.
   client layout. Edges are restricted to the (capped) node set, no dangles. Test in
   `test_graph.py`.
 
-- **Still open:** S5 (real FTS / `pg_trgm` — everything is still leading-wildcard `ILIKE`,
-  no ranking/fuzzy, non-indexable at scale). The one larger, separate investment.
-  Note O2 custom-field sort is text-order (numeric fields like score sort lexically) —
-  a documented limitation.
+### Ninth block
+
+- **S5 [SHIPPED]** — search is now **indexable, fuzzy, and ranked**. Added trigram GIN
+  indexes on `assets.description` and `relationships.description` (`assets.name` already
+  had one + `pg_trgm` was enabled), so the substring searches use indexes instead of
+  seq-scanning. `search_assets` (and `/api/assets/search`, the relationship target
+  picker) now also matches via pg_trgm **word similarity** (`<%`, typo-tolerant) and
+  **ranks** results — exact-substring hits first, then by descending similarity —
+  instead of alphabetical. Tests in `test_search_depth.py` (fuzzy typo, ranking, API).
+
+**All review findings are now resolved.** Remaining nice-to-haves (not blockers):
+the `/assets` list `q` still uses substring `ILIKE` (now index-backed) rather than
+ranked FTS, because the list respects the user's chosen sort; and O2 custom-field
+sort is text-order (numeric fields like score sort lexically).
 
 ---
 

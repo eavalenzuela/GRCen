@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS assets (
 
 CREATE INDEX IF NOT EXISTS ix_assets_type ON assets (type);
 CREATE INDEX IF NOT EXISTS ix_assets_name_trgm ON assets USING gin (name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS ix_assets_description_trgm ON assets USING gin (description gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS ix_assets_metadata ON assets USING gin (metadata);
 
 CREATE TABLE IF NOT EXISTS relationships (
@@ -60,6 +61,8 @@ CREATE TABLE IF NOT EXISTS relationships (
 
 CREATE INDEX IF NOT EXISTS ix_rel_source_target
     ON relationships (source_asset_id, target_asset_id);
+CREATE INDEX IF NOT EXISTS ix_rel_description_trgm
+    ON relationships USING gin (description gin_trgm_ops);
 
 CREATE TABLE IF NOT EXISTS attachments (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
