@@ -111,6 +111,21 @@ async def create_relationship(
 
 
 @router.get(
+    "/types",
+    response_model=list[str],
+    summary="Suggested relationship types (canonical vocabulary ∪ types in use)",
+)
+async def relationship_types(
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.VIEW)),
+):
+    from grcen.routers._pages_shared import suggested_relationship_types
+
+    used = await rel_svc.list_relationship_types(pool, organization_id=user.organization_id)
+    return suggested_relationship_types(used)
+
+
+@router.get(
     "/{rel_id}",
     response_model=RelationshipResponse,
     summary="Fetch one relationship by id",

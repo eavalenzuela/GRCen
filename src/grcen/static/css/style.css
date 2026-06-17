@@ -85,6 +85,24 @@ body {
     width: fit-content;
 }
 .gnp-name { font-weight: 600; }
+.graph-link-form {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0.5rem 0;
+    padding: 0.5rem 0.65rem;
+    background: var(--surface);
+    border: 1px solid var(--primary);
+    border-radius: 6px;
+}
+.graph-link-form input {
+    padding: 0.3rem 0.5rem;
+    font-size: 0.85rem;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+}
+.glf-label { font-size: 0.85rem; color: var(--text-muted); }
 .btn-small { padding: 0.2rem 0.55rem; font-size: 0.8rem; }
 .graph-status { font-size: 0.85rem; color: var(--text-muted); margin-left: 0.5rem; }
 .notif-link { position: relative; }

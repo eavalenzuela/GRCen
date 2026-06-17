@@ -70,6 +70,16 @@ def _rel_direction_label(rel_type: str, is_outgoing: bool) -> str:
         return labels[0] if is_outgoing else labels[1]
     return rel_type if is_outgoing else f"incoming: {rel_type}"
 
+
+def suggested_relationship_types(db_types: list[str]) -> list[str]:
+    """Canonical vocabulary ∪ types already in use, sorted — for input datalists.
+
+    Suggestions only: any new free-text type is still accepted. Offering the
+    canonical set at the moment of creation is what keeps a fresh org from
+    fragmenting its vocabulary ("owns" vs "owned by" vs "manages").
+    """
+    return sorted(set(RELATIONSHIP_LABELS) | set(db_types))
+
 _ASSET_FIELDS = ["name", "description", "status", "owner", "metadata"]
 _USER_FIELDS = ["username", "role", "is_active"]
 

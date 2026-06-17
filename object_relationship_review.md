@@ -63,11 +63,22 @@ were verified directly in source.
   the whole-org graph renders, the legend type-filter hides nodes, and Expand pulls
   12 neighbours in-place with no reload. Earlier "JS not browser-driven" caveat retired.
 
-- **Still open (next blocks):** R2/R5 (vocabulary suggestions + replace graph
-  `prompt()`), R4 (import rewrite/gating), G5 (single-CTE traversal), G6 (unify the
-  two `TYPE_COLORS` tables, fix doc URL), S3/S4/S5 (search depth: descriptions/metadata,
-  name-only `/search`, FTS). Note O2 custom-field sort is text-order (numeric fields
-  like score sort lexically) — a documented limitation.
+### Fifth block
+
+- **R2 [SHIPPED]** — the **controlled vocabulary is now offered on input**. New
+  `suggested_relationship_types()` (canonical 45 ∪ types in use, sorted) feeds the
+  add-relationship datalist on the detail page and the relationship edit form, so a
+  fresh org gets canonical suggestions (still free-text). New `GET /api/relationships/types`.
+- **R5 [SHIPPED]** — the graph drag-to-link **`prompt()` dialogs are replaced** with an
+  inline form: source→target label, a relationship-type input backed by the vocabulary
+  datalist (fetched from `/api/relationships/types`), a description field, Create/Cancel.
+  Browser-verified: 50 datalist options incl. canonical `mitigated_by`, Create → 201,
+  edge persisted. Tests in `test_rel_vocabulary.py`.
+
+- **Still open (next blocks):** R4 (import rewrite/gating), G5 (single-CTE traversal),
+  G6 (unify the two `TYPE_COLORS` tables, fix doc URL), S3/S4/S5 (search depth:
+  descriptions/metadata, name-only `/search`, FTS). Note O2 custom-field sort is
+  text-order (numeric fields like score sort lexically) — a documented limitation.
 
 ---
 

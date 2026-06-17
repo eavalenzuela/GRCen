@@ -306,6 +306,7 @@ function toggleLinkMode() {
         btn.textContent = 'Link Mode';
         btn.classList.remove('btn-primary');
         updateStatus('');
+        hideLinkForm();
         if (cleanupLinkMode) { cleanupLinkMode(); cleanupLinkMode = null; }
     }
 }
@@ -377,7 +378,7 @@ function enableDragLink(cy) {
             updateStatus('Drag from a source node onto a target node to create a relationship.');
             return;
         }
-        createLink(src.id(), target.id());
+        showLinkForm(src.id(), target.id());
     }
 
     cy.on('mousedown', 'node', onDown);
@@ -402,13 +403,81 @@ function updateStatus(msg) {
     if (status) status.textContent = msg;
 }
 
-function createLink(sourceId, targetId) {
-    const relType = prompt('Relationship type:');
-    if (!relType) {
-        updateStatus('Cancelled.');
-        return;
-    }
-    const description = prompt('Description (optional):') || '';
+// Load the suggested relationship-type vocabulary once into the datalist that
+// the link form's type input references (canonical types ∪ types already in use).
+let relTypesLoaded = false;
+function ensureRelTypeSuggestions() {
+    if (relTypesLoaded) return;
+    relTypesLoaded = true;
+    fetch('/api/relationships/types')
+        .then(r => r.json())
+        .then(types => {
+            const dl = document.getElementById('rel-type-suggestions');
+            if (!dl) return;
+            dl.innerHTML = '';
+            types.forEach(t => {
+                const o = document.createElement('option');
+                o.value = t;
+                dl.appendChild(o);
+            });
+        })
+        .catch(() => {});
+}
+
+// Inline form to create a relationship after a drag-link — replaces the old
+// raw prompt() dialogs with a typed input backed by the vocabulary datalist.
+function showLinkForm(sourceId, targetId) {
+    const form = document.getElementById('graph-link-form');
+    if (!form) return;
+    ensureRelTypeSuggestions();
+    const sName = cyInstance.getElementById(sourceId).data('label') || 'source';
+    const tName = cyInstance.getElementById(targetId).data('label') || 'target';
+
+    form.innerHTML = '';
+    const label = document.createElement('span');
+    label.className = 'glf-label';
+    label.append('Link ');
+    const s = document.createElement('b'); s.textContent = sName; label.append(s);
+    label.append(' → ');
+    const t = document.createElement('b'); t.textContent = tName; label.append(t);
+
+    const type = document.createElement('input');
+    type.id = 'glf-type';
+    type.setAttribute('list', 'rel-type-suggestions');
+    type.placeholder = 'Relationship type (e.g. depends_on)';
+    type.autocomplete = 'off';
+
+    const desc = document.createElement('input');
+    desc.id = 'glf-desc';
+    desc.placeholder = 'Description (optional)';
+
+    const create = document.createElement('button');
+    create.type = 'button';
+    create.className = 'btn btn-small btn-primary';
+    create.textContent = 'Create';
+    create.addEventListener('click', () => {
+        const rt = type.value.trim();
+        if (!rt) { type.focus(); return; }
+        submitLink(sourceId, targetId, rt, desc.value.trim());
+    });
+
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'btn btn-small';
+    cancel.textContent = 'Cancel';
+    cancel.addEventListener('click', () => { hideLinkForm(); updateStatus('Cancelled.'); });
+
+    form.append(label, type, desc, create, cancel);
+    form.style.display = 'flex';
+    type.focus();
+}
+
+function hideLinkForm() {
+    const form = document.getElementById('graph-link-form');
+    if (form) form.style.display = 'none';
+}
+
+function submitLink(sourceId, targetId, relType, description) {
     fetch('/api/relationships/', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -424,6 +493,7 @@ function createLink(sourceId, targetId) {
         return r.json();
     })
     .then(() => {
+        hideLinkForm();
         updateStatus('Created. Drag another pair or click Cancel Link Mode to navigate.');
         // Re-render the current view to show the new edge. The mode stays on so
         // the user can keep building relationships without a second click.

@@ -13,6 +13,7 @@ from grcen.routers._pages_shared import (
     _ASSET_FIELDS,
     _csrf_check,
     _extract_metadata,
+    suggested_relationship_types,
     templates,
 )
 from grcen.routers.deps import (
@@ -299,8 +300,8 @@ async def asset_detail(
         organization_id=user.organization_id,
     )
     sensitive_overrides = await redaction.list_asset_overrides(pool, asset_id)
-    relationship_types = await rel_svc.list_relationship_types(
-        pool, organization_id=user.organization_id
+    relationship_types = suggested_relationship_types(
+        await rel_svc.list_relationship_types(pool, organization_id=user.organization_id)
     )
     return templates.TemplateResponse(request, "assets/detail.html", context={
             "user": user,

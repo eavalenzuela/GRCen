@@ -12,6 +12,7 @@ from grcen.models.user import User
 from grcen.permissions import Permission
 from grcen.routers._pages_shared import (
     _csrf_check,
+    suggested_relationship_types,
     templates,
 )
 from grcen.routers.deps import (
@@ -39,7 +40,9 @@ async def relationship_edit_page(
     rel = await rel_svc.get_relationship(pool, rel_id, organization_id=user.organization_id)
     if not rel:
         raise HTTPException(status_code=404, detail="Relationship not found")
-    rel_types = await rel_svc.list_relationship_types(pool, organization_id=user.organization_id)
+    rel_types = suggested_relationship_types(
+        await rel_svc.list_relationship_types(pool, organization_id=user.organization_id)
+    )
     notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     return templates.TemplateResponse(
         request,
