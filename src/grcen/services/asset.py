@@ -192,8 +192,15 @@ async def list_assets(
         "status": "a.status",
         "owner": "o.name",
         "created_at": "a.created_at",
+        "updated_at": "a.updated_at",
     }
     sort_col = allowed_sorts.get(sort, "a.name")
+    # Sort by a custom field: "meta.<key>" → a.metadata->>'<key>' (text order).
+    if sort.startswith("meta."):
+        import re
+        meta_sort_key = sort[len("meta."):]
+        if re.match(r"^[a-zA-Z0-9_\-]+$", meta_sort_key):
+            sort_col = f"a.metadata->>'{meta_sort_key}'"
     sort_dir = "DESC" if order == "desc" else "ASC"
 
     vals.append(page_size)

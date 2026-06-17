@@ -122,6 +122,8 @@
             {{ sort_header('status', 'Status') }}
             {{ sort_header('owner', 'Manager' if current_type and current_type.value == 'person' else 'Owner') }}
             {{ sort_header('created_at', 'Created') }}
+            {{ sort_header('updated_at', 'Updated') }}
+            {% for f in type_columns %}{{ sort_header('meta.' ~ f.name, f.label) }}{% endfor %}
         </tr>
     </thead>
     <tbody>
@@ -138,9 +140,19 @@
                 {% endif %}
             </td>
             <td>{{ asset.created_at.strftime('%Y-%m-%d') }}</td>
+            <td>{{ asset.updated_at.strftime('%Y-%m-%d') if asset.updated_at else '—' }}</td>
+            {% for f in type_columns %}
+            {% set val = asset.metadata_.get(f.name) if asset.metadata_ else None %}
+            <td>
+                {% if val is none or val == '' %}—
+                {% elif f.field_type == 'boolean' %}{{ "Yes" if val else "No" }}
+                {% elif f.field_type == 'enum' %}{{ val | replace('_', ' ') | title }}
+                {% else %}{{ val }}{% endif %}
+            </td>
+            {% endfor %}
         </tr>
         {% else %}
-        <tr><td colspan="5">No assets found matching your filters.</td></tr>
+        <tr><td colspan="{{ 6 + type_columns|length }}">No assets found matching your filters.</td></tr>
         {% endfor %}
     </tbody>
 </table>

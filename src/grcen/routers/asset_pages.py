@@ -81,6 +81,11 @@ async def asset_list(
     saved_searches = await saved_search_service.list_visible(
         pool, user.id, path="/assets", organization_id=user.organization_id
     )
+    # When filtered to a single type, surface that type's (non-sensitive) custom
+    # fields as extra, sortable columns so a filtered list is an actual worklist.
+    type_columns = []
+    if asset_type:
+        type_columns = [f for f in CUSTOM_FIELDS.get(asset_type, []) if not f.sensitive]
     # Build filter params string for pagination links
     filter_params = ""
     if asset_type:
@@ -123,6 +128,7 @@ async def asset_list(
             "filter_meta_value": meta_value or "",
             "filter_tag": tag or "",
             "filter_unlinked": unlinked_flag,
+            "type_columns": type_columns,
             "all_tags": all_tags,
             "saved_searches": saved_searches,
             "current_path": "/assets",

@@ -49,10 +49,25 @@ were verified directly in source.
 - **Tenancy nit [FIXED]** — the API relationship PUT/DELETE pre-read (`old = get_relationship`)
   now passes `organization_id` instead of reading cross-org.
 
-- **Still open (next blocks):** O1/O2 (type columns + custom-field sort), R2/R5
-  (vocabulary suggestions + replace graph `prompt()`), R4 (import rewrite/gating),
-  G5 (single-CTE traversal), G6 (unify the two `TYPE_COLORS` tables, fix doc URL),
-  S3/S4/S5 (search depth: descriptions/metadata, name-only `/search`, FTS).
+### Fourth block
+
+- **O1 [SHIPPED]** — type-aware **list columns**. When `/assets` is filtered to one
+  type, that type's non-sensitive custom fields render as extra columns, so a
+  filtered list is an actual worklist (e.g. Risk shows Severity/Likelihood/Impact).
+  Sensitive fields are excluded from the table. (`asset_pages.py` + `list.html`)
+- **O2 [SHIPPED]** — sort by **`updated_at`** and by **custom fields** (`sort=meta.<key>`,
+  key regex-validated against injection; NULLS LAST). Custom-field column headers are
+  click-to-sort. Tests in `test_list_columns_sort.py` (incl. an injection-safety case).
+
+- **G2/G4 browser-verified** — headless Chromium against a seeded instance confirmed
+  the whole-org graph renders, the legend type-filter hides nodes, and Expand pulls
+  12 neighbours in-place with no reload. Earlier "JS not browser-driven" caveat retired.
+
+- **Still open (next blocks):** R2/R5 (vocabulary suggestions + replace graph
+  `prompt()`), R4 (import rewrite/gating), G5 (single-CTE traversal), G6 (unify the
+  two `TYPE_COLORS` tables, fix doc URL), S3/S4/S5 (search depth: descriptions/metadata,
+  name-only `/search`, FTS). Note O2 custom-field sort is text-order (numeric fields
+  like score sort lexically) — a documented limitation.
 
 ---
 
