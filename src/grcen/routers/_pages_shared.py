@@ -4,6 +4,8 @@ import asyncpg
 from fastapi import Request
 from fastapi.templating import Jinja2Templates
 
+from datetime import date
+
 from grcen.custom_fields import CUSTOM_FIELDS, coerce_value
 from grcen.models.asset import AssetType
 from grcen.permissions import Permission, has_permission
@@ -11,6 +13,7 @@ from grcen.services import (
     oidc_settings,
     saml_settings,
 )
+from grcen.services.review_service import review_status
 
 # Static mapping: relationship_type -> (outgoing_label, incoming_label)
 RELATIONSHIP_LABELS: dict[str, tuple[str, str]] = {
@@ -83,10 +86,22 @@ def suggested_relationship_types(db_types: list[str]) -> list[str]:
 _ASSET_FIELDS = ["name", "description", "status", "owner", "metadata"]
 _USER_FIELDS = ["username", "role", "is_active"]
 
+def _days_since(date_str: str | None) -> int | None:
+    """Whole days from an ISO date string until today (None if unparseable)."""
+    if not date_str:
+        return None
+    try:
+        return (date.today() - date.fromisoformat(str(date_str))).days
+    except (ValueError, TypeError):
+        return None
+
+
 templates = Jinja2Templates(directory="src/grcen/templates")
 templates.env.globals["has_perm"] = has_permission
 templates.env.globals["Permission"] = Permission
 templates.env.globals["rel_label"] = _rel_direction_label
+templates.env.globals["review_status"] = review_status
+templates.env.globals["days_since"] = _days_since
 
 async def _csrf_check(request: Request):
     """Verify CSRF token on POST form submissions.

@@ -5,6 +5,7 @@ import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
+from grcen import registers
 from grcen.custom_fields import CUSTOM_FIELDS
 from grcen.models.asset import ORGANIZATIONAL_TYPES, AssetType
 from grcen.models.user import User
@@ -27,6 +28,7 @@ from grcen.services import (
     attachment as att_svc,
     audit_service as audit_svc,
     redaction,
+    register_service,
     relationship as rel_svc,
     risk_service as risk_svc,
     saved_search_service,
@@ -51,6 +53,7 @@ async def asset_list(
     unlinked: str | None = None,
     sort: str = "name",
     order: str = "asc",
+    columns: str | None = None,
     page: int = 1,
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.VIEW)),
@@ -82,11 +85,29 @@ async def asset_list(
     saved_searches = await saved_search_service.list_visible(
         pool, user.id, path="/assets", organization_id=user.organization_id
     )
-    # When filtered to a single type, surface that type's (non-sensitive) custom
-    # fields as extra, sortable columns so a filtered list is an actual worklist.
-    type_columns = []
-    if asset_type:
-        type_columns = [f for f in CUSTOM_FIELDS.get(asset_type, []) if not f.sensitive]
+    # Register framework: a single asset type resolves to a RegisterDef, which
+    # gives the list a name, curated columns (?columns=curated), and a metrics
+    # header. Ad-hoc /assets?type=X (no ?columns) keeps today's "all columns".
+    register = registers.by_type(asset_type)
+    columns_mode = "curated" if (columns == "curated" and register is not None) else "all"
+    # Override-aware sensitivity: exclude effective-sensitive columns AND mask
+    # override-promoted values in the rows (the list path previously leaked them).
+    effective_sensitive: set[str] = set()
+    if asset_type is not None:
+        effective_sensitive = await redaction.effective_sensitive_field_names(
+            pool, asset_type, user.organization_id
+        )
+        await redaction.redact_assets_metadata(
+            pool, items, asset_type, user, user.organization_id, effective=effective_sensitive
+        )
+    columns_resolved = registers.resolve_columns(
+        register, columns_mode, asset_type, effective_sensitive
+    )
+    metrics = (
+        await register_service.build_metrics(pool, register, organization_id=user.organization_id)
+        if register is not None and register.metrics
+        else []
+    )
     # Build filter params string for pagination links
     filter_params = ""
     if asset_type:
@@ -111,6 +132,8 @@ async def asset_list(
         filter_params += f"&sort={sort}"
     if order != "asc":
         filter_params += f"&order={order}"
+    if columns_mode != "all":
+        filter_params += f"&columns={columns_mode}"
     return templates.TemplateResponse(request, "assets/list.html", context={
             "user": user,
             "assets": items,
@@ -129,7 +152,10 @@ async def asset_list(
             "filter_meta_value": meta_value or "",
             "filter_tag": tag or "",
             "filter_unlinked": unlinked_flag,
-            "type_columns": type_columns,
+            "register": register,
+            "columns": columns_resolved,
+            "columns_mode": columns_mode,
+            "metrics": metrics,
             "all_tags": all_tags,
             "saved_searches": saved_searches,
             "current_path": "/assets",
