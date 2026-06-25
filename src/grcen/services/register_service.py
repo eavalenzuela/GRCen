@@ -12,6 +12,7 @@ from uuid import UUID
 
 import asyncpg
 
+from grcen.custom_fields import INCIDENT_TERMINAL_STATUSES
 from grcen.registers import MetricDef, RegisterDef
 from grcen.services import review_service
 
@@ -44,9 +45,16 @@ async def _metric_value(pool, type_val: str, m: MetricDef, organization_id) -> i
     if m.kind == "status_eq":
         return await _count(pool, type_val, organization_id, " AND status = $3", (m.value,))
     if m.kind == "incident_open":
+        # Open = not in a terminal lifecycle state. When incident_status is set,
+        # use it; when it's unset (incidents predating the field), fall back to
+        # resolved_at so a genuinely-resolved legacy incident isn't miscounted as
+        # open. The $3 array is a non-empty, NULL-free literal (terminal states).
         return await _count(
             pool, type_val, organization_id,
-            " AND NULLIF(metadata->>'resolved_at', '') IS NULL",
+            " AND (CASE WHEN NULLIF(metadata->>'incident_status', '') IS NOT NULL"
+            "           THEN metadata->>'incident_status' <> ALL($3::text[])"
+            "           ELSE NULLIF(metadata->>'resolved_at', '') IS NULL END)",
+            (list(INCIDENT_TERMINAL_STATUSES),),
         )
     if m.kind == "overdue_reviews":
         reviews = await review_service.get_reviews(

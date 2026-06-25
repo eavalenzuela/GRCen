@@ -31,7 +31,7 @@ from grcen.services.review_service import REVIEW_DATE_FIELDS
 class ColumnDef:
     """One curated column. ``key`` is a core field (``name``/``status``/``owner``/
     ``created_at``/``updated_at``/``type``), a ``meta.<field>`` custom field, or a
-    ``computed.*`` column (``next_review``/``lifecycle``/``incident_state``)."""
+    ``computed.*`` column (``next_review``/``lifecycle``)."""
 
     key: str
     label: str
@@ -98,14 +98,14 @@ REGISTERS: dict[AssetType, RegisterDef] = {
     AssetType.INCIDENT: RegisterDef(
         type=AssetType.INCIDENT, slug="incidents", label="Incident", plural="Incidents",
         columns=(
-            _m("computed.incident_state", "State", sortable=False),
+            _m("meta.incident_status", "Status"),
             _m("meta.severity", "Severity"),
             _m("meta.incident_type", "Type"),
             _m("meta.detected_at", "Detected"),
         ),
         default_sort="meta.detected_at", default_order="desc",
-        lifecycle_column="computed.incident_state",
-        bulk_fields=("status", "owner", "tags", "meta.severity"),
+        lifecycle_column="meta.incident_status",
+        bulk_fields=("status", "owner", "tags", "meta.incident_status", "meta.severity"),
         metrics=(
             MetricDef("Total", "total"),
             MetricDef("Open", "incident_open", warn=True),
@@ -323,8 +323,6 @@ def _resolve_one(c: ColumnDef, register: RegisterDef, asset_type: AssetType,
             return None
         return {"kind": "next_review", "label": c.label, "sortable": True,
                 "sort_key": f"meta.{fname}", "meta_name": fname}
-    if key == "computed.incident_state":
-        return {"kind": "incident_state", "label": c.label, "sortable": False, "sort_key": None}
     if key == "computed.lifecycle":
         lc = register.lifecycle_column
         if lc and lc.startswith("meta."):

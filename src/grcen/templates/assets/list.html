@@ -152,11 +152,6 @@
 {% set val = asset.metadata_.get(col.meta_name) if asset.metadata_ else None %}
 {% set rs = review_status(val) %}
 <td>{% if not val %}—{% else %}{{ val }}{% if rs == 'overdue' %} <span class="badge review-overdue">Overdue</span>{% elif rs == 'due_soon' %} <span class="badge review-due-soon">Due soon</span>{% endif %}{% endif %}</td>
-{% elif col.kind == 'incident_state' %}
-{% set resolved = asset.metadata_.get('resolved_at') if asset.metadata_ else None %}
-{% set detected = asset.metadata_.get('detected_at') if asset.metadata_ else None %}
-{% set age = days_since(detected) %}
-<td>{% if resolved %}<span class="badge badge-archived">Closed</span>{% else %}<span class="badge badge-active">Open</span>{% if age is not none %} <small style="color:#6b7280;">{{ age }}d</small>{% endif %}{% endif %}</td>
 {% else %}
 <td>—</td>
 {% endif %}

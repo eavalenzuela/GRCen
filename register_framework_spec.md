@@ -83,7 +83,7 @@ from grcen.models.asset import AssetType
 class ColumnDef:
     key: str            # "name"|"status"|"owner"|"created_at"|"updated_at"  (core)
                         # or "meta.<field>"                                  (custom field)
-                        # or "computed.next_review" | "computed.lifecycle" | "computed.incident_state"
+                        # or "computed.next_review" | "computed.lifecycle"
     label: str
     sortable: bool = True
     numeric: bool = False   # meta column to sort numerically (§7.4)
@@ -117,7 +117,7 @@ metric choices reflect the review.
 | Type | slug | Default cols (beyond Name) | lifecycle_column | owner_field | bulk_fields | nav_primary | canonical |
 |---|---|---|---|---|---|---|---|
 | vendor | `vendors` | tier, assessment_result, next_assessment_due, contract_end | `meta.assessment_result` | security_contact | status, owner, tags, tier, next_assessment_due | ✅ | — |
-| incident | `incidents` | severity, incident_type, detected_at, **computed.incident_state** | `computed.incident_state` ‡ | — | status, owner, tags, severity | ✅ | — |
+| incident | `incidents` | **incident_status**, severity, incident_type, detected_at | `meta.incident_status` ‡ | — | status, owner, tags, incident_status, severity | ✅ | — |
 | policy | `policies` | **computed.lifecycle**, policy_type, computed.next_review, approver | core `status` | approver | status, owner, tags, review_date | ✅ | — |
 | audit | `audits` | audit_type, result, end_date, open_findings | core `status` § | auditor | status, owner, tags | ✅ | — |
 | system | `systems` | environment, criticality, hosting, computed.next_review | core `status` | — | status, owner, tags, criticality | — | — |
@@ -133,11 +133,17 @@ metric choices reflect the review.
 | control | `controls` | effectiveness, frequency, next_test_due | `meta.effectiveness` | — | status, owner, tags, next_test_due | (link) | `/controls` |
 | framework | `frameworks` | — | — | — | — | (link) | `/frameworks` |
 
-‡ **Incident has no status field** (`custom_fields.py:434-456`: only `detected_at`/
-`resolved_at`). v1 ships `computed.incident_state` = open/closed from `resolved_at IS NULL`,
-plus age-since-`detected_at`; it does **not** badge the shared `AssetStatus`. A real
-lifecycle (`open→triaged→contained→closed`) is the forward-compatible prereq: add an
-`incident_status` enum to `CUSTOM_FIELDS` and repoint `lifecycle_column` — no framework change.
+‡ **Incident lifecycle — RESOLVED (decision #3).** Slice 1 shipped a stop-gap
+`computed.incident_state` (open/closed from `resolved_at IS NULL`) rather than badge the
+meaningless shared `AssetStatus`. A real `incident_status` enum
+(`open → triaged → investigating → contained → resolved → closed`, plus `reopened`) was then
+added to `CUSTOM_FIELDS` and `lifecycle_column` repointed to `meta.incident_status`; it is the
+lead curated column and a bulk field. The "Open" metric counts incidents not in a terminal
+state (`resolved`/`closed`, single-sourced as `INCIDENT_TERMINAL_STATUSES`); for incidents
+predating the field (unset status) it **falls back to `resolved_at`**, so no data backfill is
+needed and legacy resolved incidents aren't miscounted as open. The stop-gap
+`computed.incident_state` machinery was removed. *Follow-up (not done):* a real MTTR/age
+metric (`detected_at → resolved_at`) — the model now supports it.
 
 § **Audit** `result` (pending/pass/pass_with_exceptions/fail, `:179`) is an *outcome*, blank
 for in-flight engagements — so it is **not** the lifecycle. Lifecycle = core `status`
@@ -209,7 +215,6 @@ can never touch another type/org. Validates enum values against `FieldDef.choice
   - `computed.next_review` — `REVIEW_DATE_FIELDS[type]` value + overdue/due_soon badge via
     `review_status()`.
   - `computed.lifecycle` — render `lifecycle_column` (core status badge or a meta enum).
-  - `computed.incident_state` — open/closed from `resolved_at IS NULL` + age since `detected_at`.
 
 ### 7.2 Curation & `columns` mode
 `resolve_columns(register, mode, effective_sensitive)`: default → `register.columns`;
@@ -253,7 +258,7 @@ the four `nav_primary` registers **in v1**:
 | Register | v1 headline metrics |
 |---|---|
 | vendor | overdue assessments (via `REVIEW_DATE_FIELDS['vendor']`), by_tier, count not_approved/conditionally_approved |
-| incident | open count (`resolved_at IS NULL`), by_severity, mean age since detected |
+| incident | open count (not in a terminal state; unset status falls back to `resolved_at`), by_severity, critical count |
 | policy | overdue reviews, draft count |
 | audit | Σ open_findings, count fail / pass_with_exceptions |
 
@@ -316,10 +321,9 @@ CLAUDE.md's "don't impose a paradigm."
 
 ## 13. Data-model impact
 
-**None** for slices 1–3 (pure reuse). Optional later: an `incident_status` enum field
-(prereq for a real Incident lifecycle, §4.2) is a one-line `CUSTOM_FIELDS` addition, no
-migration. New entity types (Findings/Exceptions/RoPA) and per-type *workflow* status are
-out of scope.
+**None.** The `incident_status` enum field (decision #3) was a one-line `CUSTOM_FIELDS`
+addition — no migration (metadata JSON). New entity types (Findings/Exceptions/RoPA) and
+per-type *workflow* status (state-machine enforcement) remain out of scope.
 
 ## 14. File-by-file change list
 
@@ -364,5 +368,5 @@ a precondition (§7.3); type-specific metrics in v1 (§8); Phase 4 dropped (§12
    `/assets?type=` keep showing all fields and only the *register alias* curate? (Default
    chosen: curate everywhere, `columns=all` to expand.)
 2. ~~Back-port gating to the risk bulk endpoint, or document it as intentionally ungated?~~ **Resolved (Slice 2): gating back-ported; the two bulk endpoints now behave identically.**
-3. Add `incident_status` now (real lifecycle) vs. ship `computed.incident_state` first? (§4.2)
+3. ~~Add `incident_status` now (real lifecycle) vs. ship `computed.incident_state` first?~~ **Resolved: real `incident_status` enum added; the stop-gap computed state was removed (§4.2).**
 4. Nav: dropdown vs. flat `nav_primary` links for the four flagship registers. (§10)
