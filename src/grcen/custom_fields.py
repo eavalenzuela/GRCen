@@ -433,6 +433,13 @@ CUSTOM_FIELDS: dict[AssetType, list[FieldDef]] = {
     ],
     AssetType.INCIDENT: [
         FieldDef(
+            "incident_status",
+            "Status",
+            "enum",
+            choices=["open", "triaged", "investigating", "contained", "resolved", "closed", "reopened"],
+            help_text="Incident response lifecycle state",
+        ),
+        FieldDef(
             "severity",
             "Severity",
             "enum",
@@ -445,7 +452,8 @@ CUSTOM_FIELDS: dict[AssetType, list[FieldDef]] = {
             choices=["security", "availability", "data_breach", "compliance", "operational"],
         ),
         FieldDef("detected_at", "Detected At", "date"),
-        FieldDef("resolved_at", "Resolved At", "date"),
+        FieldDef("resolved_at", "Resolved At", "date",
+                 help_text="Timestamp the incident reached 'resolved' — not an independent open/closed flag"),
         FieldDef("root_cause", "Root Cause", "text"),
         FieldDef("impact_summary", "Impact Summary", "text"),
         FieldDef("affected_records", "Affected Records", "integer"),
@@ -495,6 +503,14 @@ CUSTOM_FIELDS: dict[AssetType, list[FieldDef]] = {
         FieldDef("last_reviewed", "Last Reviewed", "date"),
     ],
 }
+
+
+# Terminal incident lifecycle states — single-sourced so the register "Open"
+# metric stays in lockstep with the enum it filters on.
+INCIDENT_TERMINAL_STATUSES: tuple[str, ...] = ("resolved", "closed")
+assert set(INCIDENT_TERMINAL_STATUSES) <= set(
+    next(f for f in CUSTOM_FIELDS[AssetType.INCIDENT] if f.name == "incident_status").choices or []
+), "INCIDENT_TERMINAL_STATUSES must be a subset of the incident_status enum choices"
 
 
 def get_field_names(asset_type: AssetType) -> set[str]:

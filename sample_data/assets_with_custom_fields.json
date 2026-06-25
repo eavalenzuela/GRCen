@@ -3537,6 +3537,7 @@
     "metadata": {
       "severity": "high",
       "incident_type": "security",
+      "incident_status": "closed",
       "detected_at": "2026-02-10T08:30:00Z",
       "resolved_at": "2026-02-10T14:45:00Z",
       "root_cause": "Adversary-in-the-middle proxy captured session tokens; non-phishing-resistant MFA in use",
@@ -3561,6 +3562,7 @@
     "metadata": {
       "severity": "medium",
       "incident_type": "privacy",
+      "incident_status": "resolved",
       "detected_at": "2026-01-22T11:00:00Z",
       "resolved_at": "2026-01-23T09:00:00Z",
       "root_cause": "Staging DB refreshed from production without running masking pipeline",
@@ -3584,6 +3586,7 @@
     "metadata": {
       "severity": "medium",
       "incident_type": "availability",
+      "incident_status": "closed",
       "detected_at": "2025-11-03T14:20:00Z",
       "resolved_at": "2025-11-03T20:15:00Z",
       "root_cause": "Memory leak in Jenkins plugin caused controller OOM after 30 days uptime",
