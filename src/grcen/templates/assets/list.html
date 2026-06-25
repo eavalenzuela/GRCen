@@ -160,22 +160,33 @@
 {% endif %}
 {% endmacro %}
 
+{% set bulk_enabled = register and bulk_fields and has_perm(user.role, Permission.EDIT) and assets %}
+{% if bulk_enabled %}
+<form method="post" action="/assets/bulk-update?{{ current_query }}">
+{% include "partials/csrf.html" %}
+{% endif %}
 <table>
     <thead>
         <tr>
+            {% if bulk_enabled %}<th><input type="checkbox" id="bulk-select-all" onclick="document.querySelectorAll('.bulk-row-check').forEach(c => c.checked = this.checked)"></th>{% endif %}
             {% for col in columns %}{{ sort_th(col) }}{% endfor %}
         </tr>
     </thead>
     <tbody>
         {% for asset in assets %}
         <tr>
+            {% if bulk_enabled %}<td><input type="checkbox" class="bulk-row-check" name="asset_ids" value="{{ asset.id }}"></td>{% endif %}
             {% for col in columns %}{{ render_cell(col, asset) }}{% endfor %}
         </tr>
         {% else %}
-        <tr><td colspan="{{ columns|length }}">No assets found matching your filters.</td></tr>
+        <tr><td colspan="{{ columns|length + (1 if bulk_enabled else 0) }}">No assets found matching your filters.</td></tr>
         {% endfor %}
     </tbody>
 </table>
+{% if bulk_enabled %}
+{% include "partials/bulk_actions.html" %}
+</form>
+{% endif %}
 
 {% if pages > 1 %}
 <div class="pagination">

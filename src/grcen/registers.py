@@ -366,6 +366,40 @@ def resolve_columns(register: RegisterDef | None, mode: str, asset_type: AssetTy
     return cols
 
 
+_STATUS_CHOICES = ["active", "inactive", "draft", "archived"]
+
+
+def resolve_bulk_fields(register: RegisterDef) -> list[dict]:
+    """Descriptors for the bulk-edit fieldset (mirrors resolve_columns).
+
+    Each descriptor drives one input in ``partials/bulk_actions.html`` and names
+    the form field the bulk endpoint reads: ``status`` / ``owner_id`` /
+    ``add_tags`` / ``meta.<field>``.
+    """
+    out: list[dict] = []
+    for key in register.bulk_fields:
+        if key == "status":
+            out.append({"kind": "status", "name": "status", "label": "Status",
+                        "choices": _STATUS_CHOICES})
+        elif key == "owner":
+            out.append({"kind": "owner", "name": "owner_id", "label": "Owner"})
+        elif key == "tags":
+            out.append({"kind": "tags", "name": "add_tags", "label": "Add Tags"})
+        elif key.startswith("meta."):
+            fname = key[len("meta."):]
+            fd = _field_def(register.type, fname)
+            if fd is None or fd.sensitive:
+                continue
+            if fd.field_type == "enum":
+                out.append({"kind": "meta_enum", "name": f"meta.{fname}",
+                            "label": fd.label, "choices": fd.choices or []})
+            elif fd.field_type == "date":
+                out.append({"kind": "meta_date", "name": f"meta.{fname}", "label": fd.label})
+            else:
+                out.append({"kind": "meta_text", "name": f"meta.{fname}", "label": fd.label})
+    return out
+
+
 def _assert_registry() -> None:
     """Fail fast on a malformed registry (non-sensitive-by-code-default, valid keys)."""
     for at, reg in REGISTERS.items():

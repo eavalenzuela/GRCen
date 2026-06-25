@@ -9,7 +9,7 @@ from grcen import registers
 from grcen.custom_fields import CUSTOM_FIELDS
 from grcen.models.asset import ORGANIZATIONAL_TYPES, AssetType
 from grcen.models.user import User
-from grcen.permissions import Permission
+from grcen.permissions import Permission, has_permission
 from grcen.routers._pages_shared import (
     _ASSET_FIELDS,
     _csrf_check,
@@ -108,6 +108,22 @@ async def asset_list(
         if register is not None and register.metrics
         else []
     )
+    # Bulk-edit controls: only when the register defines bulk_fields and the user
+    # can edit. The owner picker reuses the risk register's person/OU query.
+    bulk_fields = (
+        registers.resolve_bulk_fields(register)
+        if register is not None and register.bulk_fields and has_permission(user.role, Permission.EDIT)
+        else []
+    )
+    bulk_owners = []
+    if bulk_fields:
+        bulk_owners = await pool.fetch(
+            """SELECT id, name FROM assets
+               WHERE type IN ('person', 'organizational_unit') AND status = 'active'
+                 AND organization_id = $1
+               ORDER BY name""",
+            user.organization_id,
+        )
     # Build filter params string for pagination links
     filter_params = ""
     if asset_type:
@@ -156,6 +172,8 @@ async def asset_list(
             "columns": columns_resolved,
             "columns_mode": columns_mode,
             "metrics": metrics,
+            "bulk_fields": bulk_fields,
+            "bulk_owners": bulk_owners,
             "all_tags": all_tags,
             "saved_searches": saved_searches,
             "current_path": "/assets",
@@ -166,6 +184,128 @@ async def asset_list(
             "order": order,
         },
     )
+
+
+@router.post("/assets/bulk-update")
+async def asset_bulk_update(
+    request: Request,
+    type: str | None = None,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.EDIT)),
+):
+    """Apply a uniform change to many assets of one register type.
+
+    Honors per-type approval gating (``/admin/workflow``): when ``update`` is
+    gated, each selected asset becomes its own ``pending_changes`` row (capped at
+    200) and the user is sent to the approval queue; otherwise the change is
+    applied directly and audit-logged per asset.
+
+    Note: the bespoke risk register's bulk endpoint (`/risk-management/bulk-update`)
+    predates gating and remains ungated — see register_framework_spec.md open
+    decision #2 (back-port vs. document) before unifying.
+    """
+    asset_type = AssetType(type) if type else None
+    register = registers.by_type(asset_type)
+    if asset_type is None or register is None or not register.bulk_fields:
+        raise HTTPException(status_code=400, detail="No bulk actions for this type")
+
+    form = await request.form()
+    asset_ids: list[UUID] = []
+    for v in form.getlist("asset_ids"):
+        try:
+            asset_ids.append(UUID(str(v)))
+        except (ValueError, TypeError):
+            continue
+
+    allowed = set(register.bulk_fields)
+    status: str | None = None
+    owner_id: UUID | None = None
+    add_tags: list[str] | None = None
+    metadata_set: dict = {}
+    if "status" in allowed:
+        s = str(form.get("status", "")).strip()
+        if s in ("active", "inactive", "draft", "archived"):
+            status = s
+    if "owner" in allowed:
+        o = str(form.get("owner_id", "")).strip()
+        if o:
+            try:
+                owner_id = UUID(o)
+            except ValueError:
+                owner_id = None
+    if "tags" in allowed:
+        raw = str(form.get("add_tags", "")).strip()
+        if raw:
+            add_tags = [t.strip() for t in raw.split(",") if t.strip()]
+    for key in allowed:
+        if not key.startswith("meta."):
+            continue
+        fname = key[len("meta."):]
+        val = str(form.get(f"meta.{fname}", "")).strip()
+        if not val:
+            continue
+        fd = registers._field_def(asset_type, fname)
+        if fd is None or fd.sensitive:
+            continue
+        if fd.field_type == "enum" and fd.choices and val not in fd.choices:
+            continue
+        metadata_set[fname] = val
+
+    back = f"/assets?{request.url.query}" if request.url.query else f"/assets?type={asset_type.value}"
+    if not asset_ids or not (status or owner_id or add_tags or metadata_set):
+        return RedirectResponse(back, status_code=302)
+
+    if await workflow_service.requires_approval(
+        pool, asset_type, "update", organization_id=user.organization_id
+    ):
+        submitted = 0
+        for aid in asset_ids[:200]:
+            current = await asset_svc.get_asset(pool, aid, organization_id=user.organization_id)
+            if current is None or current.type != asset_type:
+                continue
+            updates: dict = {}
+            if status:
+                updates["status"] = status
+            if owner_id is not None:
+                updates["owner_id"] = owner_id
+            if metadata_set:
+                merged = dict(current.metadata_ or {})
+                merged.update(metadata_set)
+                updates["metadata_"] = merged
+            if add_tags:
+                updates["tags"] = list(dict.fromkeys((current.tags or []) + add_tags))
+            try:
+                await workflow_service.submit(
+                    pool, action="update", asset_type=asset_type,
+                    target_asset_id=aid, title=current.name,
+                    payload=workflow_service.asset_update_payload(updates), user=user,
+                )
+                submitted += 1
+            except ValueError:
+                continue  # an identical change for this asset is already pending
+        return RedirectResponse(f"/approvals?submitted={submitted}", status_code=302)
+
+    try:
+        updated = await asset_svc.bulk_update_assets(
+            pool, asset_ids, asset_type=asset_type, status=status, owner_id=owner_id,
+            add_tags=add_tags, metadata_set=metadata_set or None,
+            updated_by=user.id, organization_id=user.organization_id,
+        )
+    except ValueError:
+        # cross-tenant owner_id, etc. — reject without applying
+        return RedirectResponse(back, status_code=302)
+    for aid in updated:
+        await audit_svc.log_audit_event(
+            pool, user_id=user.id, username=user.username, action="bulk_update",
+            entity_type="asset", entity_id=aid, entity_name=register.label.lower(),
+            changes={
+                "status": {"new": status} if status else {},
+                "owner_id": {"new": str(owner_id)} if owner_id else {},
+                "tags_added": {"new": add_tags} if add_tags else {},
+                "metadata": {"new": metadata_set} if metadata_set else {},
+            },
+        )
+    return RedirectResponse(back, status_code=302)
 
 
 @router.get("/assets/new", response_class=HTMLResponse)

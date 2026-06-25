@@ -1,0 +1,34 @@
+{# Bulk-edit fieldset for register views. Rendered inside the bulk <form> in
+   assets/list.html; driven by `bulk_fields` (registers.resolve_bulk_fields) and
+   `bulk_owners`. Only shown to EDIT users when a register defines bulk_fields. #}
+<fieldset style="margin-top:1rem;border:1px solid #e5e7eb;padding:0.75rem;border-radius:6px;">
+    <legend style="padding:0 0.5rem;font-weight:600;">Bulk Apply to Selected</legend>
+    <div style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:center;">
+        {% for bf in bulk_fields %}
+        <label>
+            {{ bf.label }}
+            {% if bf.kind == 'status' or bf.kind == 'meta_enum' %}
+            <select name="{{ bf.name }}">
+                <option value="">— no change —</option>
+                {% for c in bf.choices %}
+                <option value="{{ c }}">{{ c | replace('_', ' ') | title }}</option>
+                {% endfor %}
+            </select>
+            {% elif bf.kind == 'owner' %}
+            <select name="{{ bf.name }}">
+                <option value="">— no change —</option>
+                {% for p in bulk_owners %}
+                <option value="{{ p.id }}">{{ p.name }}</option>
+                {% endfor %}
+            </select>
+            {% elif bf.kind == 'meta_date' %}
+            <input type="date" name="{{ bf.name }}">
+            {% else %}
+            <input type="text" name="{{ bf.name }}" placeholder="comma,separated">
+            {% endif %}
+        </label>
+        {% endfor %}
+        <button type="submit" class="btn btn-primary"
+                onclick="return confirm('Apply to all selected?');">Apply</button>
+    </div>
+</fieldset>
