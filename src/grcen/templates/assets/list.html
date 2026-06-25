@@ -1,17 +1,30 @@
 {% extends "base.html" %}
-{% block title %}Assets - GRCen{% endblock %}
+{% block title %}{{ register.plural if register else 'Assets' }} - GRCen{% endblock %}
 {% block content %}
 <div class="page-header">
-    <h1>Assets</h1>
+    <h1>{{ register.plural if register else 'Assets' }}</h1>
     <div>
         {% if has_perm(user.role, Permission.EXPORT) %}
+        <a href="/assets/export?{{ request.url.query }}&format=csv" class="btn">CSV</a>
+        <a href="/assets/export?{{ request.url.query }}&format=json" class="btn">JSON</a>
         <a href="/exports/assets.pdf?{{ request.url.query }}" class="btn">Download PDF</a>
         {% endif %}
         {% if has_perm(user.role, Permission.CREATE) %}
-        <a href="/assets/new" class="btn btn-primary">New Asset</a>
+        <a href="/assets/new{% if current_type %}?type={{ current_type.value }}{% endif %}" class="btn btn-primary">New {{ register.label if register else 'Asset' }}</a>
         {% endif %}
     </div>
 </div>
+
+{% if register and metrics %}
+<div class="risk-summary-row">
+    {% for m in metrics %}
+    <div class="risk-stat-card {% if m.warn %}risk-stat-warn{% endif %}">
+        <div class="risk-stat-value">{{ m.value }}</div>
+        <div class="risk-stat-label">{{ m.label }}</div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
 
 {% include "partials/saved_searches.html" %}
 
@@ -98,9 +111,10 @@
         <a href="/assets" style="margin-left:0.5rem; font-size:0.85rem;">Clear</a>
     </div>
     {% endif %}
-    {# Persist sort in form submission #}
+    {# Persist sort + column mode in form submission #}
     <input type="hidden" name="sort" value="{{ sort }}">
     <input type="hidden" name="order" value="{{ order }}">
+    {% if columns_mode and columns_mode != 'all' %}<input type="hidden" name="columns" value="{{ columns_mode }}">{% endif %}
 </form>
 
 <p style="margin-bottom:0.75rem;color:var(--text-muted);font-size:0.875rem;">
@@ -108,54 +122,73 @@
     {% if pages > 1 %} (page {{ page }} of {{ pages }}){% endif %}
 </p>
 
-{% macro sort_header(col, label) %}
-{% set new_order = 'desc' if sort == col and order == 'asc' else 'asc' %}
-{% set arrow = '▲' if sort == col and order == 'asc' else ('▼' if sort == col and order == 'desc' else '') %}
-<th><a href="/assets?sort={{ col }}&order={{ new_order }}{{ filter_params | replace('&sort=' ~ sort, '') | replace('&order=' ~ order, '') }}" style="text-decoration:none;color:inherit;">{{ label }} {{ arrow }}</a></th>
+{% macro sort_th(col) %}
+{% if col.sortable %}
+{% set new_order = 'desc' if sort == col.sort_key and order == 'asc' else 'asc' %}
+{% set arrow = '▲' if sort == col.sort_key and order == 'asc' else ('▼' if sort == col.sort_key and order == 'desc' else '') %}
+<th><a href="/assets?sort={{ col.sort_key }}&order={{ new_order }}{{ filter_params | replace('&sort=' ~ sort, '') | replace('&order=' ~ order, '') }}" style="text-decoration:none;color:inherit;">{{ col.label }} {{ arrow }}</a></th>
+{% else %}
+<th>{{ col.label }}</th>
+{% endif %}
 {% endmacro %}
 
+{% macro render_cell(col, asset) %}
+{% if col.kind == 'name' %}
+<td><a href="/assets/{{ asset.id }}">{{ asset.name }}</a></td>
+{% elif col.kind == 'type' %}
+<td><a href="/assets?type={{ asset.type.value }}">{{ asset.type.value | replace('_', ' ') | title }}</a></td>
+{% elif col.kind == 'status' %}
+<td><span class="badge badge-{{ asset.status.value }}">{{ asset.status.value | title }}</span></td>
+{% elif col.kind == 'owner' %}
+<td>{% if asset.owner_id %}<a href="/assets/{{ asset.owner_id }}">{{ asset.owner or '—' }}</a>{% else %}{{ asset.owner or '—' }}{% endif %}</td>
+{% elif col.kind == 'created_at' %}
+<td>{{ asset.created_at.strftime('%Y-%m-%d') if asset.created_at else '—' }}</td>
+{% elif col.kind == 'updated_at' %}
+<td>{{ asset.updated_at.strftime('%Y-%m-%d') if asset.updated_at else '—' }}</td>
+{% elif col.kind == 'meta' %}
+{% set val = asset.metadata_.get(col.meta_name) if asset.metadata_ else None %}
+<td>{% if val is none or val == '' %}—{% elif col.field_type == 'boolean' %}{{ "Yes" if val else "No" }}{% elif col.field_type == 'enum' %}{{ val | replace('_', ' ') | title }}{% else %}{{ val }}{% endif %}</td>
+{% elif col.kind == 'next_review' %}
+{% set val = asset.metadata_.get(col.meta_name) if asset.metadata_ else None %}
+{% set rs = review_status(val) %}
+<td>{% if not val %}—{% else %}{{ val }}{% if rs == 'overdue' %} <span class="badge review-overdue">Overdue</span>{% elif rs == 'due_soon' %} <span class="badge review-due-soon">Due soon</span>{% endif %}{% endif %}</td>
+{% elif col.kind == 'incident_state' %}
+{% set resolved = asset.metadata_.get('resolved_at') if asset.metadata_ else None %}
+{% set detected = asset.metadata_.get('detected_at') if asset.metadata_ else None %}
+{% set age = days_since(detected) %}
+<td>{% if resolved %}<span class="badge badge-archived">Closed</span>{% else %}<span class="badge badge-active">Open</span>{% if age is not none %} <small style="color:#6b7280;">{{ age }}d</small>{% endif %}{% endif %}</td>
+{% else %}
+<td>—</td>
+{% endif %}
+{% endmacro %}
+
+{% set bulk_enabled = register and bulk_fields and has_perm(user.role, Permission.EDIT) and assets %}
+{% if bulk_enabled %}
+<form method="post" action="/assets/bulk-update?{{ current_query }}">
+{% include "partials/csrf.html" %}
+{% endif %}
 <table>
     <thead>
         <tr>
-            {{ sort_header('name', 'Name') }}
-            {{ sort_header('type', 'Type') }}
-            {{ sort_header('status', 'Status') }}
-            {{ sort_header('owner', 'Manager' if current_type and current_type.value == 'person' else 'Owner') }}
-            {{ sort_header('created_at', 'Created') }}
-            {{ sort_header('updated_at', 'Updated') }}
-            {% for f in type_columns %}{{ sort_header('meta.' ~ f.name, f.label) }}{% endfor %}
+            {% if bulk_enabled %}<th><input type="checkbox" id="bulk-select-all" onclick="document.querySelectorAll('.bulk-row-check').forEach(c => c.checked = this.checked)"></th>{% endif %}
+            {% for col in columns %}{{ sort_th(col) }}{% endfor %}
         </tr>
     </thead>
     <tbody>
         {% for asset in assets %}
         <tr>
-            <td><a href="/assets/{{ asset.id }}">{{ asset.name }}</a></td>
-            <td><a href="/assets?type={{ asset.type.value }}">{{ asset.type.value | replace('_', ' ') | title }}</a></td>
-            <td><span class="badge badge-{{ asset.status.value }}">{{ asset.status.value | title }}</span></td>
-            <td>
-                {% if asset.owner_id %}
-                <a href="/assets/{{ asset.owner_id }}">{{ asset.owner or '—' }}</a>
-                {% else %}
-                {{ asset.owner or '—' }}
-                {% endif %}
-            </td>
-            <td>{{ asset.created_at.strftime('%Y-%m-%d') }}</td>
-            <td>{{ asset.updated_at.strftime('%Y-%m-%d') if asset.updated_at else '—' }}</td>
-            {% for f in type_columns %}
-            {% set val = asset.metadata_.get(f.name) if asset.metadata_ else None %}
-            <td>
-                {% if val is none or val == '' %}—
-                {% elif f.field_type == 'boolean' %}{{ "Yes" if val else "No" }}
-                {% elif f.field_type == 'enum' %}{{ val | replace('_', ' ') | title }}
-                {% else %}{{ val }}{% endif %}
-            </td>
-            {% endfor %}
+            {% if bulk_enabled %}<td><input type="checkbox" class="bulk-row-check" name="asset_ids" value="{{ asset.id }}"></td>{% endif %}
+            {% for col in columns %}{{ render_cell(col, asset) }}{% endfor %}
         </tr>
         {% else %}
-        <tr><td colspan="{{ 6 + type_columns|length }}">No assets found matching your filters.</td></tr>
+        <tr><td colspan="{{ columns|length + (1 if bulk_enabled else 0) }}">No assets found matching your filters.</td></tr>
         {% endfor %}
     </tbody>
 </table>
+{% if bulk_enabled %}
+{% include "partials/bulk_actions.html" %}
+</form>
+{% endif %}
 
 {% if pages > 1 %}
 <div class="pagination">

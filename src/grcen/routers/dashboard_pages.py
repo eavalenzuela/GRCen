@@ -5,7 +5,7 @@ import asyncpg
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from grcen.models.asset import ORGANIZATIONAL_TYPES
+from grcen.models.asset import ORGANIZATIONAL_TYPES, AssetType
 from grcen.models.user import User
 from grcen.permissions import Permission
 from grcen.routers._pages_shared import (
@@ -24,6 +24,7 @@ from grcen.services import (
     review_service as review_svc,
     risk_service as risk_svc,
     saved_search_service,
+    workflow_service,
 )
 
 router = APIRouter(tags=["pages"], dependencies=[Depends(_csrf_check)])
@@ -231,6 +232,43 @@ async def risk_bulk_update(
     owner_raw = str(form.get("owner_id", "")).strip()
     owner_id = UUID(owner_raw) if owner_raw else None
     review_date = (str(form.get("review_date", "")).strip() or None)
+
+    has_change = bool(treatment or owner_id is not None or review_date)
+    # Honor per-type approval gating, mirroring /assets/bulk-update: when risk
+    # `update` is gated, each selected risk becomes its own pending_changes row
+    # (capped at 200) and the user is routed to the approval queue. (Resolves
+    # register_framework_spec.md open decision #2 — risk bulk no longer diverges.)
+    if (
+        risk_ids and has_change
+        and await workflow_service.requires_approval(
+            pool, AssetType.RISK, "update", organization_id=user.organization_id
+        )
+    ):
+        submitted = 0
+        for rid in risk_ids[:200]:
+            current = await asset_svc.get_asset(pool, rid, organization_id=user.organization_id)
+            if current is None or current.type != AssetType.RISK:
+                continue
+            updates: dict = {}
+            if owner_id is not None:
+                updates["owner_id"] = owner_id
+            if treatment or review_date:
+                merged = dict(current.metadata_ or {})
+                if treatment:
+                    merged["treatment"] = treatment
+                if review_date:
+                    merged["review_date"] = review_date
+                updates["metadata_"] = merged
+            try:
+                await workflow_service.submit(
+                    pool, action="update", asset_type=AssetType.RISK,
+                    target_asset_id=rid, title=current.name,
+                    payload=workflow_service.asset_update_payload(updates), user=user,
+                )
+                submitted += 1
+            except ValueError:
+                continue  # an identical change for this risk is already pending
+        return RedirectResponse(f"/approvals?submitted={submitted}", status_code=302)
 
     updated = await risk_svc.bulk_update_risks(
         pool,

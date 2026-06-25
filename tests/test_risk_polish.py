@@ -116,6 +116,43 @@ async def test_bulk_update_http_endpoint(auth_client, pool, admin_user):
         assert fresh.metadata_["treatment"] == "transfer"
 
 
+@pytest.mark.asyncio
+async def test_bulk_update_honors_approval_gating(auth_client, pool, admin_user):
+    """When risk `update` is gated, the bulk endpoint routes each selected risk
+    to the approval queue instead of applying directly (parity with the generic
+    register bulk endpoint — spec open decision #2)."""
+    from tests.conftest import _extract_csrf_from_session_cookie
+    from grcen.services import workflow_service
+
+    await workflow_service.upsert_config(
+        pool, AssetType.RISK,
+        require_approval_create=False, require_approval_update=True,
+        require_approval_delete=False,
+    )
+    r1 = await _risk(pool, admin_user.id, "R1")
+    r2 = await _risk(pool, admin_user.id, "R2")
+    resp = await auth_client.post(
+        "/risk-management/bulk-update",
+        data={
+            "risk_ids": [str(r1.id), str(r2.id)],
+            "treatment": "transfer",
+            "csrf_token": _extract_csrf_from_session_cookie(auth_client),
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    assert resp.headers["location"].startswith("/approvals")
+    # Unchanged until approval…
+    for rid in (r1.id, r2.id):
+        fresh = await asset_svc.get_asset(pool, rid)
+        assert fresh.metadata_.get("treatment") != "transfer"
+    # …one pending change per selected risk.
+    pending = await pool.fetchval(
+        "SELECT count(*) FROM pending_changes WHERE action = 'update' AND asset_type = 'risk' AND status = 'pending'"
+    )
+    assert pending == 2
+
+
 # ── trend snapshots ──────────────────────────────────────────────────────
 
 

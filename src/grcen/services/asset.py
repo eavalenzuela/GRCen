@@ -216,12 +216,28 @@ async def list_assets(
         "updated_at": "a.updated_at",
     }
     sort_col = allowed_sorts.get(sort, "a.name")
-    # Sort by a custom field: "meta.<key>" → a.metadata->>'<key>' (text order).
+    # Sort by a custom field: "meta.<key>" → a.metadata->>'<key>'. Integer custom
+    # fields (e.g. headcount, open_findings) sort numerically via a per-value cast
+    # so a single non-numeric row can't abort the whole ORDER BY; everything else
+    # sorts as text.
     if sort.startswith("meta."):
         import re
         meta_sort_key = sort[len("meta."):]
         if re.match(r"^[a-zA-Z0-9_\-]+$", meta_sort_key):
-            sort_col = f"a.metadata->>'{meta_sort_key}'"
+            numeric = False
+            if asset_type is not None:
+                fd = next(
+                    (f for f in CUSTOM_FIELDS.get(asset_type, []) if f.name == meta_sort_key),
+                    None,
+                )
+                numeric = fd is not None and fd.field_type == "integer"
+            if numeric:
+                sort_col = (
+                    f"(CASE WHEN a.metadata->>'{meta_sort_key}' ~ '^-?[0-9.]+$' "
+                    f"THEN (a.metadata->>'{meta_sort_key}')::numeric ELSE NULL END)"
+                )
+            else:
+                sort_col = f"a.metadata->>'{meta_sort_key}'"
     sort_dir = "DESC" if order == "desc" else "ASC"
 
     vals.append(page_size)
@@ -313,6 +329,90 @@ async def update_asset(
         owner_row = await pool.fetchrow("SELECT name FROM assets WHERE id = $1", row_dict["owner_id"])
         row_dict["owner_name"] = owner_row["name"] if owner_row else None
     return Asset.from_row(row_dict)
+
+
+async def bulk_update_assets(
+    pool: asyncpg.Pool,
+    asset_ids: list[UUID],
+    *,
+    asset_type: AssetType,
+    status: str | None = None,
+    owner_id: UUID | None = None,
+    add_tags: list[str] | None = None,
+    metadata_set: dict | None = None,
+    updated_by: UUID | None = None,
+    organization_id: UUID | None = None,
+) -> list[UUID]:
+    """Apply a uniform set of changes to many assets of one type (direct path).
+
+    Generalizes ``risk_service.bulk_update_risks``: ``metadata_set`` merges into
+    each asset's existing metadata (other keys kept), ``add_tags`` appends and
+    de-dups, ``status``/``owner_id`` are column updates. The ``WHERE`` is pinned
+    to both ``organization_id`` and ``asset_type`` so a bulk can only ever touch
+    the intended type and tenant. Returns the ids actually changed.
+    """
+    if not asset_ids:
+        return []
+    if not status and owner_id is None and not add_tags and not metadata_set:
+        return []
+    # Cross-tenant owner guard (mirrors update_asset).
+    if owner_id is not None and organization_id is not None:
+        ok = await pool.fetchval(
+            "SELECT 1 FROM assets WHERE id = $1 AND organization_id = $2",
+            owner_id, organization_id,
+        )
+        if not ok:
+            raise ValueError("owner_id refers to an asset in a different organization")
+
+    updated: list[UUID] = []
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            for aid in asset_ids:
+                if organization_id is not None:
+                    row = await conn.fetchrow(
+                        "SELECT metadata, tags FROM assets"
+                        " WHERE id = $1 AND type = $2 AND organization_id = $3",
+                        aid, asset_type.value, organization_id,
+                    )
+                else:
+                    row = await conn.fetchrow(
+                        "SELECT metadata, tags FROM assets WHERE id = $1 AND type = $2",
+                        aid, asset_type.value,
+                    )
+                if not row:
+                    continue
+                sets: list[str] = []
+                vals: list = []
+                idx = 1
+                if status:
+                    sets.append(f"status = ${idx}"); vals.append(status); idx += 1
+                if owner_id is not None:
+                    sets.append(f"owner_id = ${idx}"); vals.append(owner_id); idx += 1
+                if metadata_set:
+                    meta = row["metadata"]
+                    if isinstance(meta, str):
+                        meta = json.loads(meta) or {}
+                    elif meta is None:
+                        meta = {}
+                    else:
+                        meta = dict(meta)
+                    meta.update(metadata_set)
+                    sets.append(f"metadata = ${idx}::jsonb"); vals.append(json.dumps(meta)); idx += 1
+                if add_tags:
+                    existing = list(row["tags"]) if row["tags"] else []
+                    merged = list(dict.fromkeys(existing + add_tags))
+                    sets.append(f"tags = ${idx}"); vals.append(merged); idx += 1
+                if not sets:
+                    continue
+                sets.append("updated_at = now()")
+                if updated_by is not None:
+                    sets.append(f"updated_by = ${idx}"); vals.append(updated_by); idx += 1
+                vals.append(aid)
+                await conn.execute(
+                    f"UPDATE assets SET {', '.join(sets)} WHERE id = ${idx}", *vals
+                )
+                updated.append(aid)
+    return updated
 
 
 async def delete_asset(

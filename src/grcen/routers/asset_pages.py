@@ -3,12 +3,13 @@ from uuid import UUID
 
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 
+from grcen import registers
 from grcen.custom_fields import CUSTOM_FIELDS
 from grcen.models.asset import ORGANIZATIONAL_TYPES, AssetType
 from grcen.models.user import User
-from grcen.permissions import Permission
+from grcen.permissions import Permission, has_permission
 from grcen.routers._pages_shared import (
     _ASSET_FIELDS,
     _csrf_check,
@@ -26,7 +27,9 @@ from grcen.services import (
     asset as asset_svc,
     attachment as att_svc,
     audit_service as audit_svc,
+    export_service,
     redaction,
+    register_service,
     relationship as rel_svc,
     risk_service as risk_svc,
     saved_search_service,
@@ -51,6 +54,7 @@ async def asset_list(
     unlinked: str | None = None,
     sort: str = "name",
     order: str = "asc",
+    columns: str | None = None,
     page: int = 1,
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.VIEW)),
@@ -82,11 +86,45 @@ async def asset_list(
     saved_searches = await saved_search_service.list_visible(
         pool, user.id, path="/assets", organization_id=user.organization_id
     )
-    # When filtered to a single type, surface that type's (non-sensitive) custom
-    # fields as extra, sortable columns so a filtered list is an actual worklist.
-    type_columns = []
-    if asset_type:
-        type_columns = [f for f in CUSTOM_FIELDS.get(asset_type, []) if not f.sensitive]
+    # Register framework: a single asset type resolves to a RegisterDef, which
+    # gives the list a name, curated columns (?columns=curated), and a metrics
+    # header. Ad-hoc /assets?type=X (no ?columns) keeps today's "all columns".
+    register = registers.by_type(asset_type)
+    columns_mode = "curated" if (columns == "curated" and register is not None) else "all"
+    # Override-aware sensitivity: exclude effective-sensitive columns AND mask
+    # override-promoted values in the rows (the list path previously leaked them).
+    effective_sensitive: set[str] = set()
+    if asset_type is not None:
+        effective_sensitive = await redaction.effective_sensitive_field_names(
+            pool, asset_type, user.organization_id
+        )
+        await redaction.redact_assets_metadata(
+            pool, items, asset_type, user, user.organization_id, effective=effective_sensitive
+        )
+    columns_resolved = registers.resolve_columns(
+        register, columns_mode, asset_type, effective_sensitive
+    )
+    metrics = (
+        await register_service.build_metrics(pool, register, organization_id=user.organization_id)
+        if register is not None and register.metrics
+        else []
+    )
+    # Bulk-edit controls: only when the register defines bulk_fields and the user
+    # can edit. The owner picker reuses the risk register's person/OU query.
+    bulk_fields = (
+        registers.resolve_bulk_fields(register)
+        if register is not None and register.bulk_fields and has_permission(user.role, Permission.EDIT)
+        else []
+    )
+    bulk_owners = []
+    if bulk_fields:
+        bulk_owners = await pool.fetch(
+            """SELECT id, name FROM assets
+               WHERE type IN ('person', 'organizational_unit') AND status = 'active'
+                 AND organization_id = $1
+               ORDER BY name""",
+            user.organization_id,
+        )
     # Build filter params string for pagination links
     filter_params = ""
     if asset_type:
@@ -111,6 +149,8 @@ async def asset_list(
         filter_params += f"&sort={sort}"
     if order != "asc":
         filter_params += f"&order={order}"
+    if columns_mode != "all":
+        filter_params += f"&columns={columns_mode}"
     return templates.TemplateResponse(request, "assets/list.html", context={
             "user": user,
             "assets": items,
@@ -129,7 +169,12 @@ async def asset_list(
             "filter_meta_value": meta_value or "",
             "filter_tag": tag or "",
             "filter_unlinked": unlinked_flag,
-            "type_columns": type_columns,
+            "register": register,
+            "columns": columns_resolved,
+            "columns_mode": columns_mode,
+            "metrics": metrics,
+            "bulk_fields": bulk_fields,
+            "bulk_owners": bulk_owners,
             "all_tags": all_tags,
             "saved_searches": saved_searches,
             "current_path": "/assets",
@@ -139,6 +184,179 @@ async def asset_list(
             "sort": sort,
             "order": order,
         },
+    )
+
+
+@router.post("/assets/bulk-update")
+async def asset_bulk_update(
+    request: Request,
+    type: str | None = None,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.EDIT)),
+):
+    """Apply a uniform change to many assets of one register type.
+
+    Honors per-type approval gating (``/admin/workflow``): when ``update`` is
+    gated, each selected asset becomes its own ``pending_changes`` row (capped at
+    200) and the user is sent to the approval queue; otherwise the change is
+    applied directly and audit-logged per asset.
+
+    Note: the bespoke risk register's bulk endpoint (`/risk-management/bulk-update`)
+    predates gating and remains ungated — see register_framework_spec.md open
+    decision #2 (back-port vs. document) before unifying.
+    """
+    asset_type = AssetType(type) if type else None
+    register = registers.by_type(asset_type)
+    if asset_type is None or register is None or not register.bulk_fields:
+        raise HTTPException(status_code=400, detail="No bulk actions for this type")
+
+    form = await request.form()
+    asset_ids: list[UUID] = []
+    for v in form.getlist("asset_ids"):
+        try:
+            asset_ids.append(UUID(str(v)))
+        except (ValueError, TypeError):
+            continue
+
+    allowed = set(register.bulk_fields)
+    status: str | None = None
+    owner_id: UUID | None = None
+    add_tags: list[str] | None = None
+    metadata_set: dict = {}
+    if "status" in allowed:
+        s = str(form.get("status", "")).strip()
+        if s in ("active", "inactive", "draft", "archived"):
+            status = s
+    if "owner" in allowed:
+        o = str(form.get("owner_id", "")).strip()
+        if o:
+            try:
+                owner_id = UUID(o)
+            except ValueError:
+                owner_id = None
+    if "tags" in allowed:
+        raw = str(form.get("add_tags", "")).strip()
+        if raw:
+            add_tags = [t.strip() for t in raw.split(",") if t.strip()]
+    for key in allowed:
+        if not key.startswith("meta."):
+            continue
+        fname = key[len("meta."):]
+        val = str(form.get(f"meta.{fname}", "")).strip()
+        if not val:
+            continue
+        fd = registers._field_def(asset_type, fname)
+        if fd is None or fd.sensitive:
+            continue
+        if fd.field_type == "enum" and fd.choices and val not in fd.choices:
+            continue
+        metadata_set[fname] = val
+
+    back = f"/assets?{request.url.query}" if request.url.query else f"/assets?type={asset_type.value}"
+    if not asset_ids or not (status or owner_id or add_tags or metadata_set):
+        return RedirectResponse(back, status_code=302)
+
+    if await workflow_service.requires_approval(
+        pool, asset_type, "update", organization_id=user.organization_id
+    ):
+        submitted = 0
+        for aid in asset_ids[:200]:
+            current = await asset_svc.get_asset(pool, aid, organization_id=user.organization_id)
+            if current is None or current.type != asset_type:
+                continue
+            updates: dict = {}
+            if status:
+                updates["status"] = status
+            if owner_id is not None:
+                updates["owner_id"] = owner_id
+            if metadata_set:
+                merged = dict(current.metadata_ or {})
+                merged.update(metadata_set)
+                updates["metadata_"] = merged
+            if add_tags:
+                updates["tags"] = list(dict.fromkeys((current.tags or []) + add_tags))
+            try:
+                await workflow_service.submit(
+                    pool, action="update", asset_type=asset_type,
+                    target_asset_id=aid, title=current.name,
+                    payload=workflow_service.asset_update_payload(updates), user=user,
+                )
+                submitted += 1
+            except ValueError:
+                continue  # an identical change for this asset is already pending
+        return RedirectResponse(f"/approvals?submitted={submitted}", status_code=302)
+
+    try:
+        updated = await asset_svc.bulk_update_assets(
+            pool, asset_ids, asset_type=asset_type, status=status, owner_id=owner_id,
+            add_tags=add_tags, metadata_set=metadata_set or None,
+            updated_by=user.id, organization_id=user.organization_id,
+        )
+    except ValueError:
+        # cross-tenant owner_id, etc. — reject without applying
+        return RedirectResponse(back, status_code=302)
+    for aid in updated:
+        await audit_svc.log_audit_event(
+            pool, user_id=user.id, username=user.username, action="bulk_update",
+            entity_type="asset", entity_id=aid, entity_name=register.label.lower(),
+            changes={
+                "status": {"new": status} if status else {},
+                "owner_id": {"new": str(owner_id)} if owner_id else {},
+                "tags_added": {"new": add_tags} if add_tags else {},
+                "metadata": {"new": metadata_set} if metadata_set else {},
+            },
+        )
+    return RedirectResponse(back, status_code=302)
+
+
+@router.get("/assets/export")
+async def asset_export(
+    request: Request,
+    type: str | None = None,
+    q: str | None = None,
+    status: str | None = None,
+    owner: str | None = None,
+    created_after: str | None = None,
+    created_before: str | None = None,
+    meta_key: str | None = None,
+    meta_value: str | None = None,
+    tag: str | None = None,
+    unlinked: str | None = None,
+    sort: str = "name",
+    order: str = "asc",
+    format: str = "csv",
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.EXPORT)),
+):
+    """Export-from-view: CSV/JSON of the current filtered+sorted asset list.
+
+    Exports every (effective-non-sensitive) field for the matching rows, so the
+    download reflects the same rows the page shows. The page's ``columns`` mode is
+    intentionally ignored — an export carries all data, not just visible columns.
+    """
+    asset_type = AssetType(type) if type else None
+    unlinked_flag = (unlinked or "").lower() in ("on", "1", "true", "yes")
+    content = await export_service.export_assets(
+        pool, format=format, asset_type=asset_type, status=status,
+        user=user, organization_id=user.organization_id,
+        q=q, owner=owner, tag=tag, created_after=created_after,
+        created_before=created_before, meta_key=meta_key, meta_value=meta_value,
+        unlinked=unlinked_flag, sort=sort, order=order,
+    )
+    label = asset_type.value if asset_type else "assets"
+    await access_log_service.record(
+        pool, user=user, action="export", entity_type="asset",
+        entity_name=f"{label}.{format}",
+        path=str(request.url.path),
+        ip_address=request.client.host if request.client else None,
+    )
+    if format == "json":
+        media_type, filename = "application/json", f"{label}.json"
+    else:
+        media_type, filename = "text/csv", f"{label}.csv"
+    return StreamingResponse(
+        iter([content]), media_type=media_type,
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 
 
