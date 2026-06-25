@@ -5,6 +5,8 @@
     <h1>{{ register.plural if register else 'Assets' }}</h1>
     <div>
         {% if has_perm(user.role, Permission.EXPORT) %}
+        <a href="/assets/export?{{ request.url.query }}&format=csv" class="btn">CSV</a>
+        <a href="/assets/export?{{ request.url.query }}&format=json" class="btn">JSON</a>
         <a href="/exports/assets.pdf?{{ request.url.query }}" class="btn">Download PDF</a>
         {% endif %}
         {% if has_perm(user.role, Permission.CREATE) %}

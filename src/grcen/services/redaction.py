@@ -174,6 +174,41 @@ async def redact_assets_metadata(
             a.metadata_ = redact_metadata(a.metadata_, asset_type, user, sensitive_fields=fields)
 
 
+async def redact_assets_by_type(
+    pool: asyncpg.Pool,
+    assets: list,
+    user: User | None,
+    organization_id: UUID,
+) -> None:
+    """Mask sensitive metadata across a MIXED-type list of assets, in place.
+
+    Like ``redact_assets_metadata`` but infers each asset's type from
+    ``asset.type`` (for exports that span types). Batched: one effective-set
+    lookup per distinct type + one overrides query for the whole list.
+    """
+    if not assets or can_view_pii(user):
+        return
+    eff_by_type: dict = {}
+    for t in {a.type for a in assets}:
+        eff_by_type[t] = await effective_sensitive_field_names(pool, t, organization_id)
+    rows = await pool.fetch(
+        "SELECT asset_id, field_name, sensitive FROM asset_sensitive_overrides WHERE asset_id = ANY($1)",
+        [a.id for a in assets],
+    )
+    per_asset: dict = {}
+    for r in rows:
+        per_asset.setdefault(r["asset_id"], {})[r["field_name"]] = r["sensitive"]
+    for a in assets:
+        fields = set(eff_by_type.get(a.type, set()))
+        for fname, sens in per_asset.get(a.id, {}).items():
+            if sens:
+                fields.add(fname)
+            else:
+                fields.discard(fname)
+        if fields:
+            a.metadata_ = redact_metadata(a.metadata_, a.type, user, sensitive_fields=fields)
+
+
 # ── per-asset overrides admin API ──────────────────────────────────────
 
 

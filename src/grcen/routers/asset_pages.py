@@ -3,7 +3,7 @@ from uuid import UUID
 
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 
 from grcen import registers
 from grcen.custom_fields import CUSTOM_FIELDS
@@ -27,6 +27,7 @@ from grcen.services import (
     asset as asset_svc,
     attachment as att_svc,
     audit_service as audit_svc,
+    export_service,
     redaction,
     register_service,
     relationship as rel_svc,
@@ -306,6 +307,57 @@ async def asset_bulk_update(
             },
         )
     return RedirectResponse(back, status_code=302)
+
+
+@router.get("/assets/export")
+async def asset_export(
+    request: Request,
+    type: str | None = None,
+    q: str | None = None,
+    status: str | None = None,
+    owner: str | None = None,
+    created_after: str | None = None,
+    created_before: str | None = None,
+    meta_key: str | None = None,
+    meta_value: str | None = None,
+    tag: str | None = None,
+    unlinked: str | None = None,
+    sort: str = "name",
+    order: str = "asc",
+    format: str = "csv",
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.EXPORT)),
+):
+    """Export-from-view: CSV/JSON of the current filtered+sorted asset list.
+
+    Exports every (effective-non-sensitive) field for the matching rows, so the
+    download reflects the same rows the page shows. The page's ``columns`` mode is
+    intentionally ignored — an export carries all data, not just visible columns.
+    """
+    asset_type = AssetType(type) if type else None
+    unlinked_flag = (unlinked or "").lower() in ("on", "1", "true", "yes")
+    content = await export_service.export_assets(
+        pool, format=format, asset_type=asset_type, status=status,
+        user=user, organization_id=user.organization_id,
+        q=q, owner=owner, tag=tag, created_after=created_after,
+        created_before=created_before, meta_key=meta_key, meta_value=meta_value,
+        unlinked=unlinked_flag, sort=sort, order=order,
+    )
+    label = asset_type.value if asset_type else "assets"
+    await access_log_service.record(
+        pool, user=user, action="export", entity_type="asset",
+        entity_name=f"{label}.{format}",
+        path=str(request.url.path),
+        ip_address=request.client.host if request.client else None,
+    )
+    if format == "json":
+        media_type, filename = "application/json", f"{label}.json"
+    else:
+        media_type, filename = "text/csv", f"{label}.csv"
+    return StreamingResponse(
+        iter([content]), media_type=media_type,
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
 
 
 @router.get("/assets/new", response_class=HTMLResponse)

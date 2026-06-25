@@ -216,12 +216,28 @@ async def list_assets(
         "updated_at": "a.updated_at",
     }
     sort_col = allowed_sorts.get(sort, "a.name")
-    # Sort by a custom field: "meta.<key>" → a.metadata->>'<key>' (text order).
+    # Sort by a custom field: "meta.<key>" → a.metadata->>'<key>'. Integer custom
+    # fields (e.g. headcount, open_findings) sort numerically via a per-value cast
+    # so a single non-numeric row can't abort the whole ORDER BY; everything else
+    # sorts as text.
     if sort.startswith("meta."):
         import re
         meta_sort_key = sort[len("meta."):]
         if re.match(r"^[a-zA-Z0-9_\-]+$", meta_sort_key):
-            sort_col = f"a.metadata->>'{meta_sort_key}'"
+            numeric = False
+            if asset_type is not None:
+                fd = next(
+                    (f for f in CUSTOM_FIELDS.get(asset_type, []) if f.name == meta_sort_key),
+                    None,
+                )
+                numeric = fd is not None and fd.field_type == "integer"
+            if numeric:
+                sort_col = (
+                    f"(CASE WHEN a.metadata->>'{meta_sort_key}' ~ '^-?[0-9.]+$' "
+                    f"THEN (a.metadata->>'{meta_sort_key}')::numeric ELSE NULL END)"
+                )
+            else:
+                sort_col = f"a.metadata->>'{meta_sort_key}'"
     sort_dir = "DESC" if order == "desc" else "ASC"
 
     vals.append(page_size)

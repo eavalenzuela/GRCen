@@ -293,18 +293,22 @@ Frameworks, Controls, Reviews, Answers). `canonical_path` entries link to the be
 
 ## 12. Phasing (re-cut smaller — review B8)
 
-**Slice 1 — Index + register-ified `/assets` (Effort M).** `registers.py` (defs + registry);
-`/registers` index + nav; `/registers/{slug}` redirect alias; enhance `asset_list` to apply
-`RegisterDef` (curated columns, default sort, metrics header, overdue-review badge) when
-`?type=` set; **§7.3 redaction prerequisite**. *Outcome:* every type gets a named, navigable,
-metric-topped register at a pretty URL — and the latent redaction leak is closed.
+**Slice 1 — Index + register-ified `/assets` (Effort M). — SHIPPED.** `registers.py` (defs +
+registry); `/registers` index + nav; `/registers/{slug}` redirect alias; enhance `asset_list`
+to apply `RegisterDef` (curated columns, default sort, metrics header, overdue-review badge)
+when `?type=` set; **§7.3 redaction prerequisite**. *Outcome:* every type gets a named,
+navigable, metric-topped register at a pretty URL — and the latent redaction leak is closed.
 
-**Slice 2 — Bulk actions (Effort M).** `partials/bulk_actions.html`; `bulk_update_assets`;
-`POST /assets/bulk-update` with the gating contract (§6); back-port gating to risk bulk.
+**Slice 2 — Bulk actions (Effort M). — SHIPPED.** `partials/bulk_actions.html`;
+`bulk_update_assets`; `POST /assets/bulk-update` with the gating contract (§6); gating
+back-ported to risk bulk (§6, decision #2).
 
-**Slice 3 — Polish (Effort M).** `computed.next_review` everywhere it's configured; full
-v1 type-specific metric cards; export-from-view filter parity + redaction (§9); numeric meta
-sort (§7.4).
+**Slice 3 — Polish (Effort M). — SHIPPED.** Export-from-view filter parity + override-aware
+redaction (`/assets/export` + extended `export_service.export_assets` reusing `list_assets`;
+§9); numeric meta sort for integer custom fields (§7.4). `computed.next_review` and the v1
+type-specific metric cards landed in Slice 1. *Note:* export-from-view exports all
+effective-non-sensitive fields for the matched rows (not just the visible column subset) —
+column-mode-aware export is a possible later refinement.
 
 **Dropped from v1:** admin-defined registers (`register_definitions` DB overlay) — defer
 until an org asks; it doubles the config story (code dict + DB + merge precedence) against
