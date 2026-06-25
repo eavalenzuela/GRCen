@@ -193,10 +193,11 @@ can never touch another type/org. Validates enum values against `FieldDef.choice
 3. `audit_svc.log_audit_event` per updated id (mirror `dashboard_pages.py:244-258`).
 4. Redirect back preserving `request.url.query`.
 
-> **Consistency fix (review B4):** the existing `/risk-management/bulk-update`
-> (`dashboard_pages.py:216`) is **ungated**. Back-port the same gating wrapper to it (small)
-> so the "gold-standard" register and the generic endpoint behave identically — or document
-> in `/admin/workflow` that risk bulk is intentionally ungated. Pick one; don't ship divergent.
+> **Consistency fix (review B4) — RESOLVED (Slice 2).** The existing
+> `/risk-management/bulk-update` (`dashboard_pages.py`) was ungated; gating was
+> back-ported so it now mirrors `/assets/bulk-update` exactly — when risk `update`
+> is gated, each selected risk becomes its own `pending_changes` row (cap 200) and
+> the user is routed to `/approvals`. The two endpoints no longer diverge.
 
 ## 7. Columns
 
@@ -358,6 +359,6 @@ a precondition (§7.3); type-specific metrics in v1 (§8); Phase 4 dropped (§12
 1. Is collapsing today's full typed `?type=` columns to ≤5 acceptable, or should ad-hoc
    `/assets?type=` keep showing all fields and only the *register alias* curate? (Default
    chosen: curate everywhere, `columns=all` to expand.)
-2. Back-port gating to the risk bulk endpoint, or document it as intentionally ungated? (§6)
+2. ~~Back-port gating to the risk bulk endpoint, or document it as intentionally ungated?~~ **Resolved (Slice 2): gating back-ported; the two bulk endpoints now behave identically.**
 3. Add `incident_status` now (real lifecycle) vs. ship `computed.incident_state` first? (§4.2)
 4. Nav: dropdown vs. flat `nav_primary` links for the four flagship registers. (§10)
