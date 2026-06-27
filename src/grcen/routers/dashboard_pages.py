@@ -19,6 +19,7 @@ from grcen.routers.deps import (
 from grcen.services import (
     alert_service as alert_svc,
     answer_service,
+    appetite_service,
     asset as asset_svc,
     audit_service as audit_svc,
     review_service as review_svc,
@@ -157,6 +158,10 @@ async def risk_management_page(
     summary = await risk_svc.get_risk_summary(pool, organization_id=user.organization_id)
     heatmap = await risk_svc.get_risk_heatmap(pool, organization_id=user.organization_id)
     trend = await risk_svc.get_severity_trend(pool, organization_id=user.organization_id)
+    appetite_evals = await appetite_service.evaluate_risks(pool, organization_id=user.organization_id)
+    appetite_status = {e["id"]: e["status"] for e in appetite_evals}
+    appetite_out = sum(1 for e in appetite_evals if e["status"] == "out")
+    appetite_near = sum(1 for e in appetite_evals if e["status"] == "near")
     notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     bulk_owners = await pool.fetch(
         """SELECT id, name FROM assets
@@ -210,6 +215,9 @@ async def risk_management_page(
             "saved_searches": saved_searches,
             "current_path": "/risk-management",
             "current_query": filter_params.lstrip("&"),
+            "appetite_status": appetite_status,
+            "appetite_out": appetite_out,
+            "appetite_near": appetite_near,
         },
     )
 

@@ -18,6 +18,7 @@ from grcen.routers import (
     framework_pages,
     register_pages,
     relationship_pages,
+    risk_appetite,
     settings_pages,
     tag_pages,
 )
@@ -38,3 +39,4 @@ for _sub in (
     content_packs_pages,
 ):
     router.include_router(_sub.router)
+router.include_router(risk_appetite.page_router)

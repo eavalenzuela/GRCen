@@ -3,6 +3,15 @@
 {% block content %}
 <h1>Risk Management</h1>
 
+{% if appetite_out or appetite_near %}
+<div class="alert" style="padding:0.6rem 0.9rem;border-radius:6px;margin-bottom:1rem;
+     background:{% if appetite_out %}#fee2e2;color:#991b1b;{% else %}#fef3c7;color:#92400e;{% endif %}">
+    <strong>{{ appetite_out }}</strong> risk{{ 's' if appetite_out != 1 else '' }} out of appetite
+    · {{ appetite_near }} near.
+    {% if has_perm(user.role, Permission.MANAGE_USERS) %}<a href="/admin/risk-appetite">Manage appetite →</a>{% endif %}
+</div>
+{% endif %}
+
 {% include "partials/saved_searches.html" %}
 
 {# ── Summary stats ─────────────────────────────────────────────────── #}

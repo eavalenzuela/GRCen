@@ -931,6 +931,19 @@ DO $$ BEGIN
     ALTER TABLE attachments ADD COLUMN valid_until TIMESTAMPTZ;
 EXCEPTION WHEN duplicate_column THEN NULL; END $$;
 UPDATE attachments SET collected_at = created_at WHERE collected_at IS NULL;
+
+-- Risk appetite: per-org (optionally per risk_category) thresholds on residual
+-- risk score. risk_category='' is the org default. A risk is "out of appetite"
+-- when its score exceeds max_score, "near" when it exceeds warn_score.
+CREATE TABLE IF NOT EXISTS risk_appetite (
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    risk_category   VARCHAR(64) NOT NULL DEFAULT '',
+    max_score       INTEGER NOT NULL,
+    warn_score      INTEGER NOT NULL,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (organization_id, risk_category)
+);
 """
 
 

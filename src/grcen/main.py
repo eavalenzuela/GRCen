@@ -28,6 +28,7 @@ from grcen.routers import (
     org_views,
     pages,
     relationships,
+    risk_appetite,
     saml,
     saved_searches,
     tags,
@@ -178,6 +179,7 @@ def create_app() -> FastAPI:
     app.include_router(frameworks.router)
     app.include_router(controls.router)
     app.include_router(findings.router)
+    app.include_router(risk_appetite.api_router)
     app.include_router(tags.router)
     app.include_router(saved_searches.router)
     app.include_router(access_log.router)
