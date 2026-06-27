@@ -1,9 +1,10 @@
 """Compliance framework dashboards, control library, and PDF/CSV reports."""
+from urllib.parse import quote
 from uuid import UUID
 
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from grcen.models.asset import AssetType
 from grcen.models.user import User
@@ -19,9 +20,17 @@ from grcen.routers.deps import (
 from grcen.services import (
     access_log_service,
     alert_service as alert_svc,
+    control_test_service,
     framework_service,
     pdf_service,
 )
+
+
+def _flash(flash: str | None) -> dict | None:
+    if not flash:
+        return None
+    ok, _, message = flash.partition(":")
+    return {"ok": ok == "ok", "message": message or flash}
 
 router = APIRouter(tags=["pages"], dependencies=[Depends(_csrf_check)])
 
@@ -117,17 +126,53 @@ async def controls_library(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.VIEW)),
 ):
-    """Inverted view: every Control with the requirements it covers."""
+    """Inverted view: every Control with the requirements it covers + test status."""
     controls = await framework_service.list_controls_with_coverage(
         pool, organization_id=user.organization_id
     )
+    control_ids = [c["id"] for c in controls]
+    sparklines = await control_test_service.recent_results(
+        pool, control_ids, organization_id=user.organization_id
+    )
+    overdue = await control_test_service.overdue_for_test(
+        pool, organization_id=user.organization_id
+    )
+    overdue_ids = {str(o["id"]) for o in overdue}
     notif_count = await alert_svc.count_unread_notifications(
         pool, organization_id=user.organization_id, user_id=user.id
     )
     return templates.TemplateResponse(
         request, "frameworks/controls.html",
-        context={"user": user, "controls": controls, "notif_count": notif_count},
+        context={
+            "user": user, "controls": controls,
+            "sparklines": {str(k): v for k, v in sparklines.items()},
+            "overdue_count": len(overdue), "overdue_ids": overdue_ids,
+            "flash": _flash(request.query_params.get("flash")),
+            "notif_count": notif_count,
+        },
     )
+
+
+@router.post("/controls/{control_id}/test")
+async def record_control_test(
+    control_id: UUID,
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.EDIT)),
+):
+    """Record a control test result from the control library form."""
+    form = await request.form()
+    result = str(form.get("result", "")).strip()
+    notes = str(form.get("notes", "")).strip() or None
+    try:
+        await control_test_service.record_test_run(
+            pool, control_id, result=result, method="manual",
+            tested_by=user.id, notes=notes, organization_id=user.organization_id,
+        )
+        msg = f"ok:Recorded {result} test result."
+    except ValueError as exc:
+        msg = f"fail:{exc}"
+    return RedirectResponse(f"/controls?flash={quote(msg)}", status_code=302)
 
 
 @router.get("/frameworks/{framework_id}/gap-report.pdf")

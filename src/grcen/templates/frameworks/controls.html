@@ -1,12 +1,28 @@
 {% extends "base.html" %}
 {% block title %}Control Library - GRCen{% endblock %}
 
+{% macro spark(results) %}
+    {% for r in results %}<span title="{{ r }}" style="display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:1px;
+        background:{% if r == 'pass' %}#16a34a{% elif r == 'partial' %}#ca8a04{% else %}#dc2626{% endif %};"></span>{% endfor %}
+{% endmacro %}
+
 {% block content %}
 <h1>Control Library</h1>
-<p>Every control asset and the requirements it covers — the inverse of the
-   per-framework gap view. Coverage edges include both
-   <code>control --[satisfies]--&gt; requirement</code> and
-   <code>requirement --[satisfied_by/implemented_by]--&gt; control</code>.</p>
+<p>Every control asset, the requirements it covers, and its test history — the
+   inverse of the per-framework gap view. Recording a test result rolls the
+   control's <em>effectiveness</em> and <em>next test due</em> forward.</p>
+
+{% if flash %}
+<div class="alert" style="padding:0.6rem 0.9rem;border-radius:6px;margin-bottom:1rem;
+     background:{% if flash.ok %}#dcfce7;color:#166534;{% else %}#fee2e2;color:#991b1b;{% endif %}">{{ flash.message }}</div>
+{% endif %}
+
+{% if overdue_count %}
+<div class="alert" style="padding:0.6rem 0.9rem;border-radius:6px;margin-bottom:1rem;background:#fef3c7;color:#92400e;">
+    <strong>{{ overdue_count }}</strong> control{{ 's' if overdue_count != 1 else '' }}
+    overdue for testing (past due date or never tested).
+</div>
+{% endif %}
 
 {% if not controls %}
 <p>No controls defined yet.</p>
@@ -17,10 +33,13 @@
             <th>Control</th>
             <th>Requirements covered</th>
             <th>Frameworks</th>
+            <th>Testing</th>
+            <th>Record result</th>
         </tr>
     </thead>
     <tbody>
     {% for c in controls %}
+        {% set is_overdue = (c.id | string) in overdue_ids %}
         <tr>
             <td>
                 <a href="/assets/{{ c.id }}">{{ c.name }}</a>
@@ -41,10 +60,33 @@
             </td>
             <td>
                 {% set frameworks = c.requirements | map(attribute='framework_name') | reject('none') | unique | list %}
-                {% if frameworks %}
-                {{ frameworks | join(', ') }}
-                {% else %}
-                <em style="color:#6b7280;">—</em>
+                {% if frameworks %}{{ frameworks | join(', ') }}{% else %}<em style="color:#6b7280;">—</em>{% endif %}
+            </td>
+            <td style="white-space:nowrap;">
+                {{ spark(sparklines.get(c.id | string, [])) }}
+                <div>
+                    <small style="color:#6b7280;">tested {{ c.metadata.get('last_tested', 'never') }}</small>
+                </div>
+                <div>
+                    {% set nd = c.metadata.get('next_test_due') %}
+                    {% if is_overdue %}
+                    <small style="color:#b91c1c;">⚠ due {{ nd or '—' }}</small>
+                    {% elif nd %}
+                    <small style="color:#6b7280;">due {{ nd }}</small>
+                    {% endif %}
+                </div>
+            </td>
+            <td>
+                {% if has_perm(user.role, Permission.EDIT) %}
+                <form method="post" action="/controls/{{ c.id }}/test" style="display:flex;gap:0.25rem;align-items:center;">
+                    {% include "partials/csrf.html" %}
+                    <select name="result" style="padding:0.2rem;">
+                        <option value="pass">pass</option>
+                        <option value="partial">partial</option>
+                        <option value="fail">fail</option>
+                    </select>
+                    <button type="submit" class="btn btn-sm">Record</button>
+                </form>
                 {% endif %}
             </td>
         </tr>

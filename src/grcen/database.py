@@ -872,6 +872,29 @@ EXCEPTION WHEN duplicate_column THEN NULL; END $$;
 CREATE UNIQUE INDEX IF NOT EXISTS ux_relationships_source_ref
     ON relationships (organization_id, source, source_ref)
     WHERE source IS NOT NULL;
+
+-- Control test ledger: one row per recorded test of a control. The latest run
+-- writes effectiveness/last_tested/next_test_due back onto the control asset
+-- (so the risk rollup + answer-freshness keep working), while the full series
+-- powers a result history and a "control operated throughout [period]" check.
+CREATE TABLE IF NOT EXISTS control_test_runs (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    control_id      UUID NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
+    run_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    result          VARCHAR(16) NOT NULL,     -- pass | partial | fail
+    method          VARCHAR(16) NOT NULL DEFAULT 'manual',  -- manual | automated | connector
+    tested_by       UUID REFERENCES users(id) ON DELETE SET NULL,
+    period_start    DATE,
+    period_end      DATE,
+    notes           TEXT,
+    evidence_url    TEXT,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS ix_control_test_runs_control
+    ON control_test_runs (control_id, run_at DESC);
+CREATE INDEX IF NOT EXISTS ix_control_test_runs_org
+    ON control_test_runs (organization_id);
 """
 
 
