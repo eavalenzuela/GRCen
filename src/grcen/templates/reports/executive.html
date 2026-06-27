@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Executive Report - GRCen{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Executive Board Pack</h1>
+    <form method="get" action="/reports/executive" style="display:inline;">
+        Period <input type="text" name="period" value="{{ period }}" style="width:8rem;">
+        <button type="submit" class="btn btn-sm">Load</button>
+    </form>
+    &nbsp;|&nbsp;
+    <a href="/reports/board-pack.pdf?period={{ period }}" class="btn btn-sm">Download PDF</a>
+</div>
+
+{% if flash %}
+<div class="alert" style="padding:0.5rem 0.9rem;border-radius:6px;margin-bottom:1rem;background:#dcfce7;color:#166534;">{{ flash.message }}</div>
+{% endif %}
+
+<div class="risk-summary-row" style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1rem;">
+    <div class="card" style="flex:1;min-width:160px;">
+        <small>Risk</small>
+        <div style="font-size:1.4rem;font-weight:600;">{{ data.risk.summary.total }}</div>
+        <small>{{ data.risk.summary.by_severity.critical }} critical · {{ data.risk.appetite.out }} out of appetite</small>
+    </div>
+    <div class="card" style="flex:1;min-width:160px;">
+        <small>Compliance</small>
+        <div style="font-size:1.4rem;font-weight:600;">{{ data.compliance.total_open_gaps }}</div>
+        <small>open gaps · {{ data.compliance.frameworks | length }} frameworks</small>
+    </div>
+    <div class="card" style="flex:1;min-width:160px;">
+        <small>Operations</small>
+        <div style="font-size:1.4rem;font-weight:600;">{{ data.operations.open_incidents }}</div>
+        <small>open incidents · {{ data.operations.overdue_findings }} overdue findings</small>
+    </div>
+</div>
+
+<div class="card">
+    <h3>Framework coverage</h3>
+    <table class="table">
+        <thead><tr><th>Framework</th><th>Effective</th><th>Trend</th><th>Open gaps</th></tr></thead>
+        <tbody>
+        {% for f in data.compliance.frameworks %}
+        <tr><td>{{ f.name }}</td><td>{{ f.effective }}%</td>
+            <td>{% if f.delta is not none and f.delta != 0 %}{{ '▲' if f.delta > 0 else '▼' }}{{ f.delta | abs }}%{% else %}—{% endif %}</td>
+            <td>{{ f.open_gaps }}</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if has_perm(user.role, Permission.EDIT) %}
+<div class="card">
+    <h3>Narrative ({{ period }})</h3>
+    <p style="color:#6b7280;">Commentary saved per period travels with the board pack PDF.</p>
+    {% for section in sections %}
+    <form method="post" action="/reports/executive" style="margin-bottom:0.75rem;">
+        {% include "partials/csrf.html" %}
+        <input type="hidden" name="period" value="{{ period }}">
+        <input type="hidden" name="section" value="{{ section }}">
+        <label style="text-transform:capitalize;font-weight:600;">{{ section }}</label>
+        <textarea name="body" rows="2" style="width:100%;">{{ narratives.get(section, '') }}</textarea>
+        <button type="submit" class="btn btn-sm">Save {{ section }}</button>
+    </form>
+    {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

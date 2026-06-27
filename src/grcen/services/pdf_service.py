@@ -21,6 +21,7 @@ from grcen.services import (
     alert_service as alert_svc,
     asset as asset_svc,
     attachment as att_svc,
+    board_service,
     framework_service,
     redaction,
     relationship as rel_svc,
@@ -77,6 +78,30 @@ async def render_framework_report(
             "generated_at": datetime.now(UTC),
             "cover_title": detail.framework["name"],
             "cover_subtitle": "Compliance Summary",
+            **branding,
+        },
+    )
+
+
+async def render_board_pack(
+    pool: asyncpg.Pool,
+    *,
+    organization_id: UUID | None = None,
+    period: str = "current",
+) -> bytes:
+    """One branded, multi-section executive board pack PDF."""
+    assert organization_id is not None, "board pack requires an organization"
+    data = await board_service.gather(pool, organization_id=organization_id)
+    narratives = await board_service.get_narratives(
+        pool, organization_id=organization_id, period=period)
+    branding = await _branding_context(pool, organization_id)
+    return _render(
+        "reports/board_pack.html",
+        {
+            "data": data, "narratives": narratives, "period": period,
+            "generated_at": datetime.now(UTC),
+            "cover_title": "Executive Board Pack",
+            "cover_subtitle": period,
             **branding,
         },
     )

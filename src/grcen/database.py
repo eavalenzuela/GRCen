@@ -944,6 +944,17 @@ CREATE TABLE IF NOT EXISTS risk_appetite (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (organization_id, risk_category)
 );
+
+-- Board-pack narrative blocks: per-org, per-period, per-section commentary that
+-- travels with the assembled board report so the story isn't re-typed each quarter.
+CREATE TABLE IF NOT EXISTS board_narratives (
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    period          VARCHAR(32) NOT NULL,
+    section         VARCHAR(32) NOT NULL,
+    body            TEXT NOT NULL DEFAULT '',
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (organization_id, period, section)
+);
 """
 
 

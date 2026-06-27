@@ -1,0 +1,64 @@
+{% extends "reports/_base.html" %}
+{% block title %}Executive Board Pack{% endblock %}
+{% block page_title %}Executive Board Pack{% endblock %}
+{% block heading %}Executive Board Pack — {{ period }}{% endblock %}
+{% block cover %}{% include "reports/_cover.html" %}{% endblock %}
+{% block content %}
+
+{% if narratives.overview %}
+<h2>Overview</h2>
+<p>{{ narratives.overview }}</p>
+{% endif %}
+
+<h2>Risk Posture</h2>
+<p>
+    <span class="pill pill-bad">{{ data.risk.summary.by_severity.critical }} critical</span>
+    <span class="pill pill-warn">{{ data.risk.summary.by_severity.high }} high</span>
+    out of {{ data.risk.summary.total }} active risks ·
+    {{ data.risk.summary.overdue }} overdue review.
+    {% if data.risk.appetite.out %}
+    <span class="pill pill-bad">{{ data.risk.appetite.out }} out of appetite</span>
+    {% endif %}
+</p>
+{% if data.risk.top %}
+<table>
+    <thead><tr><th>Top risks</th><th>Category</th><th>Score</th></tr></thead>
+    <tbody>
+    {% for r in data.risk.top %}
+        <tr><td>{{ r.name }}</td><td class="muted">{{ r.category }}</td><td>{{ r.score }}</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+{% if narratives.risk %}<p>{{ narratives.risk }}</p>{% endif %}
+
+<h2>Compliance Coverage</h2>
+<p>{{ data.compliance.total_open_gaps }} open gaps across {{ data.compliance.frameworks | length }} frameworks.</p>
+{% if data.compliance.frameworks %}
+<table>
+    <thead><tr><th>Framework</th><th>Coverage</th><th>Effective</th><th>Trend</th><th>Open gaps</th><th>Certification</th></tr></thead>
+    <tbody>
+    {% for f in data.compliance.frameworks %}
+        <tr>
+            <td>{{ f.name }}</td>
+            <td>{{ f.coverage }}%</td>
+            <td>{{ f.effective }}%</td>
+            <td class="muted">{% if f.delta is not none and f.delta != 0 %}{{ '▲' if f.delta > 0 else '▼' }}{{ f.delta | abs }}%{% else %}—{% endif %}</td>
+            <td>{{ f.open_gaps }}</td>
+            <td class="muted">{{ f.certification or '—' }}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+{% if narratives.compliance %}<p>{{ narratives.compliance }}</p>{% endif %}
+
+<h2>Operations</h2>
+<table>
+    <tbody>
+        <tr><td>Open incidents</td><td>{{ data.operations.open_incidents }}</td></tr>
+        <tr><td>Overdue findings</td><td>{{ data.operations.overdue_findings }}</td></tr>
+        <tr><td>Answers needing review</td><td>{{ data.operations.answers_needing_review }}</td></tr>
+    </tbody>
+</table>
+{% endblock %}
