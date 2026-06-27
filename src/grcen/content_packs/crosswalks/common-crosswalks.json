@@ -1,0 +1,809 @@
+{
+  "crosswalks": [
+    {
+      "from": "nist-csf-2.0:PR.AA-01",
+      "to": "iso27001:A.5.16",
+      "relationship": "equivalent",
+      "confidence": "high",
+      "note": "identity and credential lifecycle management"
+    },
+    {
+      "from": "nist-csf-2.0:PR.AA-05",
+      "to": "soc2:CC6.3",
+      "relationship": "equivalent",
+      "confidence": "high",
+      "note": "role-based least-privilege access"
+    },
+    {
+      "from": "nist-csf-2.0:PR.PS-04",
+      "to": "iso27001:A.8.15",
+      "relationship": "equivalent",
+      "confidence": "high",
+      "note": "log generation and logging"
+    },
+    {
+      "from": "iso27001:A.8.16",
+      "to": "soc2:CC7.2",
+      "relationship": "equivalent",
+      "confidence": "high",
+      "note": "monitoring activities for anomalies"
+    },
+    {
+      "from": "cis-v8.1:8.4",
+      "to": "iso27001:A.8.17",
+      "relationship": "equivalent",
+      "confidence": "high",
+      "note": "clock/time synchronization"
+    },
+    {
+      "from": "iso27001:A.5.25",
+      "to": "soc2:CC7.3",
+      "relationship": "equivalent",
+      "confidence": "high",
+      "note": "assessment and decision on events"
+    },
+    {
+      "from": "nist-csf-2.0:ID.RA-01",
+      "to": "iso27001:A.8.8",
+      "relationship": "equivalent",
+      "confidence": "high",
+      "note": "identification/management of technical vulnerabilities"
+    },
+    {
+      "from": "nist-csf-2.0:PR.PS-01",
+      "to": "iso27001:A.8.9",
+      "relationship": "equivalent",
+      "confidence": "high",
+      "note": "configuration management"
+    },
+    {
+      "from": "nist-csf-2.0:ID.AM-01",
+      "to": "cis-v8.1:1.1",
+      "relationship": "equivalent",
+      "confidence": "high",
+      "note": "hardware/enterprise asset inventory"
+    },
+    {
+      "from": "nist-csf-2.0:ID.AM-02",
+      "to": "cis-v8.1:2.1",
+      "relationship": "equivalent",
+      "confidence": "high",
+      "note": "software inventory"
+    },
+    {
+      "from": "iso27001:A.8.7",
+      "to": "soc2:CC6.8",
+      "relationship": "equivalent",
+      "confidence": "high",
+      "note": "protection against malware"
+    },
+    {
+      "from": "nist-csf-2.0:PR.DS-11",
+      "to": "iso27001:A.8.13",
+      "relationship": "equivalent",
+      "confidence": "high",
+      "note": "information backup"
+    },
+    {
+      "from": "nist-csf-2.0:PR.AT-01",
+      "to": "iso27001:A.6.3",
+      "relationship": "equivalent",
+      "confidence": "high",
+      "note": "security awareness and training"
+    },
+    {
+      "from": "iso27001:A.8.32",
+      "to": "soc2:CC8.1",
+      "relationship": "equivalent",
+      "confidence": "high",
+      "note": "change management"
+    },
+    {
+      "from": "nist-csf-2.0:PR.PS-06",
+      "to": "iso27001:A.8.25",
+      "relationship": "equivalent",
+      "confidence": "high",
+      "note": "secure development lifecycle"
+    },
+    {
+      "from": "nist-csf-2.0:GV.PO-01",
+      "to": "iso27001:A.5.1",
+      "relationship": "equivalent",
+      "confidence": "high",
+      "note": "information security policy"
+    },
+    {
+      "from": "nist-csf-2.0:PR.AA-01",
+      "to": "soc2:CC6.2",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "registering and managing user identities"
+    },
+    {
+      "from": "iso27001:A.5.16",
+      "to": "soc2:CC6.2",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "identity management vs user registration/authorization"
+    },
+    {
+      "from": "nist-csf-2.0:PR.AA-03",
+      "to": "iso27001:A.8.5",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "authentication of users/services"
+    },
+    {
+      "from": "iso27001:A.8.5",
+      "to": "soc2:CC6.1",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "secure authentication vs logical access controls"
+    },
+    {
+      "from": "nist-csf-2.0:PR.AA-05",
+      "to": "iso27001:A.8.3",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "least-privilege access restriction"
+    },
+    {
+      "from": "nist-csf-2.0:PR.AA-05",
+      "to": "iso27001:A.5.15",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "access control rules and enforcement"
+    },
+    {
+      "from": "nist-csf-2.0:PR.AA-05",
+      "to": "cis-v8.1:6.8",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "role-based access control / least privilege"
+    },
+    {
+      "from": "iso27001:A.5.15",
+      "to": "soc2:CC6.3",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "access control policy vs role-based access"
+    },
+    {
+      "from": "iso27001:A.8.2",
+      "to": "soc2:CC6.3",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "privileged access vs least privilege"
+    },
+    {
+      "from": "iso27001:A.8.2",
+      "to": "cis-v8.1:5.4",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "privileged/admin access restriction"
+    },
+    {
+      "from": "iso27001:A.5.18",
+      "to": "soc2:CC6.2",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "provisioning and revoking access rights"
+    },
+    {
+      "from": "nist-csf-2.0:PR.AA-06",
+      "to": "iso27001:A.7.2",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "physical entry / access management"
+    },
+    {
+      "from": "nist-csf-2.0:PR.AA-06",
+      "to": "soc2:CC6.4",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "physical access restriction"
+    },
+    {
+      "from": "iso27001:A.7.2",
+      "to": "soc2:CC6.4",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "physical entry controls"
+    },
+    {
+      "from": "iso27001:A.7.1",
+      "to": "soc2:CC6.4",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "physical security perimeter vs access restriction"
+    },
+    {
+      "from": "nist-csf-2.0:PR.PS-04",
+      "to": "cis-v8.1:8.2",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "generating and collecting audit logs"
+    },
+    {
+      "from": "iso27001:A.8.15",
+      "to": "soc2:CC7.2",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "logging vs monitoring for anomalies"
+    },
+    {
+      "from": "iso27001:A.8.15",
+      "to": "cis-v8.1:8.2",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "logging vs collecting audit logs"
+    },
+    {
+      "from": "nist-csf-2.0:DE.CM-01",
+      "to": "iso27001:A.8.16",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "network monitoring vs monitoring activities"
+    },
+    {
+      "from": "nist-csf-2.0:DE.CM-01",
+      "to": "soc2:CC7.2",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "monitoring for adverse events"
+    },
+    {
+      "from": "cis-v8.1:8.11",
+      "to": "iso27001:A.8.15",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "audit log review / analysis"
+    },
+    {
+      "from": "nist-csf-2.0:DE.AE-02",
+      "to": "soc2:CC7.3",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "analyzing events to determine incidents"
+    },
+    {
+      "from": "nist-csf-2.0:DE.AE-02",
+      "to": "iso27001:A.5.25",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "assessment/decision on security events"
+    },
+    {
+      "from": "nist-csf-2.0:DE.AE-08",
+      "to": "iso27001:A.5.25",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "declaring incidents from events"
+    },
+    {
+      "from": "nist-csf-2.0:DE.AE-08",
+      "to": "soc2:CC7.3",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "incident determination"
+    },
+    {
+      "from": "nist-csf-2.0:ID.RA-01",
+      "to": "cis-v8.1:7.1",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "vulnerability management process"
+    },
+    {
+      "from": "nist-csf-2.0:ID.RA-01",
+      "to": "soc2:CC7.1",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "detection of new vulnerabilities"
+    },
+    {
+      "from": "iso27001:A.8.8",
+      "to": "cis-v8.1:7.1",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "technical vulnerability management"
+    },
+    {
+      "from": "iso27001:A.8.8",
+      "to": "soc2:CC7.1",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "vulnerability detection"
+    },
+    {
+      "from": "cis-v8.1:7.1",
+      "to": "soc2:CC7.1",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "vulnerability management vs detection"
+    },
+    {
+      "from": "nist-csf-2.0:PR.PS-02",
+      "to": "cis-v8.1:7.4",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "software maintenance/patching"
+    },
+    {
+      "from": "nist-csf-2.0:PR.PS-01",
+      "to": "cis-v8.1:4.1",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "secure configuration process"
+    },
+    {
+      "from": "iso27001:A.8.9",
+      "to": "cis-v8.1:4.1",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "configuration management vs secure config process"
+    },
+    {
+      "from": "nist-csf-2.0:PR.DS-02",
+      "to": "iso27001:A.8.24",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "cryptography protecting data in transit"
+    },
+    {
+      "from": "nist-csf-2.0:PR.DS-02",
+      "to": "soc2:CC6.7",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "protecting information during transmission"
+    },
+    {
+      "from": "nist-csf-2.0:PR.DS-02",
+      "to": "cis-v8.1:3.10",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "encrypt sensitive data in transit"
+    },
+    {
+      "from": "cis-v8.1:3.10",
+      "to": "soc2:CC6.7",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "encrypt data in transit vs transmission protection"
+    },
+    {
+      "from": "nist-csf-2.0:PR.DS-01",
+      "to": "cis-v8.1:3.11",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "encrypt sensitive data at rest"
+    },
+    {
+      "from": "cis-v8.1:3.13",
+      "to": "iso27001:A.8.12",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "data loss/leakage prevention"
+    },
+    {
+      "from": "cis-v8.1:3.2",
+      "to": "nist-csf-2.0:ID.AM-07",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "data inventory"
+    },
+    {
+      "from": "cis-v8.1:3.7",
+      "to": "iso27001:A.5.12",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "data classification scheme"
+    },
+    {
+      "from": "cis-v8.1:3.5",
+      "to": "iso27001:A.8.10",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "secure data disposal / deletion"
+    },
+    {
+      "from": "cis-v8.1:3.5",
+      "to": "soc2:C1.2",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "secure disposal of confidential data"
+    },
+    {
+      "from": "iso27001:A.8.10",
+      "to": "soc2:C1.2",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "information deletion vs disposal"
+    },
+    {
+      "from": "soc2:CC6.5",
+      "to": "iso27001:A.7.14",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "secure disposal/re-use of equipment"
+    },
+    {
+      "from": "cis-v8.1:3.8",
+      "to": "nist-csf-2.0:ID.AM-03",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "documenting data flows"
+    },
+    {
+      "from": "nist-csf-2.0:ID.AM-01",
+      "to": "iso27001:A.5.9",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "asset inventory with ownership"
+    },
+    {
+      "from": "cis-v8.1:1.1",
+      "to": "iso27001:A.5.9",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "enterprise asset inventory vs asset inventory"
+    },
+    {
+      "from": "nist-csf-2.0:ID.AM-04",
+      "to": "cis-v8.1:15.1",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "inventory of supplier services/providers"
+    },
+    {
+      "from": "cis-v8.1:10.1",
+      "to": "iso27001:A.8.7",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "anti-malware deployment"
+    },
+    {
+      "from": "cis-v8.1:10.1",
+      "to": "soc2:CC6.8",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "preventing/detecting malicious software"
+    },
+    {
+      "from": "nist-csf-2.0:PR.IR-01",
+      "to": "iso27001:A.8.20",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "network protection/security"
+    },
+    {
+      "from": "nist-csf-2.0:PR.IR-01",
+      "to": "soc2:CC6.6",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "protection from external threats"
+    },
+    {
+      "from": "cis-v8.1:12.2",
+      "to": "iso27001:A.8.22",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "network segmentation/segregation"
+    },
+    {
+      "from": "cis-v8.1:13.4",
+      "to": "iso27001:A.8.22",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "traffic filtering between segments"
+    },
+    {
+      "from": "iso27001:A.8.20",
+      "to": "soc2:CC6.6",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "network security vs external threat protection"
+    },
+    {
+      "from": "nist-csf-2.0:PR.DS-11",
+      "to": "cis-v8.1:11.2",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "automated backups"
+    },
+    {
+      "from": "nist-csf-2.0:PR.DS-11",
+      "to": "soc2:A1.2",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "backup infrastructure for availability"
+    },
+    {
+      "from": "iso27001:A.8.13",
+      "to": "cis-v8.1:11.2",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "backup vs automated backups"
+    },
+    {
+      "from": "iso27001:A.8.13",
+      "to": "soc2:A1.2",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "backup vs recovery infrastructure"
+    },
+    {
+      "from": "cis-v8.1:11.5",
+      "to": "soc2:A1.3",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "recovery testing"
+    },
+    {
+      "from": "nist-csf-2.0:RC.RP-01",
+      "to": "soc2:CC7.5",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "executing recovery / recovering from incidents"
+    },
+    {
+      "from": "nist-csf-2.0:PR.IR-04",
+      "to": "soc2:A1.1",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "resource/capacity management for availability"
+    },
+    {
+      "from": "iso27001:A.8.6",
+      "to": "soc2:A1.1",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "capacity management"
+    },
+    {
+      "from": "nist-csf-2.0:PR.IR-04",
+      "to": "iso27001:A.8.6",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "resource capacity vs capacity management"
+    },
+    {
+      "from": "nist-csf-2.0:PR.IR-03",
+      "to": "iso27001:A.5.30",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "resilience vs ICT continuity readiness"
+    },
+    {
+      "from": "nist-csf-2.0:RS.MA-01",
+      "to": "iso27001:A.5.26",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "executing incident response"
+    },
+    {
+      "from": "nist-csf-2.0:RS.MA-01",
+      "to": "soc2:CC7.4",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "incident response program execution"
+    },
+    {
+      "from": "nist-csf-2.0:RS.MA-01",
+      "to": "cis-v8.1:17.4",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "incident response process execution"
+    },
+    {
+      "from": "iso27001:A.5.26",
+      "to": "soc2:CC7.4",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "response to incidents vs IR program"
+    },
+    {
+      "from": "cis-v8.1:17.4",
+      "to": "soc2:CC7.4",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "IR process vs IR program"
+    },
+    {
+      "from": "nist-csf-2.0:RS.MI-01",
+      "to": "soc2:CC7.4",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "containment within incident response"
+    },
+    {
+      "from": "iso27001:A.5.27",
+      "to": "cis-v8.1:17.8",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "learning from incidents / post-incident review"
+    },
+    {
+      "from": "iso27001:A.5.28",
+      "to": "nist-csf-2.0:RS.AN-07",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "collection/preservation of evidence"
+    },
+    {
+      "from": "nist-csf-2.0:PR.AT-01",
+      "to": "cis-v8.1:14.1",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "awareness training program"
+    },
+    {
+      "from": "iso27001:A.6.3",
+      "to": "cis-v8.1:14.1",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "awareness training program"
+    },
+    {
+      "from": "nist-csf-2.0:PR.AT-02",
+      "to": "iso27001:A.6.3",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "role-specialized training"
+    },
+    {
+      "from": "nist-csf-2.0:PR.AT-02",
+      "to": "cis-v8.1:14.9",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "role-specific training"
+    },
+    {
+      "from": "nist-csf-2.0:GV.SC-01",
+      "to": "iso27001:A.5.19",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "supplier risk management program"
+    },
+    {
+      "from": "nist-csf-2.0:GV.SC-01",
+      "to": "soc2:CC9.2",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "managing vendor/partner risk"
+    },
+    {
+      "from": "iso27001:A.5.19",
+      "to": "soc2:CC9.2",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "supplier relationships vs vendor risk"
+    },
+    {
+      "from": "nist-csf-2.0:GV.SC-05",
+      "to": "iso27001:A.5.20",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "security requirements in supplier agreements"
+    },
+    {
+      "from": "nist-csf-2.0:GV.SC-05",
+      "to": "cis-v8.1:15.4",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "security requirements in provider contracts"
+    },
+    {
+      "from": "iso27001:A.5.20",
+      "to": "cis-v8.1:15.4",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "supplier agreements vs provider contract requirements"
+    },
+    {
+      "from": "nist-csf-2.0:GV.SC-07",
+      "to": "iso27001:A.5.22",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "monitoring/reviewing supplier services"
+    },
+    {
+      "from": "nist-csf-2.0:GV.SC-07",
+      "to": "cis-v8.1:15.6",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "monitoring suppliers"
+    },
+    {
+      "from": "iso27001:A.5.21",
+      "to": "nist-csf-2.0:GV.SC-09",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "ICT supply chain security across lifecycle"
+    },
+    {
+      "from": "nist-csf-2.0:GV.SC-04",
+      "to": "cis-v8.1:15.3",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "prioritizing/classifying suppliers by criticality"
+    },
+    {
+      "from": "nist-csf-2.0:ID.RA-07",
+      "to": "iso27001:A.8.32",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "managing changes and change management"
+    },
+    {
+      "from": "iso27001:A.8.31",
+      "to": "cis-v8.1:16.8",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "separating production and non-production"
+    },
+    {
+      "from": "nist-csf-2.0:PR.PS-06",
+      "to": "cis-v8.1:16.1",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "secure development process"
+    },
+    {
+      "from": "iso27001:A.8.25",
+      "to": "cis-v8.1:16.1",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "secure development lifecycle vs process"
+    },
+    {
+      "from": "iso27001:A.8.29",
+      "to": "cis-v8.1:16.13",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "security testing / application penetration testing"
+    },
+    {
+      "from": "nist-csf-2.0:GV.PO-01",
+      "to": "soc2:CC5.3",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "policy deployment"
+    },
+    {
+      "from": "iso27001:A.5.1",
+      "to": "soc2:CC5.3",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "security policies vs deployment through policies"
+    },
+    {
+      "from": "nist-csf-2.0:GV.RR-02",
+      "to": "iso27001:A.5.2",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "security roles and responsibilities"
+    },
+    {
+      "from": "nist-csf-2.0:GV.OC-03",
+      "to": "iso27001:A.5.31",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "legal/regulatory/contractual requirements"
+    },
+    {
+      "from": "nist-csf-2.0:ID.RA-05",
+      "to": "soc2:CC3.2",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "determining risk vs identifying/analyzing risk"
+    },
+    {
+      "from": "nist-csf-2.0:ID.RA-02",
+      "to": "iso27001:A.5.7",
+      "relationship": "partial",
+      "confidence": "high",
+      "note": "threat intelligence"
+    }
+  ]
+}

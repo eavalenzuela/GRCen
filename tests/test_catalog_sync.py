@@ -189,6 +189,96 @@ async def test_dashboard_coverage_lights_up(pool):
     assert soc2.coverage_percent == 100
 
 
+def _catalog_xwalk():
+    """Two frameworks with an equivalent requirement crosswalked between them."""
+    return {
+        "catalog_version": "1",
+        "source": "autocomply",
+        "frameworks": [
+            {
+                "ref": "soc2", "name": "SOC 2",
+                "requirements": [
+                    {"ref": "soc2:CC6.1", "name": "CC6.1 — Logical access"},
+                ],
+            },
+            {
+                "ref": "iso27001", "name": "ISO 27001",
+                "requirements": [
+                    {"ref": "iso27001:A.5.15", "name": "A.5.15 — Access control"},
+                ],
+            },
+        ],
+        "controls": [],
+        "crosswalks": [
+            {"from": "iso27001:A.5.15", "to": "soc2:CC6.1",
+             "relationship": "equivalent", "confidence": "high"},
+        ],
+    }
+
+
+@pytest.mark.asyncio
+async def test_crosswalk_edge_created(pool):
+    org = await _org(pool)
+    result = await catalog_sync.sync_catalog(pool, _catalog_xwalk(), organization_id=org)
+    assert not result.errors
+    assert result.crosswalks == 1
+    row = await pool.fetchrow(
+        """SELECT relationship_type, description FROM relationships
+           WHERE source = 'autocomply' AND relationship_type = 'cross_maps'
+             AND organization_id = $1""",
+        org,
+    )
+    assert row is not None
+    assert row["relationship_type"] == "cross_maps"
+    assert "equivalent" in row["description"]
+    assert "confidence: high" in row["description"]
+
+
+@pytest.mark.asyncio
+async def test_crosswalk_is_idempotent_and_pruned(pool):
+    org = await _org(pool)
+    await catalog_sync.sync_catalog(pool, _catalog_xwalk(), organization_id=org)
+    again = await catalog_sync.sync_catalog(pool, _catalog_xwalk(), organization_id=org)
+    assert again.crosswalks == 1
+    assert again.edges_created == 0  # no new edges on resync
+
+    dropped = _catalog_xwalk()
+    dropped["crosswalks"] = []
+    pruned = await catalog_sync.sync_catalog(pool, dropped, organization_id=org)
+    assert pruned.crosswalks == 0
+    assert pruned.edges_pruned == 1
+    remaining = await pool.fetchval(
+        """SELECT count(*) FROM relationships
+           WHERE relationship_type = 'cross_maps' AND organization_id = $1""",
+        org,
+    )
+    assert remaining == 0
+
+
+@pytest.mark.asyncio
+async def test_crosswalk_unknown_ref_rejected(pool):
+    org = await _org(pool)
+    cat = _catalog_xwalk()
+    cat["crosswalks"][0]["to"] = "soc2:NOPE"
+    result = await catalog_sync.sync_catalog(pool, cat, organization_id=org)
+    assert any("unknown requirement 'soc2:NOPE'" in e for e in result.errors)
+    assert result.assets_created == 0
+
+
+@pytest.mark.asyncio
+async def test_crosswalk_self_and_duplicate_rejected(pool):
+    org = await _org(pool)
+    cat = _catalog_xwalk()
+    cat["crosswalks"] = [
+        {"from": "soc2:CC6.1", "to": "soc2:CC6.1"},  # self
+        {"from": "iso27001:A.5.15", "to": "soc2:CC6.1"},
+        {"from": "soc2:CC6.1", "to": "iso27001:A.5.15"},  # reverse dup
+    ]
+    result = await catalog_sync.sync_catalog(pool, cat, organization_id=org)
+    assert any("to itself" in e for e in result.errors)
+    assert any("duplicates the mapping" in e for e in result.errors)
+
+
 @pytest.mark.asyncio
 async def test_human_edges_survive_resync(pool):
     """A relationship a human adds to a synced control isn't pruned."""

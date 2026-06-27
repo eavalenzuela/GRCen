@@ -1,0 +1,780 @@
+{
+  "framework": {
+    "ref": "iso27001",
+    "name": "ISO/IEC 27001:2022 Annex A",
+    "description": "Information security controls catalog from Annex A of ISO/IEC 27001:2022, comprising 93 controls organized into Organizational, People, Physical, and Technological themes and governed by the Statement of Applicability.",
+    "metadata": {
+      "version": "2022",
+      "governing_body": "ISO/IEC",
+      "scope": "Information security controls (Annex A)"
+    },
+    "requirements": [
+      {
+        "ref": "iso27001:A.5.1",
+        "name": "A.5.1 — Policies for information security",
+        "reference_id": "A.5.1",
+        "category": "Organizational",
+        "description": "Define, approve, publish, and periodically review a set of policies that govern information security.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.5.2",
+        "name": "A.5.2 — Information security roles and responsibilities",
+        "reference_id": "A.5.2",
+        "category": "Organizational",
+        "description": "Allocate and communicate clear responsibilities for protecting information.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.5.3",
+        "name": "A.5.3 — Segregation of duties",
+        "reference_id": "A.5.3",
+        "category": "Organizational",
+        "description": "Separate conflicting duties to reduce opportunities for unauthorized or unintended actions.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.5.4",
+        "name": "A.5.4 — Management responsibilities",
+        "reference_id": "A.5.4",
+        "category": "Organizational",
+        "description": "Require management to ensure staff apply information security in line with established policies and procedures.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.5.5",
+        "name": "A.5.5 — Contact with authorities",
+        "reference_id": "A.5.5",
+        "category": "Organizational",
+        "description": "Establish and maintain appropriate contact with relevant authorities.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.5.6",
+        "name": "A.5.6 — Contact with special interest groups",
+        "reference_id": "A.5.6",
+        "category": "Organizational",
+        "description": "Maintain contact with security forums and specialist professional groups.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.5.7",
+        "name": "A.5.7 — Threat intelligence",
+        "reference_id": "A.5.7",
+        "category": "Organizational",
+        "description": "Collect and analyze information about security threats to inform protective action.",
+        "metadata": {
+          "new_2022": true
+        }
+      },
+      {
+        "ref": "iso27001:A.5.8",
+        "name": "A.5.8 — Information security in project management",
+        "reference_id": "A.5.8",
+        "category": "Organizational",
+        "description": "Integrate information security considerations into project management activities.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.5.9",
+        "name": "A.5.9 — Inventory of information and other associated assets",
+        "reference_id": "A.5.9",
+        "category": "Organizational",
+        "description": "Maintain an inventory of information and associated assets with assigned ownership.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.5.10",
+        "name": "A.5.10 — Acceptable use of information and other associated assets",
+        "reference_id": "A.5.10",
+        "category": "Organizational",
+        "description": "Establish and enforce rules for the acceptable use and handling of information and assets.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.5.11",
+        "name": "A.5.11 — Return of assets",
+        "reference_id": "A.5.11",
+        "category": "Organizational",
+        "description": "Ensure personnel return organizational assets on termination or change of employment.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.5.12",
+        "name": "A.5.12 — Classification of information",
+        "reference_id": "A.5.12",
+        "category": "Organizational",
+        "description": "Classify information according to its security needs and value to the organization.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.5.13",
+        "name": "A.5.13 — Labelling of information",
+        "reference_id": "A.5.13",
+        "category": "Organizational",
+        "description": "Apply procedures to label information consistently with the classification scheme.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.5.14",
+        "name": "A.5.14 — Information transfer",
+        "reference_id": "A.5.14",
+        "category": "Organizational",
+        "description": "Protect information transferred within the organization and with external parties.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.5.15",
+        "name": "A.5.15 — Access control",
+        "reference_id": "A.5.15",
+        "category": "Organizational",
+        "description": "Establish and apply rules to control physical and logical access based on requirements.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.5.16",
+        "name": "A.5.16 — Identity management",
+        "reference_id": "A.5.16",
+        "category": "Organizational",
+        "description": "Manage the full lifecycle of identities used to access information and assets.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.5.17",
+        "name": "A.5.17 — Authentication information",
+        "reference_id": "A.5.17",
+        "category": "Organizational",
+        "description": "Control the allocation and management of authentication secrets.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.5.18",
+        "name": "A.5.18 — Access rights",
+        "reference_id": "A.5.18",
+        "category": "Organizational",
+        "description": "Provision, review, and revoke access rights in line with the access control policy.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.5.19",
+        "name": "A.5.19 — Information security in supplier relationships",
+        "reference_id": "A.5.19",
+        "category": "Organizational",
+        "description": "Manage the information security risks arising from the use of suppliers.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.5.20",
+        "name": "A.5.20 — Addressing information security within supplier agreements",
+        "reference_id": "A.5.20",
+        "category": "Organizational",
+        "description": "Establish and agree information security requirements in supplier agreements.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.5.21",
+        "name": "A.5.21 — Managing information security in the ICT supply chain",
+        "reference_id": "A.5.21",
+        "category": "Organizational",
+        "description": "Manage information security risks across the ICT products and services supply chain.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.5.22",
+        "name": "A.5.22 — Monitoring, review and change management of supplier services",
+        "reference_id": "A.5.22",
+        "category": "Organizational",
+        "description": "Regularly monitor, review, and manage changes to supplier service delivery.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.5.23",
+        "name": "A.5.23 — Information security for use of cloud services",
+        "reference_id": "A.5.23",
+        "category": "Organizational",
+        "description": "Define processes for securely acquiring, using, managing, and exiting cloud services.",
+        "metadata": {
+          "new_2022": true
+        }
+      },
+      {
+        "ref": "iso27001:A.5.24",
+        "name": "A.5.24 — Information security incident management planning and preparation",
+        "reference_id": "A.5.24",
+        "category": "Organizational",
+        "description": "Plan and prepare processes, roles, and responsibilities for managing security incidents.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.5.25",
+        "name": "A.5.25 — Assessment and decision on information security events",
+        "reference_id": "A.5.25",
+        "category": "Organizational",
+        "description": "Assess security events and decide whether to classify them as incidents.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.5.26",
+        "name": "A.5.26 — Response to information security incidents",
+        "reference_id": "A.5.26",
+        "category": "Organizational",
+        "description": "Respond to security incidents in accordance with documented procedures.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.5.27",
+        "name": "A.5.27 — Learning from information security incidents",
+        "reference_id": "A.5.27",
+        "category": "Organizational",
+        "description": "Use knowledge gained from incidents to strengthen and improve controls.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.5.28",
+        "name": "A.5.28 — Collection of evidence",
+        "reference_id": "A.5.28",
+        "category": "Organizational",
+        "description": "Identify, collect, and preserve evidence relating to security events.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.5.29",
+        "name": "A.5.29 — Information security during disruption",
+        "reference_id": "A.5.29",
+        "category": "Organizational",
+        "description": "Maintain information security at an appropriate level during disruptions.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.5.30",
+        "name": "A.5.30 — ICT readiness for business continuity",
+        "reference_id": "A.5.30",
+        "category": "Organizational",
+        "description": "Plan, implement, and test ICT readiness to meet business continuity objectives.",
+        "metadata": {
+          "new_2022": true
+        }
+      },
+      {
+        "ref": "iso27001:A.5.31",
+        "name": "A.5.31 — Legal, statutory, regulatory and contractual requirements",
+        "reference_id": "A.5.31",
+        "category": "Organizational",
+        "description": "Identify and meet legal, statutory, regulatory, and contractual security obligations.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.5.32",
+        "name": "A.5.32 — Intellectual property rights",
+        "reference_id": "A.5.32",
+        "category": "Organizational",
+        "description": "Protect intellectual property rights and ensure proper licensing of materials.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.5.33",
+        "name": "A.5.33 — Protection of records",
+        "reference_id": "A.5.33",
+        "category": "Organizational",
+        "description": "Protect records against loss, destruction, falsification, and unauthorized access.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.5.34",
+        "name": "A.5.34 — Privacy and protection of PII",
+        "reference_id": "A.5.34",
+        "category": "Organizational",
+        "description": "Identify and meet requirements for privacy and protection of personally identifiable information.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.5.35",
+        "name": "A.5.35 — Independent review of information security",
+        "reference_id": "A.5.35",
+        "category": "Organizational",
+        "description": "Independently review the information security approach at planned intervals.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.5.36",
+        "name": "A.5.36 — Compliance with policies, rules and standards",
+        "reference_id": "A.5.36",
+        "category": "Organizational",
+        "description": "Regularly verify compliance with information security policies, rules, and standards.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.5.37",
+        "name": "A.5.37 — Documented operating procedures",
+        "reference_id": "A.5.37",
+        "category": "Organizational",
+        "description": "Document operating procedures and make them available to those who need them.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.6.1",
+        "name": "A.6.1 — Screening",
+        "reference_id": "A.6.1",
+        "category": "People",
+        "description": "Perform background verification of candidates before employment.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.6.2",
+        "name": "A.6.2 — Terms and conditions of employment",
+        "reference_id": "A.6.2",
+        "category": "People",
+        "description": "State information security responsibilities in employment terms and conditions.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.6.3",
+        "name": "A.6.3 — Information security awareness, education and training",
+        "reference_id": "A.6.3",
+        "category": "People",
+        "description": "Provide ongoing awareness, education, and training on information security.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.6.4",
+        "name": "A.6.4 — Disciplinary process",
+        "reference_id": "A.6.4",
+        "category": "People",
+        "description": "Establish a disciplinary process to address information security policy violations.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.6.5",
+        "name": "A.6.5 — Responsibilities after termination or change of employment",
+        "reference_id": "A.6.5",
+        "category": "People",
+        "description": "Define and enforce security responsibilities that persist after termination or role change.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.6.6",
+        "name": "A.6.6 — Confidentiality or non-disclosure agreements",
+        "reference_id": "A.6.6",
+        "category": "People",
+        "description": "Identify, document, and maintain confidentiality or non-disclosure agreements.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.6.7",
+        "name": "A.6.7 — Remote working",
+        "reference_id": "A.6.7",
+        "category": "People",
+        "description": "Protect information accessed or processed when personnel work remotely.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.6.8",
+        "name": "A.6.8 — Information security event reporting",
+        "reference_id": "A.6.8",
+        "category": "People",
+        "description": "Provide a mechanism for personnel to report security events in a timely manner.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.7.1",
+        "name": "A.7.1 — Physical security perimeters",
+        "reference_id": "A.7.1",
+        "category": "Physical",
+        "description": "Define and protect physical security perimeters around sensitive areas.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.7.2",
+        "name": "A.7.2 — Physical entry",
+        "reference_id": "A.7.2",
+        "category": "Physical",
+        "description": "Protect secure areas with appropriate physical entry controls.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.7.3",
+        "name": "A.7.3 — Securing offices, rooms and facilities",
+        "reference_id": "A.7.3",
+        "category": "Physical",
+        "description": "Design and apply physical security for offices, rooms, and facilities.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.7.4",
+        "name": "A.7.4 — Physical security monitoring",
+        "reference_id": "A.7.4",
+        "category": "Physical",
+        "description": "Continuously monitor premises for unauthorized physical access.",
+        "metadata": {
+          "new_2022": true
+        }
+      },
+      {
+        "ref": "iso27001:A.7.5",
+        "name": "A.7.5 — Protecting against physical and environmental threats",
+        "reference_id": "A.7.5",
+        "category": "Physical",
+        "description": "Design and apply protection against physical and environmental threats.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.7.6",
+        "name": "A.7.6 — Working in secure areas",
+        "reference_id": "A.7.6",
+        "category": "Physical",
+        "description": "Apply security measures for working within designated secure areas.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.7.7",
+        "name": "A.7.7 — Clear desk and clear screen",
+        "reference_id": "A.7.7",
+        "category": "Physical",
+        "description": "Enforce clear-desk and clear-screen rules to limit exposure of information.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.7.8",
+        "name": "A.7.8 — Equipment siting and protection",
+        "reference_id": "A.7.8",
+        "category": "Physical",
+        "description": "Site and protect equipment to reduce environmental and unauthorized-access risks.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.7.9",
+        "name": "A.7.9 — Security of assets off-premises",
+        "reference_id": "A.7.9",
+        "category": "Physical",
+        "description": "Protect assets used or stored outside the organization's premises.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.7.10",
+        "name": "A.7.10 — Storage media",
+        "reference_id": "A.7.10",
+        "category": "Physical",
+        "description": "Manage storage media throughout its lifecycle per classification and handling rules.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.7.11",
+        "name": "A.7.11 — Supporting utilities",
+        "reference_id": "A.7.11",
+        "category": "Physical",
+        "description": "Protect facilities from disruption caused by failures of supporting utilities.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.7.12",
+        "name": "A.7.12 — Cabling security",
+        "reference_id": "A.7.12",
+        "category": "Physical",
+        "description": "Protect power and telecommunications cabling from interception and damage.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.7.13",
+        "name": "A.7.13 — Equipment maintenance",
+        "reference_id": "A.7.13",
+        "category": "Physical",
+        "description": "Maintain equipment correctly to ensure ongoing availability and integrity.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.7.14",
+        "name": "A.7.14 — Secure disposal or re-use of equipment",
+        "reference_id": "A.7.14",
+        "category": "Physical",
+        "description": "Verify removal of data and licensed software before equipment disposal or reuse.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.8.1",
+        "name": "A.8.1 — User endpoint devices",
+        "reference_id": "A.8.1",
+        "category": "Technological",
+        "description": "Protect information stored on or accessed via user endpoint devices.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.8.2",
+        "name": "A.8.2 — Privileged access rights",
+        "reference_id": "A.8.2",
+        "category": "Technological",
+        "description": "Restrict and manage the allocation and use of privileged access rights.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.8.3",
+        "name": "A.8.3 — Information access restriction",
+        "reference_id": "A.8.3",
+        "category": "Technological",
+        "description": "Restrict access to information and functions per the access control policy.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.8.4",
+        "name": "A.8.4 — Access to source code",
+        "reference_id": "A.8.4",
+        "category": "Technological",
+        "description": "Manage read and write access to source code, tools, and libraries.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.8.5",
+        "name": "A.8.5 — Secure authentication",
+        "reference_id": "A.8.5",
+        "category": "Technological",
+        "description": "Implement secure authentication technologies and procedures.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.8.6",
+        "name": "A.8.6 — Capacity management",
+        "reference_id": "A.8.6",
+        "category": "Technological",
+        "description": "Monitor and tune resource usage to meet current and future capacity needs.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.8.7",
+        "name": "A.8.7 — Protection against malware",
+        "reference_id": "A.8.7",
+        "category": "Technological",
+        "description": "Implement malware protection reinforced by appropriate user awareness.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.8.8",
+        "name": "A.8.8 — Management of technical vulnerabilities",
+        "reference_id": "A.8.8",
+        "category": "Technological",
+        "description": "Obtain information on and evaluate exposure to technical vulnerabilities, then act.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.8.9",
+        "name": "A.8.9 — Configuration management",
+        "reference_id": "A.8.9",
+        "category": "Technological",
+        "description": "Establish, document, implement, and monitor secure configurations of systems.",
+        "metadata": {
+          "new_2022": true
+        }
+      },
+      {
+        "ref": "iso27001:A.8.10",
+        "name": "A.8.10 — Information deletion",
+        "reference_id": "A.8.10",
+        "category": "Technological",
+        "description": "Delete information held in systems and devices when no longer required.",
+        "metadata": {
+          "new_2022": true
+        }
+      },
+      {
+        "ref": "iso27001:A.8.11",
+        "name": "A.8.11 — Data masking",
+        "reference_id": "A.8.11",
+        "category": "Technological",
+        "description": "Use data masking to limit exposure of sensitive data.",
+        "metadata": {
+          "new_2022": true
+        }
+      },
+      {
+        "ref": "iso27001:A.8.12",
+        "name": "A.8.12 — Data leakage prevention",
+        "reference_id": "A.8.12",
+        "category": "Technological",
+        "description": "Apply measures to prevent unauthorized disclosure and extraction of sensitive data.",
+        "metadata": {
+          "new_2022": true
+        }
+      },
+      {
+        "ref": "iso27001:A.8.13",
+        "name": "A.8.13 — Information backup",
+        "reference_id": "A.8.13",
+        "category": "Technological",
+        "description": "Maintain and regularly test backups in line with an agreed backup policy.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.8.14",
+        "name": "A.8.14 — Redundancy of information processing facilities",
+        "reference_id": "A.8.14",
+        "category": "Technological",
+        "description": "Provide sufficient redundancy of processing facilities to meet availability needs.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.8.15",
+        "name": "A.8.15 — Logging",
+        "reference_id": "A.8.15",
+        "category": "Technological",
+        "description": "Produce, store, protect, and analyze logs of activities and events.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.8.16",
+        "name": "A.8.16 — Monitoring activities",
+        "reference_id": "A.8.16",
+        "category": "Technological",
+        "description": "Monitor networks, systems, and applications for anomalous behavior.",
+        "metadata": {
+          "new_2022": true
+        }
+      },
+      {
+        "ref": "iso27001:A.8.17",
+        "name": "A.8.17 — Clock synchronization",
+        "reference_id": "A.8.17",
+        "category": "Technological",
+        "description": "Synchronize system clocks to approved reference time sources.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.8.18",
+        "name": "A.8.18 — Use of privileged utility programs",
+        "reference_id": "A.8.18",
+        "category": "Technological",
+        "description": "Restrict and tightly control the use of privileged utility programs.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.8.19",
+        "name": "A.8.19 — Installation of software on operational systems",
+        "reference_id": "A.8.19",
+        "category": "Technological",
+        "description": "Apply procedures to securely manage software installation on operational systems.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.8.20",
+        "name": "A.8.20 — Networks security",
+        "reference_id": "A.8.20",
+        "category": "Technological",
+        "description": "Secure, manage, and control networks to protect information in systems.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.8.21",
+        "name": "A.8.21 — Security of network services",
+        "reference_id": "A.8.21",
+        "category": "Technological",
+        "description": "Identify and apply security mechanisms and service levels for network services.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.8.22",
+        "name": "A.8.22 — Segregation of networks",
+        "reference_id": "A.8.22",
+        "category": "Technological",
+        "description": "Segregate groups of services, users, and systems within networks.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.8.23",
+        "name": "A.8.23 — Web filtering",
+        "reference_id": "A.8.23",
+        "category": "Technological",
+        "description": "Manage access to external websites to reduce exposure to malicious content.",
+        "metadata": {
+          "new_2022": true
+        }
+      },
+      {
+        "ref": "iso27001:A.8.24",
+        "name": "A.8.24 — Use of cryptography",
+        "reference_id": "A.8.24",
+        "category": "Technological",
+        "description": "Define and apply rules for effective use of cryptography and key management.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.8.25",
+        "name": "A.8.25 — Secure development life cycle",
+        "reference_id": "A.8.25",
+        "category": "Technological",
+        "description": "Establish and apply rules for secure development across the software lifecycle.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.8.26",
+        "name": "A.8.26 — Application security requirements",
+        "reference_id": "A.8.26",
+        "category": "Technological",
+        "description": "Identify, specify, and approve security requirements when developing applications.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.8.27",
+        "name": "A.8.27 — Secure system architecture and engineering principles",
+        "reference_id": "A.8.27",
+        "category": "Technological",
+        "description": "Establish and apply secure engineering principles to system architecture.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.8.28",
+        "name": "A.8.28 — Secure coding",
+        "reference_id": "A.8.28",
+        "category": "Technological",
+        "description": "Apply secure coding principles throughout software development.",
+        "metadata": {
+          "new_2022": true
+        }
+      },
+      {
+        "ref": "iso27001:A.8.29",
+        "name": "A.8.29 — Security testing in development and acceptance",
+        "reference_id": "A.8.29",
+        "category": "Technological",
+        "description": "Define and carry out security testing during development and acceptance.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.8.30",
+        "name": "A.8.30 — Outsourced development",
+        "reference_id": "A.8.30",
+        "category": "Technological",
+        "description": "Direct, monitor, and review the security of outsourced system development.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.8.31",
+        "name": "A.8.31 — Separation of development, test and production environments",
+        "reference_id": "A.8.31",
+        "category": "Technological",
+        "description": "Separate and protect development, test, and production environments.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.8.32",
+        "name": "A.8.32 — Change management",
+        "reference_id": "A.8.32",
+        "category": "Technological",
+        "description": "Subject changes to information processing facilities to change-management procedures.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.8.33",
+        "name": "A.8.33 — Test information",
+        "reference_id": "A.8.33",
+        "category": "Technological",
+        "description": "Select, protect, and manage test information appropriately.",
+        "metadata": {}
+      },
+      {
+        "ref": "iso27001:A.8.34",
+        "name": "A.8.34 — Protection of information systems during audit testing",
+        "reference_id": "A.8.34",
+        "category": "Technological",
+        "description": "Plan and agree audit tests to minimize disruption to operational systems.",
+        "metadata": {}
+      }
+    ]
+  }
+}

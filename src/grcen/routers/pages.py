@@ -13,6 +13,7 @@ from grcen.routers import (
     answer_pages,
     asset_pages,
     auth_pages,
+    content_packs_pages,
     dashboard_pages,
     framework_pages,
     register_pages,
@@ -34,5 +35,6 @@ for _sub in (
     settings_pages,
     answer_pages,
     admin_pages,
+    content_packs_pages,
 ):
     router.include_router(_sub.router)

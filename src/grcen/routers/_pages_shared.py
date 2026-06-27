@@ -61,6 +61,8 @@ RELATIONSHIP_LABELS: dict[str, tuple[str, str]] = {
     "parent_of": ("parent of", "child of"),
     # Answer-library entry → the Control/Policy/System/Framework/Audit that backs it
     "substantiated_by": ("substantiated by", "substantiates"),
+    # Cross-framework crosswalk: an equivalent requirement in another framework
+    "cross_maps": ("cross-maps to", "cross-mapped from"),
 }
 
 

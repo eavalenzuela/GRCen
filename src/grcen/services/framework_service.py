@@ -18,7 +18,7 @@ requirements that are satisfied.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 from uuid import UUID
 
@@ -48,6 +48,9 @@ class RequirementStatus:
     name: str
     satisfied: bool
     satisfiers: list[dict[str, Any]]  # [{id, name, type, via}]
+    # Equivalent requirements in *other* frameworks (cross_maps edges):
+    # [{id, name, code, framework, relationship}]
+    crosswalks: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -71,6 +74,10 @@ class FrameworkDetail:
         if not self.requirements:
             return 0
         return round(100 * self.satisfied_count / len(self.requirements))
+
+    @property
+    def crosswalk_count(self) -> int:
+        return sum(len(r.crosswalks) for r in self.requirements)
 
 
 # Edges that mark a requirement as satisfied.
@@ -153,6 +160,11 @@ async def get_framework_detail(
 
     req_ids = await _requirement_ids(pool, framework_id)
     requirements = await _requirement_statuses(pool, req_ids)
+    crosswalk_map = await _crosswalks_for_requirements(
+        pool, req_ids, exclude_framework=framework["name"]
+    )
+    for r in requirements:
+        r.crosswalks = crosswalk_map.get(r.id, [])
     audits = await _certified_audits(pool, framework_id)
     vendors = await _certified_vendors(pool, framework_id)
     in_scope_assets = await _in_scope_assets(pool, req_ids)
@@ -207,6 +219,55 @@ async def _satisfied_requirements(
         r["target_asset_id"] for r in in_rows
     }
     return {rid: rid in satisfied for rid in req_ids}
+
+
+async def _crosswalks_for_requirements(
+    pool: asyncpg.Pool, req_ids: list[UUID], *, exclude_framework: str | None = None
+) -> dict[UUID, list[dict[str, Any]]]:
+    """For each requirement, the equivalent requirements in *other* frameworks.
+
+    Reads ``cross_maps`` edges in either direction, resolving the far endpoint's
+    requirement, its short code, and its owning framework. The relationship label
+    (equivalent/partial/related) is the leading token of the edge description.
+    """
+    by_req: dict[UUID, list[dict[str, Any]]] = {rid: [] for rid in req_ids}
+    if not req_ids:
+        return by_req
+    rows = await pool.fetch(
+        """SELECT r.source_asset_id AS a_id, r.target_asset_id AS b_id,
+                  r.description AS rel,
+                  oa.id AS other_id, oa.name AS other_name,
+                  oa.metadata->>'reference_id' AS other_code,
+                  fw.name AS other_framework
+           FROM relationships r
+           JOIN assets oa
+             ON oa.id = CASE WHEN r.source_asset_id = ANY($1::uuid[])
+                             THEN r.target_asset_id ELSE r.source_asset_id END
+            AND oa.type = 'requirement'
+           LEFT JOIN relationships fr
+             ON fr.target_asset_id = oa.id AND fr.relationship_type = 'parent_of'
+           LEFT JOIN assets fw
+             ON fw.id = fr.source_asset_id AND fw.type = 'framework'
+           WHERE r.relationship_type = 'cross_maps'
+             AND (r.source_asset_id = ANY($1::uuid[])
+                  OR r.target_asset_id = ANY($1::uuid[]))""",
+        req_ids,
+    )
+    req_set = set(req_ids)
+    for row in rows:
+        anchor = row["a_id"] if row["a_id"] in req_set else row["b_id"]
+        if exclude_framework and row["other_framework"] == exclude_framework:
+            continue
+        by_req.setdefault(anchor, []).append({
+            "id": row["other_id"],
+            "name": row["other_name"],
+            "code": row["other_code"] or row["other_name"],
+            "framework": row["other_framework"] or "—",
+            "relationship": (row["rel"] or "related").split(" · ")[0],
+        })
+    for links in by_req.values():
+        links.sort(key=lambda x: (x["framework"], x["code"]))
+    return by_req
 
 
 async def _requirement_statuses(

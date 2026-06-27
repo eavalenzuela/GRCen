@@ -1,0 +1,1739 @@
+{
+  "controls": [
+    {
+      "ref": "CCF-01",
+      "name": "Enterprise Asset Inventory",
+      "description": "Maintain a complete, current inventory of all hardware and enterprise assets that store or process data.",
+      "metadata": {
+        "control_type": "detective",
+        "implementation": "administrative",
+        "frequency": "continuous",
+        "crosswalk": {
+          "cis-v8.1:1.1": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "cis-v8.1:1.2": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "nist-csf-2.0:ID.AM-01": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "nist-csf-2.0:ID.AM-08": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "iso27001:A.5.9": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "soc2:CC6.1": {
+            "relationship": "related",
+            "confidence": "low"
+          }
+        }
+      },
+      "satisfies": [
+        "cis-v8.1:1.1",
+        "cis-v8.1:1.2",
+        "nist-csf-2.0:ID.AM-01",
+        "nist-csf-2.0:ID.AM-08",
+        "iso27001:A.5.9",
+        "soc2:CC6.1"
+      ]
+    },
+    {
+      "ref": "CCF-02",
+      "name": "Software Inventory and Control",
+      "description": "Maintain an inventory of authorized software and ensure unauthorized or unsupported software is removed.",
+      "metadata": {
+        "control_type": "detective",
+        "implementation": "administrative",
+        "frequency": "continuous",
+        "crosswalk": {
+          "cis-v8.1:2.1": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "cis-v8.1:2.2": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "cis-v8.1:2.3": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "nist-csf-2.0:ID.AM-02": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "iso27001:A.5.9": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "iso27001:A.8.19": {
+            "relationship": "partial",
+            "confidence": "medium"
+          }
+        }
+      },
+      "satisfies": [
+        "cis-v8.1:2.1",
+        "cis-v8.1:2.2",
+        "cis-v8.1:2.3",
+        "nist-csf-2.0:ID.AM-02",
+        "iso27001:A.5.9",
+        "iso27001:A.8.19"
+      ]
+    },
+    {
+      "ref": "CCF-03",
+      "name": "Data Inventory and Classification",
+      "description": "Identify, inventory, and classify data by sensitivity to drive appropriate protection.",
+      "metadata": {
+        "control_type": "preventive",
+        "implementation": "administrative",
+        "frequency": "quarterly",
+        "crosswalk": {
+          "cis-v8.1:3.2": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "cis-v8.1:3.7": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "cis-v8.1:3.1": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "nist-csf-2.0:ID.AM-07": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "iso27001:A.5.12": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "iso27001:A.5.9": {
+            "relationship": "partial",
+            "confidence": "low"
+          },
+          "soc2:C1.1": {
+            "relationship": "partial",
+            "confidence": "high"
+          }
+        }
+      },
+      "satisfies": [
+        "cis-v8.1:3.2",
+        "cis-v8.1:3.7",
+        "cis-v8.1:3.1",
+        "nist-csf-2.0:ID.AM-07",
+        "iso27001:A.5.12",
+        "iso27001:A.5.9",
+        "soc2:C1.1"
+      ]
+    },
+    {
+      "ref": "CCF-04",
+      "name": "Data Flow Mapping",
+      "description": "Document and maintain representations of authorized data flows within and across organizational boundaries.",
+      "metadata": {
+        "control_type": "detective",
+        "implementation": "administrative",
+        "frequency": "quarterly",
+        "crosswalk": {
+          "cis-v8.1:3.8": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "nist-csf-2.0:ID.AM-03": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "iso27001:A.5.14": {
+            "relationship": "related",
+            "confidence": "medium"
+          }
+        }
+      },
+      "satisfies": [
+        "cis-v8.1:3.8",
+        "nist-csf-2.0:ID.AM-03",
+        "iso27001:A.5.14"
+      ]
+    },
+    {
+      "ref": "CCF-05",
+      "name": "Identity and Credential Management",
+      "description": "Establish and manage identities and credentials for users, services, and hardware across their lifecycle.",
+      "metadata": {
+        "control_type": "preventive",
+        "implementation": "technical",
+        "frequency": "continuous",
+        "crosswalk": {
+          "cis-v8.1:5.1": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "nist-csf-2.0:PR.AA-01": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "iso27001:A.5.16": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "iso27001:A.5.17": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "soc2:CC6.2": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "soc2:CC6.1": {
+            "relationship": "partial",
+            "confidence": "medium"
+          }
+        }
+      },
+      "satisfies": [
+        "cis-v8.1:5.1",
+        "nist-csf-2.0:PR.AA-01",
+        "iso27001:A.5.16",
+        "iso27001:A.5.17",
+        "soc2:CC6.2",
+        "soc2:CC6.1"
+      ]
+    },
+    {
+      "ref": "CCF-06",
+      "name": "Multi-Factor Authentication",
+      "description": "Require multi-factor authentication for administrative, remote, and externally exposed access.",
+      "metadata": {
+        "control_type": "preventive",
+        "implementation": "technical",
+        "frequency": "continuous",
+        "crosswalk": {
+          "cis-v8.1:6.3": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "cis-v8.1:6.4": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "cis-v8.1:6.5": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "nist-csf-2.0:PR.AA-03": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "iso27001:A.8.5": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "soc2:CC6.1": {
+            "relationship": "partial",
+            "confidence": "high"
+          }
+        }
+      },
+      "satisfies": [
+        "cis-v8.1:6.3",
+        "cis-v8.1:6.4",
+        "cis-v8.1:6.5",
+        "nist-csf-2.0:PR.AA-03",
+        "iso27001:A.8.5",
+        "soc2:CC6.1"
+      ]
+    },
+    {
+      "ref": "CCF-07",
+      "name": "Least Privilege and Access Enforcement",
+      "description": "Define, enforce, and review access permissions using least privilege and separation of duties.",
+      "metadata": {
+        "control_type": "preventive",
+        "implementation": "technical",
+        "frequency": "continuous",
+        "crosswalk": {
+          "cis-v8.1:6.8": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "cis-v8.1:5.4": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "nist-csf-2.0:PR.AA-05": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "iso27001:A.8.2": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "iso27001:A.8.3": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "iso27001:A.5.15": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "soc2:CC6.3": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          }
+        }
+      },
+      "satisfies": [
+        "cis-v8.1:6.8",
+        "cis-v8.1:5.4",
+        "nist-csf-2.0:PR.AA-05",
+        "iso27001:A.8.2",
+        "iso27001:A.8.3",
+        "iso27001:A.5.15",
+        "soc2:CC6.3"
+      ]
+    },
+    {
+      "ref": "CCF-08",
+      "name": "Access Provisioning and Deprovisioning",
+      "description": "Grant access on hire or role change and promptly revoke it on termination or role change.",
+      "metadata": {
+        "control_type": "preventive",
+        "implementation": "administrative",
+        "frequency": "continuous",
+        "crosswalk": {
+          "cis-v8.1:6.1": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "cis-v8.1:6.2": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "cis-v8.1:5.3": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "nist-csf-2.0:PR.AA-01": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "iso27001:A.5.18": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "soc2:CC6.2": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "soc2:CC6.3": {
+            "relationship": "partial",
+            "confidence": "high"
+          }
+        }
+      },
+      "satisfies": [
+        "cis-v8.1:6.1",
+        "cis-v8.1:6.2",
+        "cis-v8.1:5.3",
+        "nist-csf-2.0:PR.AA-01",
+        "iso27001:A.5.18",
+        "soc2:CC6.2",
+        "soc2:CC6.3"
+      ]
+    },
+    {
+      "ref": "CCF-09",
+      "name": "Secure Authentication Mechanisms",
+      "description": "Implement secure authentication technologies, strong passwords, and protection of authentication secrets.",
+      "metadata": {
+        "control_type": "preventive",
+        "implementation": "technical",
+        "frequency": "continuous",
+        "crosswalk": {
+          "cis-v8.1:5.2": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "nist-csf-2.0:PR.AA-02": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "nist-csf-2.0:PR.AA-03": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "iso27001:A.8.5": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "iso27001:A.5.17": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "soc2:CC6.1": {
+            "relationship": "partial",
+            "confidence": "high"
+          }
+        }
+      },
+      "satisfies": [
+        "cis-v8.1:5.2",
+        "nist-csf-2.0:PR.AA-02",
+        "nist-csf-2.0:PR.AA-03",
+        "iso27001:A.8.5",
+        "iso27001:A.5.17",
+        "soc2:CC6.1"
+      ]
+    },
+    {
+      "ref": "CCF-10",
+      "name": "Audit Logging",
+      "description": "Generate and collect audit logs across enterprise assets to support detection and accountability.",
+      "metadata": {
+        "control_type": "detective",
+        "implementation": "technical",
+        "frequency": "continuous",
+        "crosswalk": {
+          "cis-v8.1:8.1": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "cis-v8.1:8.2": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "cis-v8.1:8.5": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "nist-csf-2.0:PR.PS-04": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "iso27001:A.8.15": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "soc2:CC7.2": {
+            "relationship": "partial",
+            "confidence": "high"
+          }
+        }
+      },
+      "satisfies": [
+        "cis-v8.1:8.1",
+        "cis-v8.1:8.2",
+        "cis-v8.1:8.5",
+        "nist-csf-2.0:PR.PS-04",
+        "iso27001:A.8.15",
+        "soc2:CC7.2"
+      ]
+    },
+    {
+      "ref": "CCF-11",
+      "name": "Log Centralization and Time Synchronization",
+      "description": "Aggregate audit logs centrally and synchronize clocks to a trusted time source.",
+      "metadata": {
+        "control_type": "detective",
+        "implementation": "technical",
+        "frequency": "continuous",
+        "crosswalk": {
+          "cis-v8.1:8.9": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "cis-v8.1:8.4": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "nist-csf-2.0:PR.PS-04": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "iso27001:A.8.15": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "iso27001:A.8.17": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "soc2:CC7.2": {
+            "relationship": "partial",
+            "confidence": "medium"
+          }
+        }
+      },
+      "satisfies": [
+        "cis-v8.1:8.9",
+        "cis-v8.1:8.4",
+        "nist-csf-2.0:PR.PS-04",
+        "iso27001:A.8.15",
+        "iso27001:A.8.17",
+        "soc2:CC7.2"
+      ]
+    },
+    {
+      "ref": "CCF-12",
+      "name": "Continuous Security Monitoring",
+      "description": "Centralize alerting and continuously monitor networks, systems, and assets for adverse events.",
+      "metadata": {
+        "control_type": "detective",
+        "implementation": "technical",
+        "frequency": "continuous",
+        "crosswalk": {
+          "cis-v8.1:13.1": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "cis-v8.1:13.11": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "nist-csf-2.0:DE.CM-01": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "nist-csf-2.0:DE.CM-09": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "iso27001:A.8.16": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "soc2:CC7.2": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          }
+        }
+      },
+      "satisfies": [
+        "cis-v8.1:13.1",
+        "cis-v8.1:13.11",
+        "nist-csf-2.0:DE.CM-01",
+        "nist-csf-2.0:DE.CM-09",
+        "iso27001:A.8.16",
+        "soc2:CC7.2"
+      ]
+    },
+    {
+      "ref": "CCF-13",
+      "name": "Audit Log Review",
+      "description": "Regularly review and correlate audit logs to detect anomalies and potential threats.",
+      "metadata": {
+        "control_type": "detective",
+        "implementation": "administrative",
+        "frequency": "weekly",
+        "crosswalk": {
+          "cis-v8.1:8.11": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "nist-csf-2.0:DE.AE-02": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "nist-csf-2.0:DE.AE-03": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "iso27001:A.8.16": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "soc2:CC7.2": {
+            "relationship": "partial",
+            "confidence": "high"
+          }
+        }
+      },
+      "satisfies": [
+        "cis-v8.1:8.11",
+        "nist-csf-2.0:DE.AE-02",
+        "nist-csf-2.0:DE.AE-03",
+        "iso27001:A.8.16",
+        "soc2:CC7.2"
+      ]
+    },
+    {
+      "ref": "CCF-14",
+      "name": "Vulnerability Management",
+      "description": "Establish a process to identify, scan for, validate, and record vulnerabilities in assets.",
+      "metadata": {
+        "control_type": "detective",
+        "implementation": "technical",
+        "frequency": "continuous",
+        "crosswalk": {
+          "cis-v8.1:7.1": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "cis-v8.1:7.5": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "cis-v8.1:7.6": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "nist-csf-2.0:ID.RA-01": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "iso27001:A.8.8": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "soc2:CC7.1": {
+            "relationship": "partial",
+            "confidence": "high"
+          }
+        }
+      },
+      "satisfies": [
+        "cis-v8.1:7.1",
+        "cis-v8.1:7.5",
+        "cis-v8.1:7.6",
+        "nist-csf-2.0:ID.RA-01",
+        "iso27001:A.8.8",
+        "soc2:CC7.1"
+      ]
+    },
+    {
+      "ref": "CCF-15",
+      "name": "Patch Management",
+      "description": "Apply operating system and application patches on a regular, risk-based cadence.",
+      "metadata": {
+        "control_type": "corrective",
+        "implementation": "technical",
+        "frequency": "weekly",
+        "crosswalk": {
+          "cis-v8.1:7.3": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "cis-v8.1:7.4": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "nist-csf-2.0:PR.PS-02": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "nist-csf-2.0:ID.RA-01": {
+            "relationship": "related",
+            "confidence": "medium"
+          },
+          "iso27001:A.8.8": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "soc2:CC7.1": {
+            "relationship": "partial",
+            "confidence": "medium"
+          }
+        }
+      },
+      "satisfies": [
+        "cis-v8.1:7.3",
+        "cis-v8.1:7.4",
+        "nist-csf-2.0:PR.PS-02",
+        "nist-csf-2.0:ID.RA-01",
+        "iso27001:A.8.8",
+        "soc2:CC7.1"
+      ]
+    },
+    {
+      "ref": "CCF-16",
+      "name": "Vulnerability Remediation",
+      "description": "Prioritize and remediate identified vulnerabilities according to a defined remediation process.",
+      "metadata": {
+        "control_type": "corrective",
+        "implementation": "administrative",
+        "frequency": "monthly",
+        "crosswalk": {
+          "cis-v8.1:7.2": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "cis-v8.1:7.7": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "nist-csf-2.0:ID.RA-06": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "iso27001:A.8.8": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "soc2:CC7.1": {
+            "relationship": "partial",
+            "confidence": "medium"
+          }
+        }
+      },
+      "satisfies": [
+        "cis-v8.1:7.2",
+        "cis-v8.1:7.7",
+        "nist-csf-2.0:ID.RA-06",
+        "iso27001:A.8.8",
+        "soc2:CC7.1"
+      ]
+    },
+    {
+      "ref": "CCF-17",
+      "name": "Encryption in Transit",
+      "description": "Encrypt sensitive data while it is transmitted across networks.",
+      "metadata": {
+        "control_type": "preventive",
+        "implementation": "technical",
+        "frequency": "continuous",
+        "crosswalk": {
+          "cis-v8.1:3.10": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "nist-csf-2.0:PR.DS-02": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "iso27001:A.8.24": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "soc2:CC6.7": {
+            "relationship": "partial",
+            "confidence": "high"
+          }
+        }
+      },
+      "satisfies": [
+        "cis-v8.1:3.10",
+        "nist-csf-2.0:PR.DS-02",
+        "iso27001:A.8.24",
+        "soc2:CC6.7"
+      ]
+    },
+    {
+      "ref": "CCF-18",
+      "name": "Encryption at Rest",
+      "description": "Encrypt sensitive data while stored at rest, including on end-user devices.",
+      "metadata": {
+        "control_type": "preventive",
+        "implementation": "technical",
+        "frequency": "continuous",
+        "crosswalk": {
+          "cis-v8.1:3.11": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "cis-v8.1:3.6": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "nist-csf-2.0:PR.DS-01": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "iso27001:A.8.24": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "soc2:C1.1": {
+            "relationship": "partial",
+            "confidence": "medium"
+          }
+        }
+      },
+      "satisfies": [
+        "cis-v8.1:3.11",
+        "cis-v8.1:3.6",
+        "nist-csf-2.0:PR.DS-01",
+        "iso27001:A.8.24",
+        "soc2:C1.1"
+      ]
+    },
+    {
+      "ref": "CCF-19",
+      "name": "Secure Configuration and Hardening",
+      "description": "Establish and maintain secure configuration baselines for assets, software, and network infrastructure.",
+      "metadata": {
+        "control_type": "preventive",
+        "implementation": "technical",
+        "frequency": "continuous",
+        "crosswalk": {
+          "cis-v8.1:4.1": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "cis-v8.1:4.2": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "cis-v8.1:4.6": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "nist-csf-2.0:PR.PS-01": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "iso27001:A.8.9": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "soc2:CC7.1": {
+            "relationship": "partial",
+            "confidence": "medium"
+          }
+        }
+      },
+      "satisfies": [
+        "cis-v8.1:4.1",
+        "cis-v8.1:4.2",
+        "cis-v8.1:4.6",
+        "nist-csf-2.0:PR.PS-01",
+        "iso27001:A.8.9",
+        "soc2:CC7.1"
+      ]
+    },
+    {
+      "ref": "CCF-20",
+      "name": "Default Account and Credential Hardening",
+      "description": "Change, disable, or remove default accounts and credentials on assets and software.",
+      "metadata": {
+        "control_type": "preventive",
+        "implementation": "technical",
+        "frequency": "quarterly",
+        "crosswalk": {
+          "cis-v8.1:4.7": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "nist-csf-2.0:PR.AA-01": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "iso27001:A.8.9": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "iso27001:A.5.17": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "soc2:CC6.2": {
+            "relationship": "partial",
+            "confidence": "medium"
+          }
+        }
+      },
+      "satisfies": [
+        "cis-v8.1:4.7",
+        "nist-csf-2.0:PR.AA-01",
+        "iso27001:A.8.9",
+        "iso27001:A.5.17",
+        "soc2:CC6.2"
+      ]
+    },
+    {
+      "ref": "CCF-21",
+      "name": "Backup",
+      "description": "Perform automated, protected backups of in-scope enterprise assets and data.",
+      "metadata": {
+        "control_type": "corrective",
+        "implementation": "technical",
+        "frequency": "daily",
+        "crosswalk": {
+          "cis-v8.1:11.1": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "cis-v8.1:11.2": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "cis-v8.1:11.3": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "nist-csf-2.0:PR.DS-11": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "iso27001:A.8.13": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "soc2:A1.2": {
+            "relationship": "partial",
+            "confidence": "high"
+          }
+        }
+      },
+      "satisfies": [
+        "cis-v8.1:11.1",
+        "cis-v8.1:11.2",
+        "cis-v8.1:11.3",
+        "nist-csf-2.0:PR.DS-11",
+        "iso27001:A.8.13",
+        "soc2:A1.2"
+      ]
+    },
+    {
+      "ref": "CCF-22",
+      "name": "Data Recovery Testing",
+      "description": "Periodically test restoration from backups and verify integrity of recovery assets.",
+      "metadata": {
+        "control_type": "corrective",
+        "implementation": "technical",
+        "frequency": "quarterly",
+        "crosswalk": {
+          "cis-v8.1:11.5": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "nist-csf-2.0:RC.RP-03": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "nist-csf-2.0:RC.RP-01": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "iso27001:A.8.13": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "soc2:A1.3": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          }
+        }
+      },
+      "satisfies": [
+        "cis-v8.1:11.5",
+        "nist-csf-2.0:RC.RP-03",
+        "nist-csf-2.0:RC.RP-01",
+        "iso27001:A.8.13",
+        "soc2:A1.3"
+      ]
+    },
+    {
+      "ref": "CCF-23",
+      "name": "Incident Response Plan",
+      "description": "Establish, maintain, and exercise a documented incident response plan with defined roles.",
+      "metadata": {
+        "control_type": "corrective",
+        "implementation": "administrative",
+        "frequency": "annually",
+        "crosswalk": {
+          "cis-v8.1:17.4": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "cis-v8.1:17.1": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "nist-csf-2.0:RS.MA-01": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "nist-csf-2.0:ID.IM-04": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "iso27001:A.5.24": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "iso27001:A.5.26": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "soc2:CC7.4": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          }
+        }
+      },
+      "satisfies": [
+        "cis-v8.1:17.4",
+        "cis-v8.1:17.1",
+        "nist-csf-2.0:RS.MA-01",
+        "nist-csf-2.0:ID.IM-04",
+        "iso27001:A.5.24",
+        "iso27001:A.5.26",
+        "soc2:CC7.4"
+      ]
+    },
+    {
+      "ref": "CCF-24",
+      "name": "Incident Detection and Triage",
+      "description": "Analyze adverse events, apply incident criteria, and declare and triage incidents.",
+      "metadata": {
+        "control_type": "detective",
+        "implementation": "administrative",
+        "frequency": "continuous",
+        "crosswalk": {
+          "cis-v8.1:17.9": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "nist-csf-2.0:DE.AE-02": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "nist-csf-2.0:DE.AE-08": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "nist-csf-2.0:RS.AN-03": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "iso27001:A.5.25": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "soc2:CC7.3": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          }
+        }
+      },
+      "satisfies": [
+        "cis-v8.1:17.9",
+        "nist-csf-2.0:DE.AE-02",
+        "nist-csf-2.0:DE.AE-08",
+        "nist-csf-2.0:RS.AN-03",
+        "iso27001:A.5.25",
+        "soc2:CC7.3"
+      ]
+    },
+    {
+      "ref": "CCF-25",
+      "name": "Incident Reporting and Communication",
+      "description": "Provide mechanisms and processes to report incidents and notify internal and external stakeholders.",
+      "metadata": {
+        "control_type": "corrective",
+        "implementation": "administrative",
+        "frequency": "continuous",
+        "crosswalk": {
+          "cis-v8.1:17.2": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "cis-v8.1:17.3": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "nist-csf-2.0:RS.CO-02": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "nist-csf-2.0:RS.CO-03": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "iso27001:A.6.8": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "soc2:CC7.4": {
+            "relationship": "partial",
+            "confidence": "medium"
+          }
+        }
+      },
+      "satisfies": [
+        "cis-v8.1:17.2",
+        "cis-v8.1:17.3",
+        "nist-csf-2.0:RS.CO-02",
+        "nist-csf-2.0:RS.CO-03",
+        "iso27001:A.6.8",
+        "soc2:CC7.4"
+      ]
+    },
+    {
+      "ref": "CCF-26",
+      "name": "Post-Incident Review",
+      "description": "Conduct post-incident reviews and feed lessons learned back into controls and plans.",
+      "metadata": {
+        "control_type": "corrective",
+        "implementation": "administrative",
+        "frequency": "continuous",
+        "crosswalk": {
+          "cis-v8.1:17.8": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "nist-csf-2.0:ID.IM-03": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "nist-csf-2.0:RC.RP-04": {
+            "relationship": "related",
+            "confidence": "medium"
+          },
+          "iso27001:A.5.27": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "soc2:CC7.5": {
+            "relationship": "partial",
+            "confidence": "high"
+          }
+        }
+      },
+      "satisfies": [
+        "cis-v8.1:17.8",
+        "nist-csf-2.0:ID.IM-03",
+        "nist-csf-2.0:RC.RP-04",
+        "iso27001:A.5.27",
+        "soc2:CC7.5"
+      ]
+    },
+    {
+      "ref": "CCF-27",
+      "name": "Security Awareness Training",
+      "description": "Deliver an ongoing security awareness program covering phishing, authentication, and data handling.",
+      "metadata": {
+        "control_type": "preventive",
+        "implementation": "administrative",
+        "frequency": "annually",
+        "crosswalk": {
+          "cis-v8.1:14.1": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "cis-v8.1:14.2": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "cis-v8.1:14.3": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "nist-csf-2.0:PR.AT-01": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "iso27001:A.6.3": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "soc2:CC1.4": {
+            "relationship": "partial",
+            "confidence": "medium"
+          }
+        }
+      },
+      "satisfies": [
+        "cis-v8.1:14.1",
+        "cis-v8.1:14.2",
+        "cis-v8.1:14.3",
+        "nist-csf-2.0:PR.AT-01",
+        "iso27001:A.6.3",
+        "soc2:CC1.4"
+      ]
+    },
+    {
+      "ref": "CCF-28",
+      "name": "Role-Based Specialized Training",
+      "description": "Provide role-specific security training to personnel in specialized roles such as developers.",
+      "metadata": {
+        "control_type": "preventive",
+        "implementation": "administrative",
+        "frequency": "annually",
+        "crosswalk": {
+          "cis-v8.1:14.9": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "cis-v8.1:16.9": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "nist-csf-2.0:PR.AT-02": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "iso27001:A.6.3": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "soc2:CC1.4": {
+            "relationship": "partial",
+            "confidence": "medium"
+          }
+        }
+      },
+      "satisfies": [
+        "cis-v8.1:14.9",
+        "cis-v8.1:16.9",
+        "nist-csf-2.0:PR.AT-02",
+        "iso27001:A.6.3",
+        "soc2:CC1.4"
+      ]
+    },
+    {
+      "ref": "CCF-29",
+      "name": "Third-Party Risk Management",
+      "description": "Inventory, classify, and contractually bind suppliers to security requirements before engagement.",
+      "metadata": {
+        "control_type": "preventive",
+        "implementation": "administrative",
+        "frequency": "annually",
+        "crosswalk": {
+          "cis-v8.1:15.1": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "cis-v8.1:15.2": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "cis-v8.1:15.4": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "nist-csf-2.0:GV.SC-01": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "nist-csf-2.0:GV.SC-05": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "iso27001:A.5.19": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "iso27001:A.5.20": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "soc2:CC9.2": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          }
+        }
+      },
+      "satisfies": [
+        "cis-v8.1:15.1",
+        "cis-v8.1:15.2",
+        "cis-v8.1:15.4",
+        "nist-csf-2.0:GV.SC-01",
+        "nist-csf-2.0:GV.SC-05",
+        "iso27001:A.5.19",
+        "iso27001:A.5.20",
+        "soc2:CC9.2"
+      ]
+    },
+    {
+      "ref": "CCF-30",
+      "name": "Vendor Monitoring and Decommissioning",
+      "description": "Monitor service providers for ongoing compliance and securely decommission them when relationships end.",
+      "metadata": {
+        "control_type": "detective",
+        "implementation": "administrative",
+        "frequency": "quarterly",
+        "crosswalk": {
+          "cis-v8.1:15.6": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "cis-v8.1:15.7": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "nist-csf-2.0:GV.SC-07": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "nist-csf-2.0:GV.SC-10": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "nist-csf-2.0:DE.CM-06": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "iso27001:A.5.22": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "soc2:CC9.2": {
+            "relationship": "partial",
+            "confidence": "high"
+          }
+        }
+      },
+      "satisfies": [
+        "cis-v8.1:15.6",
+        "cis-v8.1:15.7",
+        "nist-csf-2.0:GV.SC-07",
+        "nist-csf-2.0:GV.SC-10",
+        "nist-csf-2.0:DE.CM-06",
+        "iso27001:A.5.22",
+        "soc2:CC9.2"
+      ]
+    },
+    {
+      "ref": "CCF-31",
+      "name": "Change Management",
+      "description": "Authorize, test, approve, and track changes to infrastructure, software, and procedures.",
+      "metadata": {
+        "control_type": "preventive",
+        "implementation": "administrative",
+        "frequency": "continuous",
+        "crosswalk": {
+          "nist-csf-2.0:ID.RA-07": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "iso27001:A.8.32": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "soc2:CC8.1": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          }
+        }
+      },
+      "satisfies": [
+        "nist-csf-2.0:ID.RA-07",
+        "iso27001:A.8.32",
+        "soc2:CC8.1"
+      ]
+    },
+    {
+      "ref": "CCF-32",
+      "name": "Network Segmentation and Boundary Defense",
+      "description": "Design a segmented network architecture and filter traffic between segments and the perimeter.",
+      "metadata": {
+        "control_type": "preventive",
+        "implementation": "technical",
+        "frequency": "continuous",
+        "crosswalk": {
+          "cis-v8.1:12.2": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "cis-v8.1:13.4": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "nist-csf-2.0:PR.IR-01": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "iso27001:A.8.20": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "iso27001:A.8.22": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "soc2:CC6.6": {
+            "relationship": "partial",
+            "confidence": "high"
+          }
+        }
+      },
+      "satisfies": [
+        "cis-v8.1:12.2",
+        "cis-v8.1:13.4",
+        "nist-csf-2.0:PR.IR-01",
+        "iso27001:A.8.20",
+        "iso27001:A.8.22",
+        "soc2:CC6.6"
+      ]
+    },
+    {
+      "ref": "CCF-33",
+      "name": "Network Intrusion Detection and Prevention",
+      "description": "Deploy network and host intrusion detection/prevention sensors at appropriate points.",
+      "metadata": {
+        "control_type": "detective",
+        "implementation": "technical",
+        "frequency": "continuous",
+        "crosswalk": {
+          "cis-v8.1:13.3": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "cis-v8.1:13.8": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "nist-csf-2.0:DE.CM-01": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "iso27001:A.8.16": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "soc2:CC6.6": {
+            "relationship": "partial",
+            "confidence": "high"
+          }
+        }
+      },
+      "satisfies": [
+        "cis-v8.1:13.3",
+        "cis-v8.1:13.8",
+        "nist-csf-2.0:DE.CM-01",
+        "iso27001:A.8.16",
+        "soc2:CC6.6"
+      ]
+    },
+    {
+      "ref": "CCF-34",
+      "name": "Data Loss Prevention",
+      "description": "Deploy DLP tooling and log sensitive data access to detect and block unauthorized exfiltration.",
+      "metadata": {
+        "control_type": "detective",
+        "implementation": "technical",
+        "frequency": "continuous",
+        "crosswalk": {
+          "cis-v8.1:3.13": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "cis-v8.1:3.14": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "nist-csf-2.0:PR.DS-01": {
+            "relationship": "related",
+            "confidence": "medium"
+          },
+          "iso27001:A.8.12": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "soc2:CC6.7": {
+            "relationship": "partial",
+            "confidence": "high"
+          }
+        }
+      },
+      "satisfies": [
+        "cis-v8.1:3.13",
+        "cis-v8.1:3.14",
+        "nist-csf-2.0:PR.DS-01",
+        "iso27001:A.8.12",
+        "soc2:CC6.7"
+      ]
+    },
+    {
+      "ref": "CCF-35",
+      "name": "Malware Defenses",
+      "description": "Deploy and centrally manage anti-malware software with automatic signature and behavior-based detection.",
+      "metadata": {
+        "control_type": "preventive",
+        "implementation": "technical",
+        "frequency": "continuous",
+        "crosswalk": {
+          "cis-v8.1:10.1": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "cis-v8.1:10.2": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "cis-v8.1:10.7": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "nist-csf-2.0:DE.CM-09": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "iso27001:A.8.7": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "soc2:CC6.8": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          }
+        }
+      },
+      "satisfies": [
+        "cis-v8.1:10.1",
+        "cis-v8.1:10.2",
+        "cis-v8.1:10.7",
+        "nist-csf-2.0:DE.CM-09",
+        "iso27001:A.8.7",
+        "soc2:CC6.8"
+      ]
+    },
+    {
+      "ref": "CCF-36",
+      "name": "Account Lifecycle and Dormant Account Control",
+      "description": "Inventory user, admin, and service accounts and disable dormant or unneeded accounts.",
+      "metadata": {
+        "control_type": "detective",
+        "implementation": "administrative",
+        "frequency": "monthly",
+        "crosswalk": {
+          "cis-v8.1:5.1": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "cis-v8.1:5.3": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "cis-v8.1:5.5": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "nist-csf-2.0:PR.AA-01": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "iso27001:A.5.16": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "iso27001:A.5.18": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "soc2:CC6.2": {
+            "relationship": "partial",
+            "confidence": "high"
+          }
+        }
+      },
+      "satisfies": [
+        "cis-v8.1:5.1",
+        "cis-v8.1:5.3",
+        "cis-v8.1:5.5",
+        "nist-csf-2.0:PR.AA-01",
+        "iso27001:A.5.16",
+        "iso27001:A.5.18",
+        "soc2:CC6.2"
+      ]
+    },
+    {
+      "ref": "CCF-37",
+      "name": "Secure Software Development Lifecycle",
+      "description": "Integrate secure development practices, code review, and secure coding throughout the SDLC.",
+      "metadata": {
+        "control_type": "preventive",
+        "implementation": "technical",
+        "frequency": "continuous",
+        "crosswalk": {
+          "cis-v8.1:16.1": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "cis-v8.1:16.11": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "cis-v8.1:16.12": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "nist-csf-2.0:PR.PS-06": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "iso27001:A.8.25": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "iso27001:A.8.28": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "soc2:CC8.1": {
+            "relationship": "partial",
+            "confidence": "medium"
+          }
+        }
+      },
+      "satisfies": [
+        "cis-v8.1:16.1",
+        "cis-v8.1:16.11",
+        "cis-v8.1:16.12",
+        "nist-csf-2.0:PR.PS-06",
+        "iso27001:A.8.25",
+        "iso27001:A.8.28",
+        "soc2:CC8.1"
+      ]
+    },
+    {
+      "ref": "CCF-38",
+      "name": "Physical Security",
+      "description": "Restrict, monitor, and enforce physical access to facilities and protected information assets.",
+      "metadata": {
+        "control_type": "preventive",
+        "implementation": "physical",
+        "frequency": "continuous",
+        "crosswalk": {
+          "nist-csf-2.0:PR.AA-06": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "nist-csf-2.0:PR.IR-02": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "iso27001:A.7.1": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "iso27001:A.7.2": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "iso27001:A.7.4": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "soc2:CC6.4": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          }
+        }
+      },
+      "satisfies": [
+        "nist-csf-2.0:PR.AA-06",
+        "nist-csf-2.0:PR.IR-02",
+        "iso27001:A.7.1",
+        "iso27001:A.7.2",
+        "iso27001:A.7.4",
+        "soc2:CC6.4"
+      ]
+    },
+    {
+      "ref": "CCF-39",
+      "name": "Business Continuity and Resilience",
+      "description": "Plan, implement, and maintain resilience and ICT continuity to sustain operations during disruption.",
+      "metadata": {
+        "control_type": "corrective",
+        "implementation": "administrative",
+        "frequency": "annually",
+        "crosswalk": {
+          "cis-v8.1:11.4": {
+            "relationship": "related",
+            "confidence": "medium"
+          },
+          "nist-csf-2.0:PR.IR-03": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "nist-csf-2.0:PR.IR-04": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "iso27001:A.5.29": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "iso27001:A.5.30": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "iso27001:A.8.14": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "soc2:A1.2": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "soc2:CC9.1": {
+            "relationship": "partial",
+            "confidence": "medium"
+          }
+        }
+      },
+      "satisfies": [
+        "cis-v8.1:11.4",
+        "nist-csf-2.0:PR.IR-03",
+        "nist-csf-2.0:PR.IR-04",
+        "iso27001:A.5.29",
+        "iso27001:A.5.30",
+        "iso27001:A.8.14",
+        "soc2:A1.2",
+        "soc2:CC9.1"
+      ]
+    },
+    {
+      "ref": "CCF-40",
+      "name": "Information Security Policy and Governance",
+      "description": "Establish, approve, communicate, and periodically review information security policies and responsibilities.",
+      "metadata": {
+        "control_type": "preventive",
+        "implementation": "administrative",
+        "frequency": "annually",
+        "crosswalk": {
+          "nist-csf-2.0:GV.PO-01": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "nist-csf-2.0:GV.PO-02": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "nist-csf-2.0:GV.RR-02": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "iso27001:A.5.1": {
+            "relationship": "equivalent",
+            "confidence": "high"
+          },
+          "iso27001:A.5.2": {
+            "relationship": "partial",
+            "confidence": "medium"
+          },
+          "soc2:CC5.3": {
+            "relationship": "partial",
+            "confidence": "high"
+          },
+          "soc2:CC1.3": {
+            "relationship": "partial",
+            "confidence": "medium"
+          }
+        }
+      },
+      "satisfies": [
+        "nist-csf-2.0:GV.PO-01",
+        "nist-csf-2.0:GV.PO-02",
+        "nist-csf-2.0:GV.RR-02",
+        "iso27001:A.5.1",
+        "iso27001:A.5.2",
+        "soc2:CC5.3",
+        "soc2:CC1.3"
+      ]
+    }
+  ]
+}

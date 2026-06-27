@@ -7,6 +7,10 @@ catalog export into GRCen assets and relationships so the ``/frameworks``
 coverage dashboard lights up, while leaving the org-graph layer a human wires
 up (owners, the systems a control protects, audits) untouched.
 
+The same projection also powers GRCen's bundled *content packs* (see
+``services/content_packs.py``), which ship ready-to-install catalogs so a fresh
+org isn't stranded on an empty register.
+
 See ``GRCEN_CATALOG_EXPORT.md`` in the autocomply repo for the export contract
 this consumes.
 
@@ -15,6 +19,13 @@ Mapping to the graph (the edges ``framework_service`` keys off):
     framework            → asset(type=framework)
     requirement          → asset(type=requirement)   parent_of  ← framework
     control              → asset(type=control)        satisfies  → requirement
+    crosswalk            → requirement --cross_maps--> requirement  (cross-framework)
+
+The optional top-level ``crosswalks`` list maps one requirement to an
+*equivalent* requirement in another framework, giving GRCen a home for the
+relationship/confidence the contract previously could only stash in a control's
+``metadata.crosswalk``. Both endpoints must be requirements present in the same
+catalog (resolved in-run, like ``control.satisfies``).
 
 Idempotency: every synced asset/relationship carries ``(source, source_ref)``.
 A stable ``source_ref`` is derived from the catalog's own refs, so re-running
@@ -37,12 +48,19 @@ from grcen.services import organization_service
 
 DEFAULT_SOURCE = "autocomply"
 
+# Crosswalk relationship vocabulary (mirrors the contract's metadata.crosswalk
+# values). ``relationship`` is optional on a crosswalk; absent ⇒ "related".
+CROSSWALK_RELATIONSHIPS = frozenset(
+    {"equivalent", "superset", "subset", "partial", "related"}
+)
+
 
 @dataclass
 class CatalogSyncResult:
     frameworks: int = 0
     requirements: int = 0
     controls: int = 0
+    crosswalks: int = 0
     assets_created: int = 0
     assets_updated: int = 0
     edges_created: int = 0
@@ -123,6 +141,40 @@ def validate_catalog(catalog: object) -> list[str]:
                 errors.append(
                     f"control '{ref or i}' satisfies unknown requirement '{tref}'"
                 )
+
+    crosswalks = catalog.get("crosswalks", [])
+    if not isinstance(crosswalks, list):
+        errors.append("'crosswalks' must be a list")
+        crosswalks = []
+    seen_pairs: set[tuple[str, str]] = set()
+    for i, x in enumerate(crosswalks):
+        if not isinstance(x, dict):
+            errors.append(f"crosswalk[{i}] must be an object")
+            continue
+        frm, to = x.get("from"), x.get("to")
+        if not frm or not to:
+            errors.append(f"crosswalk[{i}] needs both 'from' and 'to'")
+            continue
+        if frm == to:
+            errors.append(f"crosswalk[{i}] maps requirement '{frm}' to itself")
+        if frm not in req_refs:
+            errors.append(f"crosswalk[{i}] 'from' is unknown requirement '{frm}'")
+        if to not in req_refs:
+            errors.append(f"crosswalk[{i}] 'to' is unknown requirement '{to}'")
+        rel = x.get("relationship")
+        if rel is not None and rel not in CROSSWALK_RELATIONSHIPS:
+            errors.append(
+                f"crosswalk[{i}] relationship '{rel}' not one of "
+                f"{sorted(CROSSWALK_RELATIONSHIPS)}"
+            )
+        # Crosswalks are symmetric: A↔B and B↔A are the same mapping.
+        pair = (frm, to) if frm <= to else (to, frm)
+        if pair in seen_pairs:
+            errors.append(
+                f"crosswalk[{i}] duplicates the mapping between '{frm}' and '{to}'"
+            )
+        else:
+            seen_pairs.add(pair)
     return errors
 
 
@@ -199,9 +251,9 @@ async def sync_catalog(
                     result.assets_updated += 1
                 return row["id"]
 
-            async def upsert_edge(src_id, tgt_id, rtype, sref):
+            async def upsert_edge(src_id, tgt_id, rtype, sref, description=""):
                 row = await conn.fetchrow(
-                    _EDGE_UPSERT, src_id, tgt_id, rtype, "", org, source, sref,
+                    _EDGE_UPSERT, src_id, tgt_id, rtype, description, org, source, sref,
                 )
                 seen_edge_refs.append(sref)
                 if row["inserted"]:
@@ -260,6 +312,27 @@ async def sync_catalog(
                         ctrl_id, tgt_id, "satisfies",
                         f"satisfies:{ctrl_ref}:{req_ref}",
                     )
+
+            for x in catalog.get("crosswalks", []) or []:
+                frm, to = x["from"], x["to"]
+                src_id = asset_ids.get(f"requirement:{frm}")
+                tgt_id = asset_ids.get(f"requirement:{to}")
+                if src_id is None or tgt_id is None:
+                    # validate_catalog already rejected dangling refs; guard
+                    # against an endpoint that failed to upsert.
+                    continue
+                rel = x.get("relationship") or "related"
+                bits = [rel]
+                if x.get("confidence"):
+                    bits.append(f"confidence: {x['confidence']}")
+                if x.get("note"):
+                    bits.append(str(x["note"]))
+                # requirement --cross_maps--> requirement (cross-framework)
+                await upsert_edge(
+                    src_id, tgt_id, "cross_maps",
+                    f"cross_maps:{frm}:{to}", " · ".join(bits),
+                )
+                result.crosswalks += 1
 
             # Prune synced edges that are no longer in the catalog. Safe: only
             # touches rows with our source tag, never human-authored edges.

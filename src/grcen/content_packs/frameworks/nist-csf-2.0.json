@@ -1,0 +1,1074 @@
+{
+  "framework": {
+    "ref": "nist-csf-2.0",
+    "name": "NIST Cybersecurity Framework (CSF) 2.0",
+    "description": "The NIST Cybersecurity Framework 2.0 organizes cybersecurity risk management outcomes into six Functions (Govern, Identify, Protect, Detect, Respond, Recover), 22 Categories, and 106 Subcategories. Each Subcategory is captured here as a requirement.",
+    "metadata": {
+      "version": "2.0",
+      "governing_body": "NIST",
+      "scope": "Cybersecurity risk management outcomes"
+    },
+    "requirements": [
+      {
+        "ref": "nist-csf-2.0:GV.OC-01",
+        "name": "GV.OC-01 — Organizational mission understood",
+        "reference_id": "GV.OC-01",
+        "category": "Organizational Context",
+        "description": "The organization's mission is understood and used to inform how cybersecurity risk is managed.",
+        "metadata": {
+          "function": "GOVERN"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:GV.OC-02",
+        "name": "GV.OC-02 — Stakeholder expectations understood",
+        "reference_id": "GV.OC-02",
+        "category": "Organizational Context",
+        "description": "The needs and expectations of internal and external stakeholders regarding cybersecurity are identified and considered.",
+        "metadata": {
+          "function": "GOVERN"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:GV.OC-03",
+        "name": "GV.OC-03 — Legal and regulatory requirements",
+        "reference_id": "GV.OC-03",
+        "category": "Organizational Context",
+        "description": "Applicable legal, regulatory, and contractual cybersecurity obligations, including privacy, are understood and managed.",
+        "metadata": {
+          "function": "GOVERN"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:GV.OC-04",
+        "name": "GV.OC-04 — Critical objectives and services",
+        "reference_id": "GV.OC-04",
+        "category": "Organizational Context",
+        "description": "The critical capabilities, services, and objectives that stakeholders expect are identified and communicated.",
+        "metadata": {
+          "function": "GOVERN"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:GV.OC-05",
+        "name": "GV.OC-05 — External dependencies understood",
+        "reference_id": "GV.OC-05",
+        "category": "Organizational Context",
+        "description": "The external outcomes, capabilities, and services the organization relies on are understood and communicated.",
+        "metadata": {
+          "function": "GOVERN"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:GV.RM-01",
+        "name": "GV.RM-01 — Risk management objectives agreed",
+        "reference_id": "GV.RM-01",
+        "category": "Risk Management Strategy",
+        "description": "Cybersecurity risk management objectives are established and agreed upon by organizational stakeholders.",
+        "metadata": {
+          "function": "GOVERN"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:GV.RM-02",
+        "name": "GV.RM-02 — Risk appetite and tolerance",
+        "reference_id": "GV.RM-02",
+        "category": "Risk Management Strategy",
+        "description": "Statements of risk appetite and risk tolerance are defined, communicated, and kept current.",
+        "metadata": {
+          "function": "GOVERN"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:GV.RM-03",
+        "name": "GV.RM-03 — Risk integrated into ERM",
+        "reference_id": "GV.RM-03",
+        "category": "Risk Management Strategy",
+        "description": "Cybersecurity risk activities and outcomes are incorporated into enterprise risk management processes.",
+        "metadata": {
+          "function": "GOVERN"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:GV.RM-04",
+        "name": "GV.RM-04 — Risk response strategy set",
+        "reference_id": "GV.RM-04",
+        "category": "Risk Management Strategy",
+        "description": "A strategic direction outlining appropriate risk response options is defined and communicated.",
+        "metadata": {
+          "function": "GOVERN"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:GV.RM-05",
+        "name": "GV.RM-05 — Risk communication channels",
+        "reference_id": "GV.RM-05",
+        "category": "Risk Management Strategy",
+        "description": "Communication lines for cybersecurity risk, including third-party risk, are established across the organization.",
+        "metadata": {
+          "function": "GOVERN"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:GV.RM-06",
+        "name": "GV.RM-06 — Standardized risk method",
+        "reference_id": "GV.RM-06",
+        "category": "Risk Management Strategy",
+        "description": "A consistent method for calculating, documenting, categorizing, and prioritizing cyber risk is established.",
+        "metadata": {
+          "function": "GOVERN"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:GV.RM-07",
+        "name": "GV.RM-07 — Strategic opportunities considered",
+        "reference_id": "GV.RM-07",
+        "category": "Risk Management Strategy",
+        "description": "Positive risks or strategic opportunities are characterized and included in cybersecurity risk discussions.",
+        "metadata": {
+          "function": "GOVERN"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:GV.RR-01",
+        "name": "GV.RR-01 — Leadership accountability and culture",
+        "reference_id": "GV.RR-01",
+        "category": "Roles, Responsibilities, and Authorities",
+        "description": "Leadership is accountable for cyber risk and fosters a risk-aware, ethical, continually improving culture.",
+        "metadata": {
+          "function": "GOVERN"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:GV.RR-02",
+        "name": "GV.RR-02 — Roles and authorities enforced",
+        "reference_id": "GV.RR-02",
+        "category": "Roles, Responsibilities, and Authorities",
+        "description": "Cybersecurity roles, responsibilities, and authorities are defined, communicated, understood, and enforced.",
+        "metadata": {
+          "function": "GOVERN"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:GV.RR-03",
+        "name": "GV.RR-03 — Resources allocated to risk",
+        "reference_id": "GV.RR-03",
+        "category": "Roles, Responsibilities, and Authorities",
+        "description": "Resources are allocated in proportion to the cybersecurity strategy, roles, responsibilities, and policies.",
+        "metadata": {
+          "function": "GOVERN"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:GV.RR-04",
+        "name": "GV.RR-04 — Cybersecurity in HR practices",
+        "reference_id": "GV.RR-04",
+        "category": "Roles, Responsibilities, and Authorities",
+        "description": "Cybersecurity considerations are embedded into human resources practices.",
+        "metadata": {
+          "function": "GOVERN"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:GV.PO-01",
+        "name": "GV.PO-01 — Cybersecurity policy established",
+        "reference_id": "GV.PO-01",
+        "category": "Policy",
+        "description": "A cybersecurity risk management policy is established from organizational context and communicated and enforced.",
+        "metadata": {
+          "function": "GOVERN"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:GV.PO-02",
+        "name": "GV.PO-02 — Policy reviewed and updated",
+        "reference_id": "GV.PO-02",
+        "category": "Policy",
+        "description": "The cybersecurity policy is reviewed and updated to reflect changes in requirements, threats, and mission.",
+        "metadata": {
+          "function": "GOVERN"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:GV.OV-01",
+        "name": "GV.OV-01 — Strategy outcomes reviewed",
+        "reference_id": "GV.OV-01",
+        "category": "Oversight",
+        "description": "Outcomes of the cyber risk strategy are reviewed to inform and adjust the strategy and direction.",
+        "metadata": {
+          "function": "GOVERN"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:GV.OV-02",
+        "name": "GV.OV-02 — Strategy coverage reviewed",
+        "reference_id": "GV.OV-02",
+        "category": "Oversight",
+        "description": "The risk management strategy is reviewed and adjusted to cover organizational requirements and risks.",
+        "metadata": {
+          "function": "GOVERN"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:GV.OV-03",
+        "name": "GV.OV-03 — Risk performance evaluated",
+        "reference_id": "GV.OV-03",
+        "category": "Oversight",
+        "description": "Cybersecurity risk management performance is measured and reviewed to identify needed adjustments.",
+        "metadata": {
+          "function": "GOVERN"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:GV.SC-01",
+        "name": "GV.SC-01 — C-SCRM program established",
+        "reference_id": "GV.SC-01",
+        "category": "Cybersecurity Supply Chain Risk Management",
+        "description": "A cybersecurity supply chain risk management program and its processes are established and agreed upon.",
+        "metadata": {
+          "function": "GOVERN"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:GV.SC-02",
+        "name": "GV.SC-02 — Supplier roles coordinated",
+        "reference_id": "GV.SC-02",
+        "category": "Cybersecurity Supply Chain Risk Management",
+        "description": "Cyber roles and responsibilities for suppliers, customers, and partners are established and coordinated.",
+        "metadata": {
+          "function": "GOVERN"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:GV.SC-03",
+        "name": "GV.SC-03 — C-SCRM integrated into ERM",
+        "reference_id": "GV.SC-03",
+        "category": "Cybersecurity Supply Chain Risk Management",
+        "description": "Supply chain risk management is integrated into cyber and enterprise risk and improvement processes.",
+        "metadata": {
+          "function": "GOVERN"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:GV.SC-04",
+        "name": "GV.SC-04 — Suppliers prioritized by criticality",
+        "reference_id": "GV.SC-04",
+        "category": "Cybersecurity Supply Chain Risk Management",
+        "description": "Suppliers are identified and prioritized according to their criticality.",
+        "metadata": {
+          "function": "GOVERN"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:GV.SC-05",
+        "name": "GV.SC-05 — Supply chain requirements in contracts",
+        "reference_id": "GV.SC-05",
+        "category": "Cybersecurity Supply Chain Risk Management",
+        "description": "Requirements addressing supply chain cyber risk are prioritized and built into supplier agreements.",
+        "metadata": {
+          "function": "GOVERN"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:GV.SC-06",
+        "name": "GV.SC-06 — Due diligence before engagement",
+        "reference_id": "GV.SC-06",
+        "category": "Cybersecurity Supply Chain Risk Management",
+        "description": "Planning and due diligence are performed to reduce risk before forming third-party relationships.",
+        "metadata": {
+          "function": "GOVERN"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:GV.SC-07",
+        "name": "GV.SC-07 — Third-party risk monitored",
+        "reference_id": "GV.SC-07",
+        "category": "Cybersecurity Supply Chain Risk Management",
+        "description": "Risks from suppliers and third parties are assessed, prioritized, responded to, and monitored over time.",
+        "metadata": {
+          "function": "GOVERN"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:GV.SC-08",
+        "name": "GV.SC-08 — Suppliers in incident response",
+        "reference_id": "GV.SC-08",
+        "category": "Cybersecurity Supply Chain Risk Management",
+        "description": "Relevant suppliers and third parties are included in incident planning, response, and recovery.",
+        "metadata": {
+          "function": "GOVERN"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:GV.SC-09",
+        "name": "GV.SC-09 — Supply chain security in lifecycle",
+        "reference_id": "GV.SC-09",
+        "category": "Cybersecurity Supply Chain Risk Management",
+        "description": "Supply chain security practices are integrated and monitored across the product and service life cycle.",
+        "metadata": {
+          "function": "GOVERN"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:GV.SC-10",
+        "name": "GV.SC-10 — Post-relationship provisions",
+        "reference_id": "GV.SC-10",
+        "category": "Cybersecurity Supply Chain Risk Management",
+        "description": "Supply chain risk plans address activities occurring after a partnership or agreement concludes.",
+        "metadata": {
+          "function": "GOVERN"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:ID.AM-01",
+        "name": "ID.AM-01 — Hardware inventory maintained",
+        "reference_id": "ID.AM-01",
+        "category": "Asset Management",
+        "description": "Inventories of hardware managed by the organization are maintained.",
+        "metadata": {
+          "function": "IDENTIFY"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:ID.AM-02",
+        "name": "ID.AM-02 — Software and services inventory",
+        "reference_id": "ID.AM-02",
+        "category": "Asset Management",
+        "description": "Inventories of organization-managed software, services, and systems are maintained.",
+        "metadata": {
+          "function": "IDENTIFY"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:ID.AM-03",
+        "name": "ID.AM-03 — Network data flows mapped",
+        "reference_id": "ID.AM-03",
+        "category": "Asset Management",
+        "description": "Representations of authorized network communications and internal and external data flows are maintained.",
+        "metadata": {
+          "function": "IDENTIFY"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:ID.AM-04",
+        "name": "ID.AM-04 — Supplier services inventory",
+        "reference_id": "ID.AM-04",
+        "category": "Asset Management",
+        "description": "Inventories of services provided by suppliers are maintained.",
+        "metadata": {
+          "function": "IDENTIFY"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:ID.AM-05",
+        "name": "ID.AM-05 — Assets prioritized",
+        "reference_id": "ID.AM-05",
+        "category": "Asset Management",
+        "description": "Assets are prioritized based on classification, criticality, resources, and mission impact.",
+        "metadata": {
+          "function": "IDENTIFY"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:ID.AM-07",
+        "name": "ID.AM-07 — Data inventories maintained",
+        "reference_id": "ID.AM-07",
+        "category": "Asset Management",
+        "description": "Inventories of data and corresponding metadata for designated data types are maintained.",
+        "metadata": {
+          "function": "IDENTIFY"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:ID.AM-08",
+        "name": "ID.AM-08 — Assets managed across lifecycle",
+        "reference_id": "ID.AM-08",
+        "category": "Asset Management",
+        "description": "Systems, hardware, software, services, and data are managed throughout their life cycles.",
+        "metadata": {
+          "function": "IDENTIFY"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:ID.RA-01",
+        "name": "ID.RA-01 — Vulnerabilities identified",
+        "reference_id": "ID.RA-01",
+        "category": "Risk Assessment",
+        "description": "Vulnerabilities in assets are identified, validated, and recorded.",
+        "metadata": {
+          "function": "IDENTIFY"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:ID.RA-02",
+        "name": "ID.RA-02 — Threat intelligence received",
+        "reference_id": "ID.RA-02",
+        "category": "Risk Assessment",
+        "description": "Cyber threat intelligence is obtained from information sharing forums and sources.",
+        "metadata": {
+          "function": "IDENTIFY"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:ID.RA-03",
+        "name": "ID.RA-03 — Threats identified",
+        "reference_id": "ID.RA-03",
+        "category": "Risk Assessment",
+        "description": "Internal and external threats to the organization are identified and recorded.",
+        "metadata": {
+          "function": "IDENTIFY"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:ID.RA-04",
+        "name": "ID.RA-04 — Impacts and likelihoods identified",
+        "reference_id": "ID.RA-04",
+        "category": "Risk Assessment",
+        "description": "Potential impacts and likelihoods of threats exploiting vulnerabilities are identified and recorded.",
+        "metadata": {
+          "function": "IDENTIFY"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:ID.RA-05",
+        "name": "ID.RA-05 — Risk understood and prioritized",
+        "reference_id": "ID.RA-05",
+        "category": "Risk Assessment",
+        "description": "Threats, vulnerabilities, likelihoods, and impacts are used to determine risk and prioritize response.",
+        "metadata": {
+          "function": "IDENTIFY"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:ID.RA-06",
+        "name": "ID.RA-06 — Risk responses chosen",
+        "reference_id": "ID.RA-06",
+        "category": "Risk Assessment",
+        "description": "Risk responses are selected, prioritized, planned, tracked, and communicated.",
+        "metadata": {
+          "function": "IDENTIFY"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:ID.RA-07",
+        "name": "ID.RA-07 — Changes and exceptions managed",
+        "reference_id": "ID.RA-07",
+        "category": "Risk Assessment",
+        "description": "Changes and exceptions are managed, assessed for risk impact, recorded, and tracked.",
+        "metadata": {
+          "function": "IDENTIFY"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:ID.RA-08",
+        "name": "ID.RA-08 — Vulnerability disclosures handled",
+        "reference_id": "ID.RA-08",
+        "category": "Risk Assessment",
+        "description": "Processes for receiving, analyzing, and responding to vulnerability disclosures are established.",
+        "metadata": {
+          "function": "IDENTIFY"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:ID.RA-09",
+        "name": "ID.RA-09 — Hardware/software integrity assessed",
+        "reference_id": "ID.RA-09",
+        "category": "Risk Assessment",
+        "description": "Authenticity and integrity of hardware and software are assessed before acquisition and use.",
+        "metadata": {
+          "function": "IDENTIFY"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:ID.RA-10",
+        "name": "ID.RA-10 — Critical suppliers assessed",
+        "reference_id": "ID.RA-10",
+        "category": "Risk Assessment",
+        "description": "Critical suppliers are assessed prior to acquisition.",
+        "metadata": {
+          "function": "IDENTIFY"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:ID.IM-01",
+        "name": "ID.IM-01 — Improvements from evaluations",
+        "reference_id": "ID.IM-01",
+        "category": "Improvement",
+        "description": "Improvements are identified from evaluations of the cybersecurity program.",
+        "metadata": {
+          "function": "IDENTIFY"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:ID.IM-02",
+        "name": "ID.IM-02 — Improvements from tests",
+        "reference_id": "ID.IM-02",
+        "category": "Improvement",
+        "description": "Improvements are identified from security tests and exercises, including those with third parties.",
+        "metadata": {
+          "function": "IDENTIFY"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:ID.IM-03",
+        "name": "ID.IM-03 — Improvements from operations",
+        "reference_id": "ID.IM-03",
+        "category": "Improvement",
+        "description": "Improvements are identified from executing operational processes, procedures, and activities.",
+        "metadata": {
+          "function": "IDENTIFY"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:ID.IM-04",
+        "name": "ID.IM-04 — Response plans maintained",
+        "reference_id": "ID.IM-04",
+        "category": "Improvement",
+        "description": "Incident response and other cybersecurity plans are established, communicated, maintained, and improved.",
+        "metadata": {
+          "function": "IDENTIFY"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:PR.AA-01",
+        "name": "PR.AA-01 — Identities and credentials managed",
+        "reference_id": "PR.AA-01",
+        "category": "Identity Management, Authentication, and Access Control",
+        "description": "Identities and credentials for authorized users, services, and hardware are managed.",
+        "metadata": {
+          "function": "PROTECT"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:PR.AA-02",
+        "name": "PR.AA-02 — Identities proofed and bound",
+        "reference_id": "PR.AA-02",
+        "category": "Identity Management, Authentication, and Access Control",
+        "description": "Identities are proofed and bound to credentials based on the context of interactions.",
+        "metadata": {
+          "function": "PROTECT"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:PR.AA-03",
+        "name": "PR.AA-03 — Authentication performed",
+        "reference_id": "PR.AA-03",
+        "category": "Identity Management, Authentication, and Access Control",
+        "description": "Users, services, and hardware are authenticated.",
+        "metadata": {
+          "function": "PROTECT"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:PR.AA-04",
+        "name": "PR.AA-04 — Identity assertions protected",
+        "reference_id": "PR.AA-04",
+        "category": "Identity Management, Authentication, and Access Control",
+        "description": "Identity assertions are protected, conveyed, and verified.",
+        "metadata": {
+          "function": "PROTECT"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:PR.AA-05",
+        "name": "PR.AA-05 — Access enforced with least privilege",
+        "reference_id": "PR.AA-05",
+        "category": "Identity Management, Authentication, and Access Control",
+        "description": "Access permissions are defined, enforced, and reviewed using least privilege and separation of duties.",
+        "metadata": {
+          "function": "PROTECT"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:PR.AA-06",
+        "name": "PR.AA-06 — Physical access managed",
+        "reference_id": "PR.AA-06",
+        "category": "Identity Management, Authentication, and Access Control",
+        "description": "Physical access to assets is managed, monitored, and enforced commensurate with risk.",
+        "metadata": {
+          "function": "PROTECT"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:PR.AT-01",
+        "name": "PR.AT-01 — General awareness training",
+        "reference_id": "PR.AT-01",
+        "category": "Awareness and Training",
+        "description": "Personnel receive awareness and training to handle general tasks with cybersecurity risk in mind.",
+        "metadata": {
+          "function": "PROTECT"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:PR.AT-02",
+        "name": "PR.AT-02 — Specialized role training",
+        "reference_id": "PR.AT-02",
+        "category": "Awareness and Training",
+        "description": "Individuals in specialized roles receive training to perform their tasks with cybersecurity risk in mind.",
+        "metadata": {
+          "function": "PROTECT"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:PR.DS-01",
+        "name": "PR.DS-01 — Data-at-rest protected",
+        "reference_id": "PR.DS-01",
+        "category": "Data Security",
+        "description": "The confidentiality, integrity, and availability of data at rest are protected.",
+        "metadata": {
+          "function": "PROTECT"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:PR.DS-02",
+        "name": "PR.DS-02 — Data-in-transit protected",
+        "reference_id": "PR.DS-02",
+        "category": "Data Security",
+        "description": "The confidentiality, integrity, and availability of data in transit are protected.",
+        "metadata": {
+          "function": "PROTECT"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:PR.DS-10",
+        "name": "PR.DS-10 — Data-in-use protected",
+        "reference_id": "PR.DS-10",
+        "category": "Data Security",
+        "description": "The confidentiality, integrity, and availability of data in use are protected.",
+        "metadata": {
+          "function": "PROTECT"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:PR.DS-11",
+        "name": "PR.DS-11 — Backups created and tested",
+        "reference_id": "PR.DS-11",
+        "category": "Data Security",
+        "description": "Backups of data are created, protected, maintained, and tested.",
+        "metadata": {
+          "function": "PROTECT"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:PR.PS-01",
+        "name": "PR.PS-01 — Configuration management",
+        "reference_id": "PR.PS-01",
+        "category": "Platform Security",
+        "description": "Configuration management practices are established and applied.",
+        "metadata": {
+          "function": "PROTECT"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:PR.PS-02",
+        "name": "PR.PS-02 — Software maintenance",
+        "reference_id": "PR.PS-02",
+        "category": "Platform Security",
+        "description": "Software is maintained, replaced, and removed commensurate with risk.",
+        "metadata": {
+          "function": "PROTECT"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:PR.PS-03",
+        "name": "PR.PS-03 — Hardware maintenance",
+        "reference_id": "PR.PS-03",
+        "category": "Platform Security",
+        "description": "Hardware is maintained, replaced, and removed commensurate with risk.",
+        "metadata": {
+          "function": "PROTECT"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:PR.PS-04",
+        "name": "PR.PS-04 — Log records generated",
+        "reference_id": "PR.PS-04",
+        "category": "Platform Security",
+        "description": "Log records are generated and made available for continuous monitoring.",
+        "metadata": {
+          "function": "PROTECT"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:PR.PS-05",
+        "name": "PR.PS-05 — Unauthorized software prevented",
+        "reference_id": "PR.PS-05",
+        "category": "Platform Security",
+        "description": "Installation and execution of unauthorized software are prevented.",
+        "metadata": {
+          "function": "PROTECT"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:PR.PS-06",
+        "name": "PR.PS-06 — Secure software development",
+        "reference_id": "PR.PS-06",
+        "category": "Platform Security",
+        "description": "Secure software development practices are integrated and monitored throughout the SDLC.",
+        "metadata": {
+          "function": "PROTECT"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:PR.IR-01",
+        "name": "PR.IR-01 — Networks protected",
+        "reference_id": "PR.IR-01",
+        "category": "Technology Infrastructure Resilience",
+        "description": "Networks and environments are protected from unauthorized logical access and usage.",
+        "metadata": {
+          "function": "PROTECT"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:PR.IR-02",
+        "name": "PR.IR-02 — Assets protected from environment",
+        "reference_id": "PR.IR-02",
+        "category": "Technology Infrastructure Resilience",
+        "description": "Technology assets are protected from environmental threats.",
+        "metadata": {
+          "function": "PROTECT"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:PR.IR-03",
+        "name": "PR.IR-03 — Resilience mechanisms implemented",
+        "reference_id": "PR.IR-03",
+        "category": "Technology Infrastructure Resilience",
+        "description": "Mechanisms are implemented to meet resilience requirements in normal and adverse situations.",
+        "metadata": {
+          "function": "PROTECT"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:PR.IR-04",
+        "name": "PR.IR-04 — Resource capacity maintained",
+        "reference_id": "PR.IR-04",
+        "category": "Technology Infrastructure Resilience",
+        "description": "Adequate resource capacity is maintained to ensure availability.",
+        "metadata": {
+          "function": "PROTECT"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:DE.CM-01",
+        "name": "DE.CM-01 — Networks monitored",
+        "reference_id": "DE.CM-01",
+        "category": "Continuous Monitoring",
+        "description": "Networks and network services are monitored to find potentially adverse events.",
+        "metadata": {
+          "function": "DETECT"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:DE.CM-02",
+        "name": "DE.CM-02 — Physical environment monitored",
+        "reference_id": "DE.CM-02",
+        "category": "Continuous Monitoring",
+        "description": "The physical environment is monitored to find potentially adverse events.",
+        "metadata": {
+          "function": "DETECT"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:DE.CM-03",
+        "name": "DE.CM-03 — Personnel activity monitored",
+        "reference_id": "DE.CM-03",
+        "category": "Continuous Monitoring",
+        "description": "Personnel activity and technology usage are monitored to find potentially adverse events.",
+        "metadata": {
+          "function": "DETECT"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:DE.CM-06",
+        "name": "DE.CM-06 — External providers monitored",
+        "reference_id": "DE.CM-06",
+        "category": "Continuous Monitoring",
+        "description": "External service provider activities and services are monitored to find potentially adverse events.",
+        "metadata": {
+          "function": "DETECT"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:DE.CM-09",
+        "name": "DE.CM-09 — Computing assets monitored",
+        "reference_id": "DE.CM-09",
+        "category": "Continuous Monitoring",
+        "description": "Computing hardware, software, runtime environments, and data are monitored for adverse events.",
+        "metadata": {
+          "function": "DETECT"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:DE.AE-02",
+        "name": "DE.AE-02 — Adverse events analyzed",
+        "reference_id": "DE.AE-02",
+        "category": "Adverse Event Analysis",
+        "description": "Potentially adverse events are analyzed to better understand the associated activity.",
+        "metadata": {
+          "function": "DETECT"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:DE.AE-03",
+        "name": "DE.AE-03 — Information correlated",
+        "reference_id": "DE.AE-03",
+        "category": "Adverse Event Analysis",
+        "description": "Event information is correlated from multiple sources.",
+        "metadata": {
+          "function": "DETECT"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:DE.AE-04",
+        "name": "DE.AE-04 — Impact and scope understood",
+        "reference_id": "DE.AE-04",
+        "category": "Adverse Event Analysis",
+        "description": "The estimated impact and scope of adverse events are determined.",
+        "metadata": {
+          "function": "DETECT"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:DE.AE-06",
+        "name": "DE.AE-06 — Event information shared",
+        "reference_id": "DE.AE-06",
+        "category": "Adverse Event Analysis",
+        "description": "Information about adverse events is provided to authorized staff and tools.",
+        "metadata": {
+          "function": "DETECT"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:DE.AE-07",
+        "name": "DE.AE-07 — Threat intel integrated",
+        "reference_id": "DE.AE-07",
+        "category": "Adverse Event Analysis",
+        "description": "Cyber threat intelligence and contextual information are integrated into event analysis.",
+        "metadata": {
+          "function": "DETECT"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:DE.AE-08",
+        "name": "DE.AE-08 — Incidents declared",
+        "reference_id": "DE.AE-08",
+        "category": "Adverse Event Analysis",
+        "description": "Incidents are declared when adverse events meet the defined incident criteria.",
+        "metadata": {
+          "function": "DETECT"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:RS.MA-01",
+        "name": "RS.MA-01 — Response plan executed",
+        "reference_id": "RS.MA-01",
+        "category": "Incident Management",
+        "description": "The incident response plan is executed with relevant third parties once an incident is declared.",
+        "metadata": {
+          "function": "RESPOND"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:RS.MA-02",
+        "name": "RS.MA-02 — Reports triaged",
+        "reference_id": "RS.MA-02",
+        "category": "Incident Management",
+        "description": "Incident reports are triaged and validated.",
+        "metadata": {
+          "function": "RESPOND"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:RS.MA-03",
+        "name": "RS.MA-03 — Incidents prioritized",
+        "reference_id": "RS.MA-03",
+        "category": "Incident Management",
+        "description": "Incidents are categorized and prioritized.",
+        "metadata": {
+          "function": "RESPOND"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:RS.MA-04",
+        "name": "RS.MA-04 — Incidents escalated",
+        "reference_id": "RS.MA-04",
+        "category": "Incident Management",
+        "description": "Incidents are escalated or elevated as needed.",
+        "metadata": {
+          "function": "RESPOND"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:RS.MA-05",
+        "name": "RS.MA-05 — Recovery criteria applied",
+        "reference_id": "RS.MA-05",
+        "category": "Incident Management",
+        "description": "The criteria for initiating incident recovery are applied.",
+        "metadata": {
+          "function": "RESPOND"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:RS.AN-03",
+        "name": "RS.AN-03 — Incident analysis performed",
+        "reference_id": "RS.AN-03",
+        "category": "Incident Analysis",
+        "description": "Analysis determines what occurred during an incident and identifies its root cause.",
+        "metadata": {
+          "function": "RESPOND"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:RS.AN-06",
+        "name": "RS.AN-06 — Investigation actions recorded",
+        "reference_id": "RS.AN-06",
+        "category": "Incident Analysis",
+        "description": "Investigation actions are recorded with their integrity and provenance preserved.",
+        "metadata": {
+          "function": "RESPOND"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:RS.AN-07",
+        "name": "RS.AN-07 — Incident data preserved",
+        "reference_id": "RS.AN-07",
+        "category": "Incident Analysis",
+        "description": "Incident data and metadata are collected with their integrity and provenance preserved.",
+        "metadata": {
+          "function": "RESPOND"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:RS.AN-08",
+        "name": "RS.AN-08 — Incident magnitude estimated",
+        "reference_id": "RS.AN-08",
+        "category": "Incident Analysis",
+        "description": "An incident's magnitude is estimated and validated.",
+        "metadata": {
+          "function": "RESPOND"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:RS.CO-02",
+        "name": "RS.CO-02 — Stakeholders notified",
+        "reference_id": "RS.CO-02",
+        "category": "Incident Response Reporting and Communication",
+        "description": "Internal and external stakeholders are notified of incidents.",
+        "metadata": {
+          "function": "RESPOND"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:RS.CO-03",
+        "name": "RS.CO-03 — Information shared",
+        "reference_id": "RS.CO-03",
+        "category": "Incident Response Reporting and Communication",
+        "description": "Information is shared with designated internal and external stakeholders.",
+        "metadata": {
+          "function": "RESPOND"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:RS.MI-01",
+        "name": "RS.MI-01 — Incidents contained",
+        "reference_id": "RS.MI-01",
+        "category": "Incident Mitigation",
+        "description": "Incidents are contained.",
+        "metadata": {
+          "function": "RESPOND"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:RS.MI-02",
+        "name": "RS.MI-02 — Incidents eradicated",
+        "reference_id": "RS.MI-02",
+        "category": "Incident Mitigation",
+        "description": "Incidents are eradicated.",
+        "metadata": {
+          "function": "RESPOND"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:RC.RP-01",
+        "name": "RC.RP-01 — Recovery plan executed",
+        "reference_id": "RC.RP-01",
+        "category": "Incident Recovery Plan Execution",
+        "description": "The recovery portion of the incident response plan is executed once initiated.",
+        "metadata": {
+          "function": "RECOVER"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:RC.RP-02",
+        "name": "RC.RP-02 — Recovery actions performed",
+        "reference_id": "RC.RP-02",
+        "category": "Incident Recovery Plan Execution",
+        "description": "Recovery actions are selected, scoped, prioritized, and performed.",
+        "metadata": {
+          "function": "RECOVER"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:RC.RP-03",
+        "name": "RC.RP-03 — Backup integrity verified",
+        "reference_id": "RC.RP-03",
+        "category": "Incident Recovery Plan Execution",
+        "description": "The integrity of backups and other restoration assets is verified before use.",
+        "metadata": {
+          "function": "RECOVER"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:RC.RP-04",
+        "name": "RC.RP-04 — Post-incident norms set",
+        "reference_id": "RC.RP-04",
+        "category": "Incident Recovery Plan Execution",
+        "description": "Critical mission functions and risk management inform new post-incident operational norms.",
+        "metadata": {
+          "function": "RECOVER"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:RC.RP-05",
+        "name": "RC.RP-05 — Restored assets verified",
+        "reference_id": "RC.RP-05",
+        "category": "Incident Recovery Plan Execution",
+        "description": "Restored asset integrity is verified, services are restored, and normal status is confirmed.",
+        "metadata": {
+          "function": "RECOVER"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:RC.RP-06",
+        "name": "RC.RP-06 — Recovery completion declared",
+        "reference_id": "RC.RP-06",
+        "category": "Incident Recovery Plan Execution",
+        "description": "The end of recovery is declared per criteria and incident documentation is completed.",
+        "metadata": {
+          "function": "RECOVER"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:RC.CO-03",
+        "name": "RC.CO-03 — Recovery progress communicated",
+        "reference_id": "RC.CO-03",
+        "category": "Incident Recovery Communication",
+        "description": "Recovery activities and restoration progress are communicated to designated stakeholders.",
+        "metadata": {
+          "function": "RECOVER"
+        }
+      },
+      {
+        "ref": "nist-csf-2.0:RC.CO-04",
+        "name": "RC.CO-04 — Public updates shared",
+        "reference_id": "RC.CO-04",
+        "category": "Incident Recovery Communication",
+        "description": "Public updates on incident recovery are shared using approved methods and messaging.",
+        "metadata": {
+          "function": "RECOVER"
+        }
+      }
+    ]
+  }
+}

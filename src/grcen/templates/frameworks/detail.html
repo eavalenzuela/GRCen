@@ -44,6 +44,9 @@
         <h3 style="margin:0;">Requirements
             <span style="color:#6b7280; font-weight:normal; font-size:0.9rem;">
                 &nbsp;— {{ detail.gap_count }} gap{{ 's' if detail.gap_count != 1 else '' }}
+                {% if detail.crosswalk_count %}
+                · {{ detail.crosswalk_count }} cross-framework map{{ 's' if detail.crosswalk_count != 1 else '' }}
+                {% endif %}
             </span>
         </h3>
         {% if has_perm(user.role, Permission.EXPORT) %}
@@ -54,7 +57,7 @@
     {% if detail.requirements %}
     <table class="table">
         <thead>
-            <tr><th>Status</th><th>Requirement</th><th>Satisfied by</th><th>Last audited</th></tr>
+            <tr><th>Status</th><th>Requirement</th><th>Satisfied by</th><th>Cross-framework</th><th>Last audited</th></tr>
         </thead>
         <tbody>
         {% for req in detail.requirements %}
@@ -75,6 +78,17 @@
                     {% endfor %}
                     {% else %}
                     <span style="color:#6b7280;">—</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if req.crosswalks %}
+                    {% for x in req.crosswalks %}
+                        <a href="/assets/{{ x.id }}"
+                           title="{{ x.relationship }} — {{ x.name }}">{{ x.code }}</a>
+                        <small style="color:#6b7280;">({{ x.framework }})</small>{% if not loop.last %}<br>{% endif %}
+                    {% endfor %}
+                    {% else %}
+                    <small style="color:#9ca3af;">—</small>
                     {% endif %}
                 </td>
                 <td>

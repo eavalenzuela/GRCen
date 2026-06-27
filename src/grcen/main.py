@@ -245,7 +245,7 @@ def cli():
     """CLI entrypoint for management commands."""
     if len(sys.argv) < 2:
         print("Usage: grcen <command>")
-        print("Commands: createadmin, createsuperadmin, createorg, listorgs, runserver, generate-key, rotate-keys, backup, restore, sync-catalog")
+        print("Commands: createadmin, createsuperadmin, createorg, listorgs, runserver, generate-key, rotate-keys, backup, restore, sync-catalog, list-packs, install-pack")
         sys.exit(1)
 
     command = sys.argv[1]
@@ -277,6 +277,10 @@ def cli():
         asyncio.run(_rotate_keys())
     elif command == "sync-catalog":
         asyncio.run(_sync_catalog())
+    elif command == "list-packs":
+        asyncio.run(_list_packs())
+    elif command == "install-pack":
+        asyncio.run(_install_pack())
     else:
         print(f"Unknown command: {command}")
         sys.exit(1)
@@ -459,7 +463,7 @@ async def _sync_catalog():
 
     tag = " (dry run — rolled back)" if dry_run else ""
     print(f"Catalog sync from '{source}'{tag}:")
-    print(f"  frameworks={result.frameworks} requirements={result.requirements} controls={result.controls}")
+    print(f"  frameworks={result.frameworks} requirements={result.requirements} controls={result.controls} crosswalks={result.crosswalks}")
     print(f"  assets:        {result.assets_created} created, {result.assets_updated} updated")
     print(f"  relationships: {result.edges_created} created, {result.edges_updated} updated, {result.edges_pruned} pruned")
     if result.stale_assets:
@@ -468,6 +472,113 @@ async def _sync_catalog():
         if not prune:
             for sref in result.stale_assets[:20]:
                 print(f"      {sref}")
+    await close_pool()
+
+
+async def _list_packs():
+    """`grcen list-packs` — list bundled compliance content packs and their status."""
+    from grcen.services import content_packs, organization_service
+
+    argv = sys.argv[2:]
+    org_slug = next((a.split("=", 1)[1] for a in argv if a.startswith("--org=")), None)
+
+    pool = await init_pool()
+    await init_schema()
+    org_id = None
+    if org_slug:
+        org = await organization_service.get_by_slug(pool, org_slug)
+        if org is None:
+            print(f"Organization '{org_slug}' not found.")
+            await close_pool()
+            sys.exit(1)
+        org_id = org.id
+    if org_id is None:
+        org_id = await organization_service.get_default_org_id(pool)
+
+    print("Bundled compliance content packs:\n")
+    for pack in content_packs.list_packs():
+        if content_packs.fragments_present(pack):
+            stats = content_packs.pack_stats(pack)
+            detail = (
+                f"{stats['frameworks']} framework(s), {stats['requirements']} requirements, "
+                f"{stats['controls']} controls, {stats['crosswalks']} crosswalks"
+            )
+        else:
+            detail = "(content not authored yet)"
+        installed = await content_packs.installed_asset_count(
+            pool, pack, organization_id=org_id
+        )
+        mark = f"installed: {installed} assets" if installed else "not installed"
+        print(f"  {pack.id:<20} v{pack.version:<14} [{mark}]")
+        print(f"      {pack.title} — {detail}")
+    print("\nInstall with: grcen install-pack <id> [--org SLUG] [--dry-run] [--prune]")
+    await close_pool()
+
+
+async def _install_pack():
+    """`grcen install-pack <id> [--org SLUG] [--dry-run] [--prune] [--uninstall]`.
+
+    Seed a fresh org with a ready-made compliance baseline (frameworks,
+    requirements, a shared control library, and cross-framework crosswalks)
+    without needing the external system-of-record. See
+    grcen.services.content_packs.
+    """
+    from grcen.services import content_packs, organization_service
+
+    argv = sys.argv[2:]
+    positional = [a for a in argv if not a.startswith("--")]
+    if not positional:
+        print("Usage: grcen install-pack <id> [--org SLUG] [--dry-run] [--prune] [--uninstall]")
+        print("Run `grcen list-packs` to see available pack ids.")
+        sys.exit(1)
+    pack = content_packs.get_pack(positional[0])
+    if pack is None:
+        print(f"Unknown pack '{positional[0]}'. Run `grcen list-packs`.")
+        sys.exit(1)
+
+    dry_run = "--dry-run" in argv
+    prune = "--prune" in argv
+    uninstall = "--uninstall" in argv
+    org_slug = next((a.split("=", 1)[1] for a in argv if a.startswith("--org=")), None)
+
+    pool = await init_pool()
+    await init_schema()
+    org_id = None
+    if org_slug:
+        org = await organization_service.get_by_slug(pool, org_slug)
+        if org is None:
+            print(f"Organization '{org_slug}' not found.")
+            await close_pool()
+            sys.exit(1)
+        org_id = org.id
+    if org_id is None:
+        org_id = await organization_service.get_default_org_id(pool)
+
+    if uninstall:
+        removed = await content_packs.uninstall_pack(pool, pack, organization_id=org_id)
+        print(
+            f"Uninstalled '{pack.id}': {removed['assets']} assets, "
+            f"{removed['relationships']} relationships removed."
+        )
+        await close_pool()
+        return
+
+    errors = content_packs.validate_pack(pack)
+    if errors:
+        print(f"Pack '{pack.id}' is invalid — {len(errors)} error(s), nothing written:")
+        for err in errors[:50]:
+            print(f"  - {err}")
+        await close_pool()
+        sys.exit(1)
+
+    result = await content_packs.install_pack(
+        pool, pack, organization_id=org_id, dry_run=dry_run, prune=prune
+    )
+    tag = " (dry run — rolled back)" if dry_run else ""
+    print(f"Installed pack '{pack.id}'{tag} (source={pack.source}):")
+    print(f"  frameworks={result.frameworks} requirements={result.requirements} controls={result.controls} crosswalks={result.crosswalks}")
+    print(f"  assets:        {result.assets_created} created, {result.assets_updated} updated")
+    print(f"  relationships: {result.edges_created} created, {result.edges_updated} updated, {result.edges_pruned} pruned")
     await close_pool()
 
 

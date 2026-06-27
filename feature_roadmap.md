@@ -19,6 +19,9 @@ Admins manage webhooks at `/admin/webhooks`; each endpoint gets HMAC-SHA256-sign
 ### 5. Relationship Bulk Import — **SHIPPED** (folded into #3)
 Relationship file upload was already wired to `/api/imports/relationships/execute`. This pass added the matching `/preview` endpoint, a `dry_run` flag on both asset and relationship execute routes, and the JSON-body `/bulk` endpoints covered in #3.
 
+### 4a. Compliance Content Packs — **SHIPPED**
+Closes the empty-register cold start (#4 lit the dashboard but shipped no seed content). Bundled, ready-to-install compliance baselines — NIST CSF 2.0 (106 subcategories), CIS Controls v8.1 (153 safeguards), SOC 2 (61 criteria), ISO 27001:2022 Annex A (93 controls), plus a flagship `common-baseline` that ties all four together with a 40-control shared library and 115 cross-framework crosswalks — installable in one click. `services/content_packs.py` assembles JSON fragments under `src/grcen/content_packs/` and projects them through `catalog_sync` under a per-pack source tag (`grcen-pack:<id>`): coexists with autocomply syncs + hand-authored data, idempotent re-install, clean uninstall. Admin UI at `/admin/content-packs` (install / dry-run preview / uninstall); CLI `grcen list-packs` / `install-pack`. `catalog_sync` gained an additive `crosswalks[]` section → `cross_maps` requirement↔requirement edges, surfaced in a new *Cross-framework* column on the framework detail page (giving the export contract's `metadata.crosswalk` a first-class home). See `CONTENT_PACKS.md`. Remaining: per-pack version/upgrade diffing.
+
 ## Tier 2 — Deepen Existing Features
 
 ### 6. Attachments on Relationships — **SHIPPED**

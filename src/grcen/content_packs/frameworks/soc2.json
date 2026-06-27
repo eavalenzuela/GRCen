@@ -1,0 +1,502 @@
+{
+  "framework": {
+    "ref": "soc2",
+    "name": "SOC 2 (AICPA Trust Services Criteria)",
+    "description": "The AICPA Trust Services Criteria used in SOC 2 examinations, covering security (Common Criteria) plus the opt-in categories of availability, confidentiality, processing integrity, and privacy. Each criterion is a mappable control objective an organization is evaluated against.",
+    "metadata": {
+      "version": "TSC 2017 (rev. 2022)",
+      "governing_body": "AICPA",
+      "scope": "Security/Common Criteria (CC1-CC9) are always in scope; Availability, Confidentiality, Processing Integrity, and Privacy are opt-in categories selected per assessment."
+    },
+    "requirements": [
+      {
+        "ref": "soc2:CC1.1",
+        "name": "CC1.1 — Commitment to integrity and ethical values",
+        "reference_id": "CC1.1",
+        "category": "Common Criteria",
+        "description": "The entity demonstrates a commitment to integrity and ethical values throughout the organization.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:CC1.2",
+        "name": "CC1.2 — Board independence and oversight",
+        "reference_id": "CC1.2",
+        "category": "Common Criteria",
+        "description": "The board of directors operates independently and exercises oversight of the development and performance of internal control.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:CC1.3",
+        "name": "CC1.3 — Management structures, reporting lines, and authority",
+        "reference_id": "CC1.3",
+        "category": "Common Criteria",
+        "description": "Management establishes structures, reporting lines, and appropriate authorities and responsibilities in pursuit of objectives.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:CC1.4",
+        "name": "CC1.4 — Commitment to competence",
+        "reference_id": "CC1.4",
+        "category": "Common Criteria",
+        "description": "The entity commits to attracting, developing, and retaining competent individuals aligned with its objectives.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:CC1.5",
+        "name": "CC1.5 — Accountability for internal control responsibilities",
+        "reference_id": "CC1.5",
+        "category": "Common Criteria",
+        "description": "The entity holds individuals accountable for their internal control responsibilities in pursuit of objectives.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:CC2.1",
+        "name": "CC2.1 — Quality information to support internal control",
+        "reference_id": "CC2.1",
+        "category": "Common Criteria",
+        "description": "The entity obtains or generates relevant, quality information to support the functioning of internal control.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:CC2.2",
+        "name": "CC2.2 — Internal communication of objectives and responsibilities",
+        "reference_id": "CC2.2",
+        "category": "Common Criteria",
+        "description": "The entity internally communicates information, including control objectives and responsibilities, needed to support internal control.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:CC2.3",
+        "name": "CC2.3 — External communication of relevant matters",
+        "reference_id": "CC2.3",
+        "category": "Common Criteria",
+        "description": "The entity communicates with external parties about matters affecting the functioning of internal control.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:CC3.1",
+        "name": "CC3.1 — Objectives specified to enable risk identification",
+        "reference_id": "CC3.1",
+        "category": "Common Criteria",
+        "description": "The entity specifies objectives with sufficient clarity to enable the identification and assessment of related risks.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:CC3.2",
+        "name": "CC3.2 — Identification and analysis of risk",
+        "reference_id": "CC3.2",
+        "category": "Common Criteria",
+        "description": "The entity identifies and analyzes risks to the achievement of its objectives as a basis for determining how risks should be managed.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:CC3.3",
+        "name": "CC3.3 — Consideration of fraud risk",
+        "reference_id": "CC3.3",
+        "category": "Common Criteria",
+        "description": "The entity considers the potential for fraud when assessing risks to the achievement of objectives.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:CC3.4",
+        "name": "CC3.4 — Identification and assessment of change",
+        "reference_id": "CC3.4",
+        "category": "Common Criteria",
+        "description": "The entity identifies and assesses changes that could significantly affect its system of internal control.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:CC4.1",
+        "name": "CC4.1 — Ongoing and separate evaluations",
+        "reference_id": "CC4.1",
+        "category": "Common Criteria",
+        "description": "The entity selects, develops, and performs ongoing and separate evaluations to ascertain whether controls are present and functioning.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:CC4.2",
+        "name": "CC4.2 — Evaluation and communication of deficiencies",
+        "reference_id": "CC4.2",
+        "category": "Common Criteria",
+        "description": "The entity evaluates and communicates internal control deficiencies in a timely manner to those responsible for corrective action.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:CC5.1",
+        "name": "CC5.1 — Control activities that mitigate risk",
+        "reference_id": "CC5.1",
+        "category": "Common Criteria",
+        "description": "The entity selects and develops control activities that contribute to mitigating risks to acceptable levels.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:CC5.2",
+        "name": "CC5.2 — Control activities over technology",
+        "reference_id": "CC5.2",
+        "category": "Common Criteria",
+        "description": "The entity selects and develops general control activities over technology to support the achievement of objectives.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:CC5.3",
+        "name": "CC5.3 — Deployment through policies and procedures",
+        "reference_id": "CC5.3",
+        "category": "Common Criteria",
+        "description": "The entity deploys control activities through policies that establish expectations and procedures that put those policies into action.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:CC6.1",
+        "name": "CC6.1 — Logical access security software and infrastructure",
+        "reference_id": "CC6.1",
+        "category": "Common Criteria",
+        "description": "The entity implements logical access security software, infrastructure, and architectures to protect information assets from unauthorized access.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:CC6.2",
+        "name": "CC6.2 — User registration and authorization",
+        "reference_id": "CC6.2",
+        "category": "Common Criteria",
+        "description": "The entity registers and authorizes new users and removes access when no longer required, governing credentials throughout their lifecycle.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:CC6.3",
+        "name": "CC6.3 — Role-based access and least privilege",
+        "reference_id": "CC6.3",
+        "category": "Common Criteria",
+        "description": "The entity authorizes, modifies, or removes access based on roles and least privilege to protect information assets.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:CC6.4",
+        "name": "CC6.4 — Physical access restriction",
+        "reference_id": "CC6.4",
+        "category": "Common Criteria",
+        "description": "The entity restricts physical access to facilities and protected information assets to authorized personnel.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:CC6.5",
+        "name": "CC6.5 — Logical and physical protections on asset disposal",
+        "reference_id": "CC6.5",
+        "category": "Common Criteria",
+        "description": "The entity discontinues logical and physical protections over assets only after rendering the data they contain unrecoverable.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:CC6.6",
+        "name": "CC6.6 — Protection against external threats",
+        "reference_id": "CC6.6",
+        "category": "Common Criteria",
+        "description": "The entity implements controls to protect against threats from sources outside its system boundaries.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:CC6.7",
+        "name": "CC6.7 — Restriction of information transmission and movement",
+        "reference_id": "CC6.7",
+        "category": "Common Criteria",
+        "description": "The entity restricts the transmission, movement, and removal of information to authorized users and protects it during transit.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:CC6.8",
+        "name": "CC6.8 — Prevention/detection of unauthorized or malicious software",
+        "reference_id": "CC6.8",
+        "category": "Common Criteria",
+        "description": "The entity implements controls to prevent or detect and act upon the introduction of unauthorized or malicious software.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:CC7.1",
+        "name": "CC7.1 — Detection of configuration changes and vulnerabilities",
+        "reference_id": "CC7.1",
+        "category": "Common Criteria",
+        "description": "The entity uses detection and monitoring procedures to identify configuration changes and new vulnerabilities.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:CC7.2",
+        "name": "CC7.2 — Monitoring for anomalies and security events",
+        "reference_id": "CC7.2",
+        "category": "Common Criteria",
+        "description": "The entity monitors system components for anomalies indicative of malicious acts, natural disasters, and errors, and analyzes security events.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:CC7.3",
+        "name": "CC7.3 — Evaluation of security events and incident determination",
+        "reference_id": "CC7.3",
+        "category": "Common Criteria",
+        "description": "The entity evaluates security events to determine whether they constitute incidents and warrant a response.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:CC7.4",
+        "name": "CC7.4 — Incident response program",
+        "reference_id": "CC7.4",
+        "category": "Common Criteria",
+        "description": "The entity responds to identified security incidents through a defined program that contains, remediates, and recovers from them.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:CC7.5",
+        "name": "CC7.5 — Recovery from identified incidents",
+        "reference_id": "CC7.5",
+        "category": "Common Criteria",
+        "description": "The entity identifies, develops, and implements activities to recover from identified security incidents.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:CC8.1",
+        "name": "CC8.1 — Change management over infrastructure, data, and software",
+        "reference_id": "CC8.1",
+        "category": "Common Criteria",
+        "description": "The entity authorizes, designs, develops, tests, approves, and implements changes to infrastructure, data, software, and procedures.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:CC9.1",
+        "name": "CC9.1 — Risk mitigation activities for business disruptions",
+        "reference_id": "CC9.1",
+        "category": "Common Criteria",
+        "description": "The entity identifies, selects, and develops risk mitigation activities for risks arising from potential business disruptions.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:CC9.2",
+        "name": "CC9.2 — Vendor and business partner risk management",
+        "reference_id": "CC9.2",
+        "category": "Common Criteria",
+        "description": "The entity assesses and manages risks associated with vendors and business partners.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:A1.1",
+        "name": "A1.1 — Capacity management",
+        "reference_id": "A1.1",
+        "category": "availability",
+        "description": "The entity maintains, monitors, and evaluates current processing capacity and demand to support availability objectives.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:A1.2",
+        "name": "A1.2 — Environmental protections, backup, and recovery infrastructure",
+        "reference_id": "A1.2",
+        "category": "availability",
+        "description": "The entity authorizes, designs, and maintains environmental protections, backups, and recovery infrastructure to meet availability objectives.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:A1.3",
+        "name": "A1.3 — Recovery plan testing",
+        "reference_id": "A1.3",
+        "category": "availability",
+        "description": "The entity tests recovery plan procedures to confirm they support the achievement of availability objectives.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:C1.1",
+        "name": "C1.1 — Identification and maintenance of confidential information",
+        "reference_id": "C1.1",
+        "category": "confidentiality",
+        "description": "The entity identifies and maintains confidential information to meet its confidentiality objectives.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:C1.2",
+        "name": "C1.2 — Disposal of confidential information",
+        "reference_id": "C1.2",
+        "category": "confidentiality",
+        "description": "The entity disposes of confidential information when no longer needed to meet its confidentiality objectives.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:PI1.1",
+        "name": "PI1.1 — Quality information about processing objectives",
+        "reference_id": "PI1.1",
+        "category": "processing integrity",
+        "description": "The entity obtains or generates relevant, quality information regarding the objectives of its processing.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:PI1.2",
+        "name": "PI1.2 — Completeness and accuracy of inputs",
+        "reference_id": "PI1.2",
+        "category": "processing integrity",
+        "description": "The entity implements controls over system inputs to ensure they are complete and accurate.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:PI1.3",
+        "name": "PI1.3 — Completeness and accuracy of processing",
+        "reference_id": "PI1.3",
+        "category": "processing integrity",
+        "description": "The entity implements controls to ensure that processing of data is complete, accurate, and timely.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:PI1.4",
+        "name": "PI1.4 — Completeness and accuracy of outputs",
+        "reference_id": "PI1.4",
+        "category": "processing integrity",
+        "description": "The entity implements controls to ensure that outputs are complete, accurate, and delivered to the intended recipients.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:PI1.5",
+        "name": "PI1.5 — Integrity of stored inputs and outputs",
+        "reference_id": "PI1.5",
+        "category": "processing integrity",
+        "description": "The entity stores inputs and outputs completely, accurately, and in a manner that preserves their integrity.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:P1.1",
+        "name": "P1.1 — Notice of privacy practices",
+        "reference_id": "P1.1",
+        "category": "privacy",
+        "description": "The entity provides notice to data subjects about its privacy practices to meet its privacy objectives.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:P2.1",
+        "name": "P2.1 — Choice and consent",
+        "reference_id": "P2.1",
+        "category": "privacy",
+        "description": "The entity communicates choices available regarding personal information and obtains consent for its collection, use, retention, disclosure, and disposal.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:P3.1",
+        "name": "P3.1 — Collection consistent with objectives",
+        "reference_id": "P3.1",
+        "category": "privacy",
+        "description": "The entity collects personal information consistent with its objectives related to privacy.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:P3.2",
+        "name": "P3.2 — Explicit consent for sensitive information",
+        "reference_id": "P3.2",
+        "category": "privacy",
+        "description": "The entity obtains explicit consent for the collection, use, and disclosure of sensitive personal information.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:P4.1",
+        "name": "P4.1 — Use limited to identified purposes",
+        "reference_id": "P4.1",
+        "category": "privacy",
+        "description": "The entity limits the use of personal information to the purposes identified in its privacy notice and for which consent was obtained.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:P4.2",
+        "name": "P4.2 — Retention of personal information",
+        "reference_id": "P4.2",
+        "category": "privacy",
+        "description": "The entity retains personal information consistent with its objectives related to privacy.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:P4.3",
+        "name": "P4.3 — Disposal of personal information",
+        "reference_id": "P4.3",
+        "category": "privacy",
+        "description": "The entity securely disposes of personal information to meet its privacy objectives.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:P5.1",
+        "name": "P5.1 — Access to personal information by individuals",
+        "reference_id": "P5.1",
+        "category": "privacy",
+        "description": "The entity grants individuals access to their personal information for review and update.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:P5.2",
+        "name": "P5.2 — Correction or amendment of personal information",
+        "reference_id": "P5.2",
+        "category": "privacy",
+        "description": "The entity corrects, amends, or appends personal information based on information provided by individuals.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:P6.1",
+        "name": "P6.1 — Disclosure consistent with consent",
+        "reference_id": "P6.1",
+        "category": "privacy",
+        "description": "The entity discloses personal information to third parties only for purposes consistent with the consent obtained from individuals.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:P6.2",
+        "name": "P6.2 — Record of authorized disclosures",
+        "reference_id": "P6.2",
+        "category": "privacy",
+        "description": "The entity creates and retains a complete, accurate, and timely record of authorized disclosures of personal information.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:P6.3",
+        "name": "P6.3 — Record of unauthorized disclosures",
+        "reference_id": "P6.3",
+        "category": "privacy",
+        "description": "The entity creates and retains a complete, accurate, and timely record of detected or reported unauthorized disclosures of personal information.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:P6.4",
+        "name": "P6.4 — Third-party compliance with privacy commitments",
+        "reference_id": "P6.4",
+        "category": "privacy",
+        "description": "The entity obtains commitments from third parties to whom it discloses personal information that they will comply with its privacy requirements.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:P6.5",
+        "name": "P6.5 — Notification of unauthorized disclosures by third parties",
+        "reference_id": "P6.5",
+        "category": "privacy",
+        "description": "The entity obtains commitments from third parties to notify it of any unauthorized disclosure or use of the personal information they receive.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:P6.6",
+        "name": "P6.6 — Breach notification",
+        "reference_id": "P6.6",
+        "category": "privacy",
+        "description": "The entity provides notification of breaches and incidents involving personal information to affected individuals and authorities as required.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:P6.7",
+        "name": "P6.7 — Accounting of disclosures to individuals",
+        "reference_id": "P6.7",
+        "category": "privacy",
+        "description": "The entity provides individuals with an accounting of the personal information held and disclosures made about them upon request.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:P7.1",
+        "name": "P7.1 — Data quality and accuracy of personal information",
+        "reference_id": "P7.1",
+        "category": "privacy",
+        "description": "The entity maintains accurate, complete, and relevant personal information for the purposes for which it is used.",
+        "metadata": {}
+      },
+      {
+        "ref": "soc2:P8.1",
+        "name": "P8.1 — Privacy complaint management and enforcement",
+        "reference_id": "P8.1",
+        "category": "privacy",
+        "description": "The entity implements a process for receiving, addressing, resolving, and enforcing privacy-related complaints and disputes.",
+        "metadata": {}
+      }
+    ]
+  }
+}
