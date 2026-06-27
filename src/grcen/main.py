@@ -33,6 +33,7 @@ from grcen.routers import (
     saved_searches,
     tags,
     tokens,
+    vendor_campaigns,
     workflow,
 )
 
@@ -180,6 +181,7 @@ def create_app() -> FastAPI:
     app.include_router(controls.router)
     app.include_router(findings.router)
     app.include_router(risk_appetite.api_router)
+    app.include_router(vendor_campaigns.portal_router)
     app.include_router(tags.router)
     app.include_router(saved_searches.router)
     app.include_router(access_log.router)

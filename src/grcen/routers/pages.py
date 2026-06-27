@@ -22,6 +22,7 @@ from grcen.routers import (
     risk_appetite,
     settings_pages,
     tag_pages,
+    vendor_campaigns,
 )
 from grcen.routers._pages_shared import _csrf_check, templates  # noqa: F401  re-export
 
@@ -42,3 +43,4 @@ for _sub in (
     router.include_router(_sub.router)
 router.include_router(risk_appetite.page_router)
 router.include_router(reports_pages.router)
+router.include_router(vendor_campaigns.page_router)

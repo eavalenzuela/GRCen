@@ -955,6 +955,37 @@ CREATE TABLE IF NOT EXISTS board_narratives (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (organization_id, period, section)
 );
+
+-- Outbound vendor questionnaire campaigns: a questionnaire WE send to a vendor,
+-- collected through a login-less portal keyed by an unguessable access_token.
+-- Mirrors the inbound questionnaires two-table shape (header + one row/question).
+CREATE TABLE IF NOT EXISTS vendor_campaigns (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    name            VARCHAR(255) NOT NULL,
+    vendor_asset_id UUID REFERENCES assets(id) ON DELETE SET NULL,
+    access_token    VARCHAR(64) NOT NULL UNIQUE,
+    status          VARCHAR(20) NOT NULL DEFAULT 'draft',
+    due_date        DATE,
+    created_by      UUID REFERENCES users(id) ON DELETE SET NULL,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_vendor_campaigns_org ON vendor_campaigns(organization_id);
+CREATE INDEX IF NOT EXISTS idx_vendor_campaigns_token ON vendor_campaigns(access_token);
+
+CREATE TABLE IF NOT EXISTS vendor_campaign_questions (
+    id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    campaign_id      UUID NOT NULL REFERENCES vendor_campaigns(id) ON DELETE CASCADE,
+    organization_id  UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    position         INTEGER NOT NULL DEFAULT 0,
+    question_text    TEXT NOT NULL,
+    answer           TEXT NOT NULL DEFAULT '',
+    status           VARCHAR(20) NOT NULL DEFAULT 'unanswered',
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_vcampaign_questions_campaign
+    ON vendor_campaign_questions(campaign_id);
 """
 
 

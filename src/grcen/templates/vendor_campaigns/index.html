@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Vendor Campaigns - GRCen{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Vendor Campaigns</h1>
+    <p style="color:#374151;">Send a security questionnaire to a vendor and collect
+    their answers through a login-less portal link.</p>
+</div>
+
+{% if flash %}
+<div class="alert" style="padding:0.5rem 0.9rem;border-radius:6px;margin-bottom:1rem;
+     background:{% if flash.ok %}#dcfce7;color:#166534;{% else %}#fee2e2;color:#991b1b;{% endif %}">{{ flash.message }}</div>
+{% endif %}
+
+<div class="card">
+    <table class="table">
+        <thead><tr><th>Campaign</th><th>Vendor</th><th>Status</th><th>Progress</th><th>Due</th></tr></thead>
+        <tbody>
+        {% if not campaigns %}
+        <tr><td colspan="5" style="color:#6b7280;">No campaigns yet.</td></tr>
+        {% endif %}
+        {% for c in campaigns %}
+        <tr>
+            <td><a href="/vendor-campaigns/{{ c.id }}">{{ c.name }}</a></td>
+            <td>{{ c.vendor_name or '—' }}</td>
+            <td><span class="badge">{{ c.status }}</span></td>
+            <td>{{ c.answered }}/{{ c.total }}</td>
+            <td>{{ c.due_date or '—' }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if has_perm(user.role, Permission.EDIT) %}
+<form method="post" action="/vendor-campaigns" class="card">
+    {% include "partials/csrf.html" %}
+    <h3>New campaign</h3>
+    <div style="display:flex;gap:1rem;align-items:end;flex-wrap:wrap;">
+        <div><label>Name</label><br><input type="text" name="name" required style="width:18rem;"></div>
+        <div><label>Vendor</label><br>
+            <select name="vendor_asset_id">
+                <option value="">(none)</option>
+                {% for v in vendors %}<option value="{{ v.id }}">{{ v.name }}</option>{% endfor %}
+            </select>
+        </div>
+        <div><label>Due date</label><br><input type="date" name="due_date"></div>
+        <button type="submit" class="btn btn-primary">Create</button>
+    </div>
+</form>
+{% endif %}
+{% endblock %}

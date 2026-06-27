@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}{{ campaign.name }} - Vendor Campaign{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>{{ campaign.name }}</h1>
+    <p>
+        <a href="/vendor-campaigns">← All campaigns</a> &nbsp;|&nbsp;
+        Vendor: {{ campaign.vendor_name or '—' }} &nbsp;|&nbsp;
+        Status: <strong>{{ campaign.status }}</strong> &nbsp;|&nbsp;
+        Progress: {{ answered }}/{{ total }}
+    </p>
+</div>
+
+{% if flash %}
+<div class="alert" style="padding:0.5rem 0.9rem;border-radius:6px;margin-bottom:1rem;
+     background:{% if flash.ok %}#dcfce7;color:#166534;{% else %}#fee2e2;color:#991b1b;{% endif %}">{{ flash.message }}</div>
+{% endif %}
+
+{% if campaign.status != 'draft' %}
+<div class="card">
+    <h3>Portal link</h3>
+    <p style="color:#6b7280;">Share this with the vendor. Anyone with the link can answer — no login.</p>
+    <input type="text" readonly value="{{ portal_url }}" style="width:100%;font-family:monospace;"
+           onclick="this.select()">
+</div>
+{% endif %}
+
+<div class="card">
+    <h3>Questions</h3>
+    <table class="table">
+        <thead><tr><th>#</th><th>Question</th><th>Answer</th><th>Status</th></tr></thead>
+        <tbody>
+        {% if not questions %}
+        <tr><td colspan="4" style="color:#6b7280;">No questions yet — add or import below.</td></tr>
+        {% endif %}
+        {% for q in questions %}
+        <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ q.question_text }}</td>
+            <td>{{ q.answer or '—' }}</td>
+            <td><span class="badge">{{ q.status }}</span></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if has_perm(user.role, Permission.EDIT) %}
+{% if campaign.status == 'draft' %}
+<div class="card" style="display:flex;gap:2rem;flex-wrap:wrap;">
+    <form method="post" action="/vendor-campaigns/{{ campaign.id }}/questions" style="flex:1;min-width:18rem;">
+        {% include "partials/csrf.html" %}
+        <h3>Add a question</h3>
+        <input type="text" name="question_text" style="width:100%;" placeholder="e.g. Do you encrypt data at rest?">
+        <button type="submit" class="btn btn-sm">Add</button>
+    </form>
+    <form method="post" action="/vendor-campaigns/{{ campaign.id }}/import" enctype="multipart/form-data" style="flex:1;min-width:18rem;">
+        {% include "partials/csrf.html" %}
+        <h3>Import CSV</h3>
+        <input type="file" name="file" accept=".csv">
+        <label style="display:block;margin:0.3rem 0;"><input type="checkbox" name="has_header"> First row is a header</label>
+        <button type="submit" class="btn btn-sm">Import</button>
+    </form>
+</div>
+<form method="post" action="/vendor-campaigns/{{ campaign.id }}/send" class="card">
+    {% include "partials/csrf.html" %}
+    <button type="submit" class="btn btn-primary">Send campaign</button>
+    <span style="color:#6b7280;">Generates the portal link and locks the question set.</span>
+</form>
+{% elif campaign.status == 'submitted' %}
+<form method="post" action="/vendor-campaigns/{{ campaign.id }}/status" class="card">
+    {% include "partials/csrf.html" %}
+    <input type="hidden" name="status" value="reviewed">
+    <button type="submit" class="btn btn-primary">Mark reviewed</button>
+</form>
+{% endif %}
+{% endif %}
+{% endblock %}
