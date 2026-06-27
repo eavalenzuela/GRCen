@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}{{ detail.framework.name }} — SoA - GRCen{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>{{ detail.framework.name }} — Statement of Applicability</h1>
+    <p>
+        <a href="/frameworks/{{ detail.framework.id }}">← Framework</a> &nbsp;|&nbsp;
+        <a href="/frameworks/{{ detail.framework.id }}/soa.csv" class="btn btn-sm">Export CSV</a>
+    </p>
+</div>
+
+{% if flash %}
+<div class="alert" style="padding:0.6rem 0.9rem;border-radius:6px;margin-bottom:1rem;
+     background:{% if flash.ok %}#dcfce7;color:#166534;{% else %}#fee2e2;color:#991b1b;{% endif %}">{{ flash.message }}</div>
+{% endif %}
+
+<div class="card">
+    <p style="color:#374151;margin-top:0;">
+        {{ detail.applicable_count }} applicable ·
+        {{ detail.not_applicable_count }} not applicable ·
+        coverage {{ detail.coverage_percent }}% over in-scope requirements.
+        Marking a requirement <em>not applicable</em> (with a justification) removes
+        it from the coverage denominator — it is no longer counted as a gap.
+    </p>
+</div>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>Requirement</th>
+            <th>Applicable</th>
+            <th>Implementation</th>
+            <th>Justification</th>
+            <th>Satisfied</th>
+            {% if has_perm(user.role, Permission.EDIT) %}<th></th>{% endif %}
+        </tr>
+    </thead>
+    <tbody>
+    {% for req in detail.requirements %}
+    <tr style="{% if not req.applicable %}opacity:0.6;{% endif %}">
+        {% if has_perm(user.role, Permission.EDIT) %}
+        <form method="post" action="/frameworks/{{ detail.framework.id }}/soa">
+        {% include "partials/csrf.html" %}
+        <input type="hidden" name="requirement_id" value="{{ req.id }}">
+        <td><a href="/assets/{{ req.id }}">{{ req.name }}</a></td>
+        <td><input type="checkbox" name="applicable" {% if req.applicable %}checked{% endif %}></td>
+        <td>
+            <select name="implementation_status" style="padding:0.2rem;">
+                <option value="" {% if not req.implementation_status %}selected{% endif %}>—</option>
+                {% for s in ["implemented", "partially_implemented", "planned", "not_applicable"] %}
+                <option value="{{ s }}" {% if req.implementation_status == s %}selected{% endif %}>{{ s | replace('_', ' ') }}</option>
+                {% endfor %}
+            </select>
+        </td>
+        <td><input type="text" name="applicability_justification" value="{{ req.applicability_justification or '' }}" style="width:100%;padding:0.2rem;"></td>
+        <td>{% if req.satisfied %}<span style="color:#166534;">✓</span>{% else %}<span style="color:#991b1b;">gap</span>{% endif %}</td>
+        <td><button type="submit" class="btn btn-sm">Save</button></td>
+        </form>
+        {% else %}
+        <td><a href="/assets/{{ req.id }}">{{ req.name }}</a></td>
+        <td>{{ 'yes' if req.applicable else 'no' }}</td>
+        <td>{{ (req.implementation_status or '—') | replace('_', ' ') }}</td>
+        <td><small>{{ req.applicability_justification or '' }}</small></td>
+        <td>{% if req.satisfied %}<span style="color:#166534;">✓</span>{% else %}<span style="color:#991b1b;">gap</span>{% endif %}</td>
+        {% endif %}
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

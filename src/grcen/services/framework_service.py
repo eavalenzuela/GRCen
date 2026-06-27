@@ -80,6 +80,10 @@ class RequirementStatus:
     # Worst evidence freshness among satisfying controls (fresh/aging/expired);
     # None when no expiry-tracked evidence is attached.
     evidence_status: str | None = None
+    # Statement of Applicability: in scope unless explicitly marked not applicable.
+    applicable: bool = True
+    implementation_status: str | None = None
+    applicability_justification: str | None = None
 
     @property
     def stale_evidence(self) -> bool:
@@ -118,45 +122,61 @@ class FrameworkDetail:
     in_scope_assets: list[dict[str, Any]]
 
     @property
+    def applicable_requirements(self) -> list[RequirementStatus]:
+        """In-scope requirements (SoA): excludes those marked not applicable.
+        All coverage metrics divide by this set, so a deliberately-N/A requirement
+        is never counted as a gap."""
+        return [r for r in self.requirements if r.applicable]
+
+    @property
+    def applicable_count(self) -> int:
+        return len(self.applicable_requirements)
+
+    @property
+    def not_applicable_count(self) -> int:
+        return sum(1 for r in self.requirements if not r.applicable)
+
+    @property
     def satisfied_count(self) -> int:
-        return sum(1 for r in self.requirements if r.satisfied)
+        return sum(1 for r in self.applicable_requirements if r.satisfied)
 
     @property
     def gap_count(self) -> int:
         """Not *directly* satisfied (includes those covered via crosswalk)."""
-        return sum(1 for r in self.requirements if not r.satisfied)
+        return sum(1 for r in self.applicable_requirements if not r.satisfied)
 
     @property
     def open_gap_count(self) -> int:
         """Truly open: neither directly satisfied nor covered via a crosswalk."""
-        return sum(1 for r in self.requirements if r.coverage == "gap")
+        return sum(1 for r in self.applicable_requirements if r.coverage == "gap")
 
     @property
     def coverage_percent(self) -> int:
-        """Direct coverage only."""
-        if not self.requirements:
+        """Direct coverage over in-scope (applicable) requirements."""
+        apps = self.applicable_requirements
+        if not apps:
             return 0
-        return round(100 * self.satisfied_count / len(self.requirements))
+        return round(100 * self.satisfied_count / len(apps))
 
     @property
     def borrowed_count(self) -> int:
-        return sum(1 for r in self.requirements if r.covered_via_crosswalk)
+        return sum(1 for r in self.applicable_requirements if r.covered_via_crosswalk)
 
     @property
     def weak_count(self) -> int:
         """Satisfied on paper but by a weak/ineffective/untested control."""
-        return sum(1 for r in self.requirements if r.graded == "satisfied_weak")
+        return sum(1 for r in self.applicable_requirements if r.graded == "satisfied_weak")
 
     @property
     def stale_evidence_count(self) -> int:
         """Satisfied requirements whose control evidence is aging or expired."""
-        return sum(1 for r in self.requirements if r.satisfied and r.stale_evidence)
+        return sum(1 for r in self.applicable_requirements if r.satisfied and r.stale_evidence)
 
     @property
     def evidence_freshness_percent(self) -> int:
         """Of satisfied requirements with expiry-tracked control evidence, the
         share whose evidence is still fresh. None of them → 100 (nothing stale)."""
-        tracked = [r for r in self.requirements if r.satisfied and r.evidence_status]
+        tracked = [r for r in self.applicable_requirements if r.satisfied and r.evidence_status]
         if not tracked:
             return 100
         fresh = sum(1 for r in tracked if r.evidence_status == "fresh")
@@ -167,15 +187,16 @@ class FrameworkDetail:
         """Coverage weighted by satisfying-control effectiveness (failing controls
         count for less). Borrowed and non-control-satisfied requirements count
         fully; direct gaps count zero."""
-        if not self.requirements:
+        apps = self.applicable_requirements
+        if not apps:
             return 0
         total = 0.0
-        for r in self.requirements:
+        for r in apps:
             if r.satisfied:
                 total += r.satisfaction_strength if r.satisfaction_strength is not None else 1.0
             elif r.covered_via_crosswalk:
                 total += 1.0
-        return round(100 * total / len(self.requirements))
+        return round(100 * total / len(apps))
 
     @property
     def effective_satisfied_count(self) -> int:
@@ -184,9 +205,10 @@ class FrameworkDetail:
     @property
     def effective_coverage_percent(self) -> int:
         """Direct coverage plus coverage borrowed via equivalent crosswalks."""
-        if not self.requirements:
+        apps = self.applicable_requirements
+        if not apps:
             return 0
-        return round(100 * self.effective_satisfied_count / len(self.requirements))
+        return round(100 * self.effective_satisfied_count / len(apps))
 
     @property
     def crosswalk_count(self) -> int:
@@ -370,7 +392,9 @@ async def list_frameworks(
     summaries: list[FrameworkSummary] = []
     for fw in fw_rows:
         req_ids = await _requirement_ids(pool, fw["id"])
-        if not req_ids:
+        # SoA: only in-scope (applicable) requirements form the coverage denominator.
+        applicable_ids = await _applicable_req_ids(pool, req_ids)
+        if not applicable_ids:
             summaries.append(
                 FrameworkSummary(
                     id=fw["id"],
@@ -381,11 +405,11 @@ async def list_frameworks(
                 )
             )
             continue
-        satisfied_map = await _satisfied_requirements(pool, req_ids)
-        satisfied_ids = [rid for rid in req_ids if satisfied_map.get(rid)]
+        satisfied_map = await _satisfied_requirements(pool, applicable_ids)
+        satisfied_ids = [rid for rid in applicable_ids if satisfied_map.get(rid)]
         strengths = await _requirement_strengths(pool, satisfied_ids)
         borrowed = await _borrowed_count_for(
-            pool, req_ids, satisfied_map, framework_name=fw["name"]
+            pool, applicable_ids, satisfied_map, framework_name=fw["name"]
         )
         # Health-weighted: each satisfied requirement contributes its control
         # strength (1.0 if satisfied by a non-control); borrowed counts fully.
@@ -397,11 +421,11 @@ async def list_frameworks(
                 id=fw["id"],
                 name=fw["name"],
                 metadata=_parse_metadata(fw["metadata"]),
-                requirement_count=len(req_ids),
+                requirement_count=len(applicable_ids),
                 satisfied_count=len(satisfied_ids),
                 borrowed_count=borrowed,
                 weak_count=weak,
-                health_adjusted_coverage_percent=round(100 * weighted / len(req_ids)),
+                health_adjusted_coverage_percent=round(100 * weighted / len(applicable_ids)),
             )
         )
     return summaries
@@ -460,6 +484,22 @@ async def _requirement_ids(pool: asyncpg.Pool, framework_id: UUID) -> list[UUID]
         framework_id,
     )
     return [r["id"] for r in rows]
+
+
+async def _applicable_req_ids(
+    pool: asyncpg.Pool, req_ids: list[UUID]
+) -> list[UUID]:
+    """The subset of requirements that are in scope (SoA): everything except
+    those whose metadata explicitly marks ``applicable`` false."""
+    if not req_ids:
+        return []
+    rows = await pool.fetch(
+        "SELECT id, metadata FROM assets WHERE id = ANY($1::uuid[])", req_ids
+    )
+    return [
+        r["id"] for r in rows
+        if _parse_metadata(r["metadata"]).get("applicable") not in (False, "false", "False")
+    ]
 
 
 async def _satisfied_requirements(
@@ -621,7 +661,7 @@ async def _requirement_statuses(
     if not req_ids:
         return []
     req_rows = await pool.fetch(
-        "SELECT id, name FROM assets WHERE id = ANY($1::uuid[]) ORDER BY name",
+        "SELECT id, name, metadata FROM assets WHERE id = ANY($1::uuid[]) ORDER BY name",
         req_ids,
     )
 
@@ -664,17 +704,21 @@ async def _requirement_statuses(
 
     strengths = await _requirement_strengths(pool, req_ids)
     evidence = await _requirement_evidence(pool, req_ids)
-    return [
-        RequirementStatus(
+    out: list[RequirementStatus] = []
+    for r in req_rows:
+        meta = _parse_metadata(r["metadata"])
+        out.append(RequirementStatus(
             id=r["id"],
             name=r["name"],
             satisfied=bool(by_req.get(r["id"])),
             satisfiers=by_req.get(r["id"], []),
             satisfaction_strength=strengths.get(r["id"]),
             evidence_status=evidence.get(r["id"]),
-        )
-        for r in req_rows
-    ]
+            applicable=meta.get("applicable") not in (False, "false", "False"),
+            implementation_status=meta.get("implementation_status"),
+            applicability_justification=meta.get("applicability_justification"),
+        ))
+    return out
 
 
 async def _certified_audits(

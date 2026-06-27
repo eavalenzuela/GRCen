@@ -20,6 +20,7 @@ from grcen.routers.deps import (
 from grcen.services import (
     access_log_service,
     alert_service as alert_svc,
+    asset as asset_svc,
     compliance_snapshot_service,
     control_test_service,
     evidence_service,
@@ -135,6 +136,93 @@ async def framework_gap_report_csv(
                 f'attachment; filename="framework-{framework_id}-gap-report.csv"'
             ),
         },
+    )
+
+
+@router.get("/frameworks/{framework_id}/soa", response_class=HTMLResponse)
+async def framework_soa(
+    framework_id: UUID,
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.VIEW)),
+):
+    """Statement of Applicability: per-requirement scope + justification."""
+    detail = await framework_service.get_framework_detail(
+        pool, framework_id, organization_id=user.organization_id
+    )
+    if not detail:
+        raise HTTPException(status_code=404, detail="Framework not found")
+    notif_count = await alert_svc.count_unread_notifications(
+        pool, organization_id=user.organization_id, user_id=user.id
+    )
+    return templates.TemplateResponse(
+        request, "frameworks/soa.html",
+        context={
+            "user": user, "detail": detail,
+            "flash": _flash(request.query_params.get("flash")), "notif_count": notif_count,
+        },
+    )
+
+
+@router.post("/frameworks/{framework_id}/soa")
+async def framework_soa_edit(
+    framework_id: UUID,
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.EDIT)),
+):
+    form = await request.form()
+    try:
+        req_id = UUID(str(form.get("requirement_id")))
+    except (ValueError, TypeError):
+        return RedirectResponse(
+            f"/frameworks/{framework_id}/soa?flash=fail:Bad requirement", status_code=302)
+    impl = str(form.get("implementation_status", "")).strip()
+    await asset_svc.bulk_update_assets(
+        pool, [req_id], asset_type=AssetType.REQUIREMENT,
+        metadata_set={
+            "applicable": "applicable" in form,
+            "applicability_justification": str(form.get("applicability_justification", "")).strip(),
+            "implementation_status": impl or None,
+        },
+        updated_by=user.id, organization_id=user.organization_id,
+    )
+    return RedirectResponse(
+        f"/frameworks/{framework_id}/soa?flash=ok:Applicability updated", status_code=302)
+
+
+@router.get("/frameworks/{framework_id}/soa.csv")
+async def framework_soa_csv(
+    framework_id: UUID,
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.EXPORT)),
+):
+    detail = await framework_service.get_framework_detail(
+        pool, framework_id, organization_id=user.organization_id
+    )
+    if not detail:
+        raise HTTPException(status_code=404, detail="Framework not found")
+    import csv
+    import io
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["requirement", "applicable", "implementation_status",
+                     "satisfied", "applicability_justification"])
+    for r in detail.requirements:
+        writer.writerow([
+            r.name, "yes" if r.applicable else "no", r.implementation_status or "",
+            "yes" if r.satisfied else "no", r.applicability_justification or "",
+        ])
+    await access_log_service.record(
+        pool, user=user, action="export", entity_type="framework",
+        entity_id=framework_id, entity_name=f"framework-{framework_id}-soa.csv",
+        path=str(request.url.path),
+        ip_address=request.client.host if request.client else None,
+    )
+    return Response(
+        content=buf.getvalue(), media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="framework-{framework_id}-soa.csv"'},
     )
 
 

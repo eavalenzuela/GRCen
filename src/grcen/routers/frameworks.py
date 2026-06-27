@@ -74,6 +74,8 @@ async def get_framework(
         "weak_count": detail.weak_count,
         "stale_evidence_count": detail.stale_evidence_count,
         "gap_count": detail.gap_count,
+        "applicable_count": detail.applicable_count,
+        "not_applicable_count": detail.not_applicable_count,
         "crosswalk_count": detail.crosswalk_count,
         "requirements": [
             {
@@ -84,6 +86,8 @@ async def get_framework(
                 "graded": r.graded,
                 "satisfaction_strength": r.satisfaction_strength,
                 "evidence_status": r.evidence_status,
+                "applicable": r.applicable,
+                "implementation_status": r.implementation_status,
                 "satisfiers": [
                     {**s, "id": str(s["id"])} for s in r.satisfiers
                 ],

@@ -9,6 +9,8 @@
         &nbsp; | &nbsp;
         <a href="/assets/{{ detail.framework.id }}">View as asset</a>
         &nbsp; | &nbsp;
+        <a href="/frameworks/{{ detail.framework.id }}/soa" class="btn btn-sm">SoA</a>
+        &nbsp; | &nbsp;
         <a href="/frameworks/{{ detail.framework.id }}/report.pdf" class="btn btn-sm">Download PDF</a>
     </p>
 </div>
@@ -30,7 +32,8 @@
         <div>
             <small>Coverage</small>
             <div style="font-weight:600;">
-                {{ detail.coverage_percent }}% ({{ detail.satisfied_count }}/{{ detail.requirements | length }})
+                {{ detail.coverage_percent }}% ({{ detail.satisfied_count }}/{{ detail.applicable_count }})
+                {% if detail.not_applicable_count %}<small style="color:#6b7280;">· {{ detail.not_applicable_count }} N/A</small>{% endif %}
             </div>
             {% if detail.borrowed_count %}
             <small style="color:#1d4ed8;" title="Direct coverage plus gaps covered by an equivalent, satisfied requirement in another framework">

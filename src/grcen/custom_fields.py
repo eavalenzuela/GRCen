@@ -227,6 +227,16 @@ CUSTOM_FIELDS: dict[AssetType, list[FieldDef]] = {
             "enum",
             choices=["critical", "high", "medium", "low"],
         ),
+        # Statement of Applicability (ISO 27001): is this requirement in scope?
+        FieldDef("applicable", "Applicable", "boolean",
+                 help_text="Unset/false excludes the requirement from coverage (SoA)"),
+        FieldDef("applicability_justification", "Applicability Justification", "text"),
+        FieldDef(
+            "implementation_status",
+            "Implementation Status",
+            "enum",
+            choices=["implemented", "partially_implemented", "planned", "not_applicable"],
+        ),
     ],
     AssetType.PROCESS: [
         FieldDef(
