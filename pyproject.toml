@@ -30,6 +30,7 @@ dependencies = [
     "weasyprint>=63.0",
     "pyotp>=2.9.0",
     "qrcode>=7.4.0",
+    "anthropic>=0.40.0",
 ]
 
 [project.optional-dependencies]
@@ -74,6 +75,8 @@ module = [
     "apscheduler.*",
     "qrcode",
     "authlib.*",
+    "anthropic",
+    "anthropic.*",
 ]
 ignore_missing_imports = true
 

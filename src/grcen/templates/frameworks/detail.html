@@ -12,8 +12,20 @@
         <a href="/frameworks/{{ detail.framework.id }}/soa" class="btn btn-sm">SoA</a>
         &nbsp; | &nbsp;
         <a href="/frameworks/{{ detail.framework.id }}/report.pdf" class="btn btn-sm">Download PDF</a>
+        {% if ai_mapping_enabled and has_perm(user.role, Permission.EDIT) and detail.open_gap_count %}
+        &nbsp; | &nbsp;
+        <form method="post" action="/frameworks/{{ detail.framework.id }}/ai-suggest-mappings" style="display:inline;">
+            {% include "partials/csrf.html" %}
+            <button type="submit" class="btn btn-sm" title="Ask Claude to propose control mappings for open gaps. Each lands in the approval queue.">✨ Suggest mappings (AI)</button>
+        </form>
+        {% endif %}
     </p>
 </div>
+
+{% if flash %}
+<div class="alert" style="padding:0.5rem 0.9rem;border-radius:6px;margin-bottom:1rem;
+     background:{% if flash.ok %}#dcfce7;color:#166534;{% else %}#fee2e2;color:#991b1b;{% endif %}">{{ flash.message }}</div>
+{% endif %}
 
 <div class="card">
     <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:1rem;">

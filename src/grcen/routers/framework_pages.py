@@ -19,6 +19,7 @@ from grcen.routers.deps import (
 )
 from grcen.services import (
     access_log_service,
+    ai_mapping_service,
     alert_service as alert_svc,
     asset as asset_svc,
     compliance_snapshot_service,
@@ -91,6 +92,8 @@ async def framework_detail(
             "user": user, "detail": detail, "timeline": timeline,
             "audit_findings": {str(k): v for k, v in audit_findings.items()},
             "last_audited": last_audited, "notif_count": notif_count,
+            "ai_mapping_enabled": ai_mapping_service.is_configured(),
+            "flash": _flash(request.query_params.get("flash")),
         },
     )
 
@@ -189,6 +192,38 @@ async def framework_soa_edit(
     )
     return RedirectResponse(
         f"/frameworks/{framework_id}/soa?flash=ok:Applicability updated", status_code=302)
+
+
+@router.post("/frameworks/{framework_id}/ai-suggest-mappings")
+async def framework_ai_suggest(
+    framework_id: UUID,
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.EDIT)),
+):
+    """Ask Claude to propose control→requirement mappings for open gaps. Each
+    proposal lands in the approval queue as a DRAFT — nothing is written live."""
+    if not ai_mapping_service.is_configured():
+        return RedirectResponse(
+            f"/frameworks/{framework_id}?flash="
+            + quote("fail:AI mapping not configured (set ANTHROPIC_API_KEY)"),
+            status_code=302)
+    try:
+        result = await ai_mapping_service.suggest_mappings(
+            pool, framework_id=framework_id,
+            organization_id=user.organization_id, user=user)
+    except Exception:  # don't leak SDK/network errors to the user
+        return RedirectResponse(
+            f"/frameworks/{framework_id}?flash="
+            + quote("fail:AI mapping request failed — check the server logs"),
+            status_code=302)
+    if result["created"]:
+        msg = (f"ok:{result['created']} mapping(s) queued for approval"
+               + (f"; {result['skipped']} skipped" if result["skipped"] else ""))
+    else:
+        msg = "ok:No new mappings suggested"
+    return RedirectResponse(
+        f"/frameworks/{framework_id}?flash=" + quote(msg), status_code=302)
 
 
 @router.get("/frameworks/{framework_id}/soa.csv")

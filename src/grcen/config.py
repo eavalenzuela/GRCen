@@ -69,5 +69,11 @@ class Settings(BaseSettings):
     # Public base URL used when building links in outbound emails.
     APP_BASE_URL: str = "http://localhost:8000"
 
+    # AI control-to-requirement mapping suggester. Empty key disables the feature
+    # (the button is hidden and the endpoint reports it's unconfigured). The model
+    # never writes directly — every suggestion lands in the approval queue.
+    ANTHROPIC_API_KEY: str = ""
+    ANTHROPIC_MODEL: str = "claude-opus-4-8"
+
 
 settings = Settings()
