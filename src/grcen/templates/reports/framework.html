@@ -18,6 +18,9 @@
     <div><small>Coverage</small>
         <strong>{{ detail.coverage_percent }}%</strong>
         <span class="muted">({{ detail.satisfied_count }} / {{ detail.requirements | length }})</span>
+        {% if detail.borrowed_count %}
+        <span class="muted">· {{ detail.effective_coverage_percent }}% incl. {{ detail.borrowed_count }} via crosswalk</span>
+        {% endif %}
     </div>
 </div>
 
@@ -25,7 +28,7 @@
 <p>{{ detail.framework.description }}</p>
 {% endif %}
 
-<h2>Requirements ({{ detail.requirements | length }} — {{ detail.gap_count }} gap{{ 's' if detail.gap_count != 1 }})</h2>
+<h2>Requirements ({{ detail.requirements | length }} — {{ detail.open_gap_count }} gap{{ 's' if detail.open_gap_count != 1 }}{% if detail.borrowed_count %}, {{ detail.borrowed_count }} via crosswalk{% endif %})</h2>
 {% if detail.requirements %}
 <table>
     <thead><tr><th style="width:6rem;">Status</th><th>Requirement</th><th>Satisfied by</th></tr></thead>
@@ -33,7 +36,8 @@
     {% for req in detail.requirements %}
         <tr>
             <td>
-                {% if req.satisfied %}<span class="pill pill-ok">satisfied</span>
+                {% if req.coverage == 'satisfied' %}<span class="pill pill-ok">satisfied</span>
+                {% elif req.coverage == 'covered_via_crosswalk' %}<span class="pill">via crosswalk</span>
                 {% else %}<span class="pill pill-bad">gap</span>{% endif %}
             </td>
             <td>{{ req.name }}</td>
@@ -41,6 +45,10 @@
                 {% if req.satisfiers %}
                 {% for s in req.satisfiers %}
                     {{ s.name }}<span class="muted"> ({{ s.type }}, {{ s.via }})</span>{% if not loop.last %},{% endif %}
+                {% endfor %}
+                {% elif req.borrowed_from %}
+                {% for b in req.borrowed_from %}
+                    ↔ {{ b.code }}<span class="muted"> ({{ b.framework }}, satisfied)</span>{% if not loop.last %},{% endif %}
                 {% endfor %}
                 {% else %}
                 <span class="muted">—</span>

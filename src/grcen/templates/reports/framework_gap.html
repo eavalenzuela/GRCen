@@ -6,6 +6,9 @@
 {% block content %}
 <p>
     <span class="pill pill-ok">{{ satisfied_count }} satisfied</span>
+    {% if borrowed_count %}
+    <span class="pill">{{ borrowed_count }} covered via crosswalk</span>
+    {% endif %}
     <span class="pill pill-bad">{{ gap_count }} gap{{ 's' if gap_count != 1 else '' }}</span>
     out of {{ rows|length }} requirements.
 </p>
@@ -15,7 +18,7 @@
         <tr>
             <th>Status</th>
             <th>Requirement</th>
-            <th>Satisfiers</th>
+            <th>Satisfiers / borrowed from</th>
             <th>Last audited</th>
         </tr>
     </thead>
@@ -23,14 +26,19 @@
     {% for r in rows %}
         <tr>
             <td>
-                {% if r.satisfied == 'yes' %}
+                {% if r.coverage == 'satisfied' %}
                 <span class="pill pill-ok">satisfied</span>
+                {% elif r.coverage == 'covered_via_crosswalk' %}
+                <span class="pill">via crosswalk</span>
                 {% else %}
                 <span class="pill pill-bad">gap</span>
                 {% endif %}
             </td>
             <td>{{ r.requirement_name }}</td>
-            <td class="muted">{{ r.satisfiers or '—' }}</td>
+            <td class="muted">
+                {% if r.coverage == 'covered_via_crosswalk' and r.borrowed_from %}↔ {{ r.borrowed_from }}
+                {% else %}{{ r.satisfiers or '—' }}{% endif %}
+            </td>
             <td class="muted">{{ r.last_audited[:10] if r.last_audited else 'never' }}</td>
         </tr>
     {% endfor %}

@@ -25,9 +25,19 @@ async def list_frameworks(
             **asdict(s),
             "id": str(s.id),
             "coverage_percent": s.coverage_percent,
+            "effective_satisfied_count": s.effective_satisfied_count,
+            "effective_coverage_percent": s.effective_coverage_percent,
         }
         for s in summaries
     ]
+
+
+@router.get("/crosswalk-matrix", summary="Framework×framework cross_maps edge counts")
+async def crosswalk_matrix(
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.VIEW)),
+):
+    return await framework_service.crosswalk_matrix(pool, organization_id=user.organization_id)
 
 
 @router.get(
@@ -45,15 +55,25 @@ async def get_framework(
     return {
         "framework": {**detail.framework, "id": str(detail.framework["id"])},
         "coverage_percent": detail.coverage_percent,
+        "effective_coverage_percent": detail.effective_coverage_percent,
         "satisfied_count": detail.satisfied_count,
+        "borrowed_count": detail.borrowed_count,
         "gap_count": detail.gap_count,
+        "crosswalk_count": detail.crosswalk_count,
         "requirements": [
             {
                 "id": str(r.id),
                 "name": r.name,
                 "satisfied": r.satisfied,
+                "coverage": r.coverage,
                 "satisfiers": [
                     {**s, "id": str(s["id"])} for s in r.satisfiers
+                ],
+                "crosswalks": [
+                    {**cw, "id": str(cw["id"])} for cw in r.crosswalks
+                ],
+                "borrowed_from": [
+                    {**b, "id": str(b["id"])} for b in r.borrowed_from
                 ],
             }
             for r in detail.requirements

@@ -32,11 +32,15 @@ async def frameworks_index(
     user: User = Depends(require_permission(Permission.VIEW)),
 ):
     frameworks = await framework_service.list_frameworks(pool, organization_id=user.organization_id)
+    matrix = await framework_service.crosswalk_matrix(pool, organization_id=user.organization_id)
     notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     return templates.TemplateResponse(
         request,
         "frameworks/index.html",
-        context={"user": user, "frameworks": frameworks, "notif_count": notif_count},
+        context={
+            "user": user, "frameworks": frameworks,
+            "matrix": matrix, "notif_count": notif_count,
+        },
     )
 
 
@@ -81,13 +85,13 @@ async def framework_gap_report_csv(
     buf = io.StringIO()
     writer = csv.writer(buf)
     writer.writerow([
-        "requirement_id", "requirement_name", "satisfied",
-        "satisfier_count", "satisfiers", "last_audited",
+        "requirement_id", "requirement_name", "coverage", "satisfied",
+        "satisfier_count", "satisfiers", "borrowed_from", "last_audited",
     ])
     for r in rows:
         writer.writerow([
-            r["requirement_id"], r["requirement_name"], r["satisfied"],
-            r["satisfier_count"], r["satisfiers"], r["last_audited"],
+            r["requirement_id"], r["requirement_name"], r["coverage"], r["satisfied"],
+            r["satisfier_count"], r["satisfiers"], r["borrowed_from"], r["last_audited"],
         ])
     await access_log_service.record(
         pool, user=user, action="export",

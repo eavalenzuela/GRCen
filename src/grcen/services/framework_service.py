@@ -34,12 +34,27 @@ class FrameworkSummary:
     metadata: dict[str, Any]
     requirement_count: int
     satisfied_count: int
+    # Requirements that are a *direct* gap but cross-map (equivalent) to a
+    # directly-satisfied requirement in another framework — "borrowed" coverage.
+    borrowed_count: int = 0
 
     @property
     def coverage_percent(self) -> int:
+        """Direct coverage only."""
         if self.requirement_count == 0:
             return 0
         return round(100 * self.satisfied_count / self.requirement_count)
+
+    @property
+    def effective_satisfied_count(self) -> int:
+        return self.satisfied_count + self.borrowed_count
+
+    @property
+    def effective_coverage_percent(self) -> int:
+        """Direct coverage plus coverage borrowed via equivalent crosswalks."""
+        if self.requirement_count == 0:
+            return 0
+        return round(100 * self.effective_satisfied_count / self.requirement_count)
 
 
 @dataclass
@@ -51,6 +66,19 @@ class RequirementStatus:
     # Equivalent requirements in *other* frameworks (cross_maps edges):
     # [{id, name, code, framework, relationship}]
     crosswalks: list[dict[str, Any]] = field(default_factory=list)
+    # True when this is a direct gap but an equivalent requirement elsewhere is
+    # satisfied; borrowed_from holds those satisfied equivalents.
+    covered_via_crosswalk: bool = False
+    borrowed_from: list[dict[str, Any]] = field(default_factory=list)
+
+    @property
+    def coverage(self) -> str:
+        """One of: 'satisfied' | 'covered_via_crosswalk' | 'gap'."""
+        if self.satisfied:
+            return "satisfied"
+        if self.covered_via_crosswalk:
+            return "covered_via_crosswalk"
+        return "gap"
 
 
 @dataclass
@@ -67,13 +95,35 @@ class FrameworkDetail:
 
     @property
     def gap_count(self) -> int:
+        """Not *directly* satisfied (includes those covered via crosswalk)."""
         return sum(1 for r in self.requirements if not r.satisfied)
 
     @property
+    def open_gap_count(self) -> int:
+        """Truly open: neither directly satisfied nor covered via a crosswalk."""
+        return sum(1 for r in self.requirements if r.coverage == "gap")
+
+    @property
     def coverage_percent(self) -> int:
+        """Direct coverage only."""
         if not self.requirements:
             return 0
         return round(100 * self.satisfied_count / len(self.requirements))
+
+    @property
+    def borrowed_count(self) -> int:
+        return sum(1 for r in self.requirements if r.covered_via_crosswalk)
+
+    @property
+    def effective_satisfied_count(self) -> int:
+        return self.satisfied_count + self.borrowed_count
+
+    @property
+    def effective_coverage_percent(self) -> int:
+        """Direct coverage plus coverage borrowed via equivalent crosswalks."""
+        if not self.requirements:
+            return 0
+        return round(100 * self.effective_satisfied_count / len(self.requirements))
 
     @property
     def crosswalk_count(self) -> int:
@@ -94,6 +144,139 @@ def _parse_metadata(raw) -> dict:
         return json.loads(raw)
     except (TypeError, ValueError):
         return {}
+
+
+# ── borrowed coverage (comply once, satisfy many) ─────────────────────────────
+# A requirement that is a *direct* gap can still be "covered via crosswalk" when
+# an EQUIVALENT requirement in another framework is itself directly satisfied —
+# implement a control once and it counts everywhere the obligation is mirrored.
+# Only `equivalent` crosswalks lend coverage; `partial`/`related` are too weak to
+# imply the gap is met.
+
+
+async def _satisfied_equivalents(pool: asyncpg.Pool, crosswalk_lists) -> set[UUID]:
+    """Of the ``equivalent`` crosswalk targets in the given lists, the subset that
+    is itself *directly* satisfied (and so can lend its coverage)."""
+    targets = {
+        cw["id"]
+        for cws in crosswalk_lists
+        for cw in cws
+        if cw.get("relationship") == "equivalent"
+    }
+    if not targets:
+        return set()
+    sat = await _satisfied_requirements(pool, list(targets))
+    return {tid for tid in targets if sat.get(tid)}
+
+
+async def _attach_crosswalks_and_borrowing(
+    pool: asyncpg.Pool,
+    requirements: list[RequirementStatus],
+    *,
+    framework_name: str | None,
+) -> None:
+    """Populate each requirement's ``crosswalks`` and, for direct gaps, its
+    ``covered_via_crosswalk`` / ``borrowed_from`` from satisfied equivalents."""
+    req_ids = [r.id for r in requirements]
+    xmap = await _crosswalks_for_requirements(
+        pool, req_ids, exclude_framework=framework_name
+    )
+    for r in requirements:
+        r.crosswalks = xmap.get(r.id, [])
+    sat_equiv = await _satisfied_equivalents(
+        pool, (r.crosswalks for r in requirements if not r.satisfied)
+    )
+    for r in requirements:
+        if r.satisfied:
+            continue
+        borrowed = [
+            cw
+            for cw in r.crosswalks
+            if cw.get("relationship") == "equivalent" and cw["id"] in sat_equiv
+        ]
+        if borrowed:
+            r.covered_via_crosswalk = True
+            r.borrowed_from = borrowed
+
+
+async def _borrowed_count_for(
+    pool: asyncpg.Pool,
+    req_ids: list[UUID],
+    satisfied_map: dict[UUID, bool],
+    *,
+    framework_name: str | None = None,
+) -> int:
+    """How many of these requirements are a direct gap but borrow coverage.
+
+    ``framework_name`` is excluded from the crosswalk lookup so this matches the
+    detail path exactly (borrowing is only from *other* frameworks).
+    """
+    gaps = [rid for rid in req_ids if not satisfied_map.get(rid)]
+    if not gaps:
+        return 0
+    xmap = await _crosswalks_for_requirements(
+        pool, gaps, exclude_framework=framework_name
+    )
+    sat_equiv = await _satisfied_equivalents(pool, xmap.values())
+    return sum(
+        1
+        for rid in gaps
+        if any(
+            cw.get("relationship") == "equivalent" and cw["id"] in sat_equiv
+            for cw in xmap.get(rid, [])
+        )
+    )
+
+
+async def crosswalk_matrix(
+    pool: asyncpg.Pool, *, organization_id: UUID | None = None
+) -> dict[str, Any]:
+    """Framework×framework ``cross_maps`` edge counts (symmetric, deduped pairs).
+
+    Returns ``{frameworks: [{id, name}], matrix: {a_id: {b_id: count}}, total}``
+    with str ids, ready for a template to render as a grid.
+    """
+    fws = await pool.fetch(
+        """SELECT id, name FROM assets WHERE type = 'framework'
+           AND ($1::uuid IS NULL OR organization_id = $1) ORDER BY name""",
+        organization_id,
+    )
+    rows = await pool.fetch(
+        """SELECT r.source_asset_id AS ra, r.target_asset_id AS rb,
+                  pa.source_asset_id AS a_fw, pb.source_asset_id AS b_fw
+           FROM relationships r
+           JOIN relationships pa
+             ON pa.target_asset_id = r.source_asset_id
+            AND pa.relationship_type = 'parent_of'
+           JOIN relationships pb
+             ON pb.target_asset_id = r.target_asset_id
+            AND pb.relationship_type = 'parent_of'
+           WHERE r.relationship_type = 'cross_maps'
+             AND ($1::uuid IS NULL OR r.organization_id = $1)""",
+        organization_id,
+    )
+    matrix: dict[str, dict[str, int]] = {str(f["id"]): {} for f in fws}
+    total = 0
+    # Count each undirected *requirement* pair once — robust to a requirement
+    # with multiple parents (Cartesian rows) or a human-authored reverse edge.
+    seen_pairs: set[tuple[str, str]] = set()
+    for row in rows:
+        ra, rb = str(row["ra"]), str(row["rb"])
+        pair = (ra, rb) if ra <= rb else (rb, ra)
+        if pair in seen_pairs:
+            continue
+        seen_pairs.add(pair)
+        a, b = str(row["a_fw"]), str(row["b_fw"])
+        if a == b or a not in matrix or b not in matrix:
+            continue
+        matrix[a][b] = matrix[a].get(b, 0) + 1
+        matrix[b][a] = matrix[b].get(a, 0) + 1
+        total += 1
+    return {
+        "frameworks": [{"id": str(f["id"]), "name": f["name"]} for f in fws],
+        "matrix": matrix,
+        "total": total,
+    }
 
 
 async def list_frameworks(
@@ -132,6 +315,9 @@ async def list_frameworks(
                 metadata=_parse_metadata(fw["metadata"]),
                 requirement_count=len(req_ids),
                 satisfied_count=sum(1 for rid in req_ids if satisfied_map.get(rid)),
+                borrowed_count=await _borrowed_count_for(
+                    pool, req_ids, satisfied_map, framework_name=fw["name"]
+                ),
             )
         )
     return summaries
@@ -160,11 +346,9 @@ async def get_framework_detail(
 
     req_ids = await _requirement_ids(pool, framework_id)
     requirements = await _requirement_statuses(pool, req_ids)
-    crosswalk_map = await _crosswalks_for_requirements(
-        pool, req_ids, exclude_framework=framework["name"]
+    await _attach_crosswalks_and_borrowing(
+        pool, requirements, framework_name=framework["name"]
     )
-    for r in requirements:
-        r.crosswalks = crosswalk_map.get(r.id, [])
     audits = await _certified_audits(pool, framework_id)
     vendors = await _certified_vendors(pool, framework_id)
     in_scope_assets = await _in_scope_assets(pool, req_ids)
@@ -263,7 +447,10 @@ async def _crosswalks_for_requirements(
             "name": row["other_name"],
             "code": row["other_code"] or row["other_name"],
             "framework": row["other_framework"] or "—",
-            "relationship": (row["rel"] or "related").split(" · ")[0],
+            # Relationship is the leading "·"-delimited token of the edge
+            # description; normalise case so a human-authored "Equivalent" still
+            # matches the vocabulary used for borrowing.
+            "relationship": (row["rel"] or "related").split(" · ")[0].strip().lower(),
         })
     for links in by_req.values():
         links.sort(key=lambda x: (x["framework"], x["code"]))
@@ -380,7 +567,7 @@ async def gap_report_rows(
     row stays grep-friendly in a spreadsheet.
     """
     fw = await pool.fetchrow(
-        """SELECT id FROM assets WHERE id = $1 AND type = 'framework'
+        """SELECT id, name FROM assets WHERE id = $1 AND type = 'framework'
            AND ($2::uuid IS NULL OR organization_id = $2)""",
         framework_id, organization_id,
     )
@@ -388,18 +575,24 @@ async def gap_report_rows(
         return []
     req_ids = await _requirement_ids(pool, framework_id)
     statuses = await _requirement_statuses(pool, req_ids)
+    await _attach_crosswalks_and_borrowing(pool, statuses, framework_name=fw["name"])
     last_audited = await _last_audited_for_requirements(pool, req_ids)
     rows: list[dict[str, Any]] = []
     for r in statuses:
         sat_str = "; ".join(
             f"{s['name']} ({s['type']}) via {s['via']}" for s in r.satisfiers
         )
+        borrowed_str = "; ".join(
+            f"{b['code']} ({b['framework']})" for b in r.borrowed_from
+        )
         rows.append({
             "requirement_id": str(r.id),
             "requirement_name": r.name,
+            "coverage": r.coverage,
             "satisfied": "yes" if r.satisfied else "no",
             "satisfier_count": len(r.satisfiers),
             "satisfiers": sat_str,
+            "borrowed_from": borrowed_str,
             "last_audited": (
                 last_audited[r.id].isoformat() if last_audited.get(r.id) else ""
             ),

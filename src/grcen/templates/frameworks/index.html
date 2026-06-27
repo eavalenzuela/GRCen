@@ -43,10 +43,18 @@
                 </td>
                 <td>
                     <div style="background:#e5e7eb; border-radius:4px; height:10px; position:relative; overflow:hidden;">
+                        {% if fw.effective_coverage_percent > fw.coverage_percent %}
+                        <div title="covered via crosswalk" style="background:#93c5fd; position:absolute; left:0; top:0;
+                                    width:{{ fw.effective_coverage_percent }}%; height:100%;"></div>
+                        {% endif %}
                         <div style="background:{% if fw.coverage_percent >= 80 %}#16a34a{% elif fw.coverage_percent >= 40 %}#ca8a04{% else %}#dc2626{% endif %};
-                                    width:{{ fw.coverage_percent }}%; height:100%;"></div>
+                                    position:absolute; left:0; top:0; width:{{ fw.coverage_percent }}%; height:100%;"></div>
                     </div>
-                    <small>{{ fw.coverage_percent }}% ({{ fw.satisfied_count }}/{{ fw.requirement_count }})</small>
+                    <small>{{ fw.coverage_percent }}% ({{ fw.satisfied_count }}/{{ fw.requirement_count }})
+                        {% if fw.borrowed_count %}
+                        <span style="color:#1d4ed8;">· ↔ {{ fw.effective_coverage_percent }}% incl. {{ fw.borrowed_count }} via crosswalk</span>
+                        {% endif %}
+                    </small>
                 </td>
                 <td style="text-align:right;">{{ fw.requirement_count }}</td>
             </tr>
@@ -54,5 +62,43 @@
         </tbody>
     </table>
 </div>
+
+{% if matrix and matrix.total %}
+<div class="card" style="margin-top:1.5rem;">
+    <h3 style="margin-top:0;">Cross-framework crosswalks
+        <small style="color:#6b7280; font-weight:normal;">— {{ matrix.total }} equivalence/overlap mappings</small>
+    </h3>
+    <p style="color:#6b7280; font-size:0.85rem; margin-top:0;">
+        How many requirements each pair of frameworks cross-maps (all relationship types).
+        The <em>equivalent</em> subset is what lets a satisfied requirement lend coverage to
+        its gap counterpart in another framework.
+    </p>
+    <table class="table">
+        <thead>
+            <tr>
+                <th></th>
+                {% for c in matrix.frameworks %}<th style="text-align:center;">{{ c.name }}</th>{% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+        {% for rfw in matrix.frameworks %}
+            <tr>
+                <th style="text-align:left;">{{ rfw.name }}</th>
+                {% for cfw in matrix.frameworks %}
+                    {% if rfw.id == cfw.id %}
+                    <td style="text-align:center; color:#d1d5db;">—</td>
+                    {% else %}
+                    {% set n = matrix.matrix[rfw.id].get(cfw.id, 0) %}
+                    <td style="text-align:center;">
+                        {% if n %}<b>{{ n }}</b>{% else %}<span style="color:#d1d5db;">0</span>{% endif %}
+                    </td>
+                    {% endif %}
+                {% endfor %}
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
 {% endif %}
 {% endblock %}

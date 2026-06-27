@@ -32,6 +32,11 @@
             <div style="font-weight:600;">
                 {{ detail.coverage_percent }}% ({{ detail.satisfied_count }}/{{ detail.requirements | length }})
             </div>
+            {% if detail.borrowed_count %}
+            <small style="color:#1d4ed8;" title="Direct coverage plus gaps covered by an equivalent, satisfied requirement in another framework">
+                ↔ {{ detail.effective_coverage_percent }}% incl. {{ detail.borrowed_count }} via crosswalk
+            </small>
+            {% endif %}
         </div>
     </div>
     {% if detail.framework.description %}
@@ -43,7 +48,10 @@
     <div style="display:flex;justify-content:space-between;align-items:center;">
         <h3 style="margin:0;">Requirements
             <span style="color:#6b7280; font-weight:normal; font-size:0.9rem;">
-                &nbsp;— {{ detail.gap_count }} gap{{ 's' if detail.gap_count != 1 else '' }}
+                &nbsp;— {{ detail.open_gap_count }} gap{{ 's' if detail.open_gap_count != 1 else '' }}
+                {% if detail.borrowed_count %}
+                · {{ detail.borrowed_count }} covered via crosswalk
+                {% endif %}
                 {% if detail.crosswalk_count %}
                 · {{ detail.crosswalk_count }} cross-framework map{{ 's' if detail.crosswalk_count != 1 else '' }}
                 {% endif %}
@@ -63,8 +71,10 @@
         {% for req in detail.requirements %}
             <tr>
                 <td>
-                    {% if req.satisfied %}
+                    {% if req.coverage == 'satisfied' %}
                     <span style="color:#166534;">✓ satisfied</span>
+                    {% elif req.coverage == 'covered_via_crosswalk' %}
+                    <span style="color:#1d4ed8;" title="Covered by an equivalent, satisfied requirement in another framework">↔ via crosswalk</span>
                     {% else %}
                     <span style="color:#991b1b;">gap</span>
                     {% endif %}
@@ -75,6 +85,11 @@
                     {% for s in req.satisfiers %}
                         <a href="/assets/{{ s.id }}">{{ s.name }}</a>
                         <small style="color:#6b7280;">({{ s.type }}, {{ s.via }})</small>{% if not loop.last %},{% endif %}
+                    {% endfor %}
+                    {% elif req.borrowed_from %}
+                    {% for b in req.borrowed_from %}
+                        <small style="color:#1d4ed8;">↔ <a href="/assets/{{ b.id }}">{{ b.code }}</a></small>
+                        <small style="color:#6b7280;">({{ b.framework }}, satisfied)</small>{% if not loop.last %}<br>{% endif %}
                     {% endfor %}
                     {% else %}
                     <span style="color:#6b7280;">—</span>

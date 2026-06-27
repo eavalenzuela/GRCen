@@ -8,6 +8,7 @@ of documents.
 from __future__ import annotations
 
 import json
+from collections import Counter
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -97,13 +98,15 @@ async def render_framework_gap_report(
         "SELECT name FROM assets WHERE id = $1", framework_id,
     )
     branding = await _branding_context(pool, organization_id)
+    tiers = Counter(r["coverage"] for r in rows)
     return _render(
         "reports/framework_gap.html",
         {
             "framework_name": fw_name or "Framework",
             "rows": rows,
-            "satisfied_count": sum(1 for r in rows if r["satisfied"] == "yes"),
-            "gap_count": sum(1 for r in rows if r["satisfied"] == "no"),
+            "satisfied_count": tiers["satisfied"],
+            "borrowed_count": tiers["covered_via_crosswalk"],
+            "gap_count": tiers["gap"],
             "generated_at": datetime.now(UTC),
             "cover_title": fw_name or "Framework",
             "cover_subtitle": "Gap Report",
