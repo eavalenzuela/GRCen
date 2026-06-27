@@ -25,6 +25,7 @@ from uuid import UUID
 import asyncpg
 
 from grcen.models.asset import POSTURE_TYPES
+from grcen.services import evidence_service
 
 
 @dataclass
@@ -76,6 +77,13 @@ class RequirementStatus:
     # Max effectiveness weight (0..1) among satisfying *control* assets; None when
     # satisfied only by a non-control (policy/system) or not satisfied at all.
     satisfaction_strength: float | None = None
+    # Worst evidence freshness among satisfying controls (fresh/aging/expired);
+    # None when no expiry-tracked evidence is attached.
+    evidence_status: str | None = None
+
+    @property
+    def stale_evidence(self) -> bool:
+        return self.evidence_status in evidence_service.STALE
 
     @property
     def coverage(self) -> str:
@@ -138,6 +146,21 @@ class FrameworkDetail:
     def weak_count(self) -> int:
         """Satisfied on paper but by a weak/ineffective/untested control."""
         return sum(1 for r in self.requirements if r.graded == "satisfied_weak")
+
+    @property
+    def stale_evidence_count(self) -> int:
+        """Satisfied requirements whose control evidence is aging or expired."""
+        return sum(1 for r in self.requirements if r.satisfied and r.stale_evidence)
+
+    @property
+    def evidence_freshness_percent(self) -> int:
+        """Of satisfied requirements with expiry-tracked control evidence, the
+        share whose evidence is still fresh. None of them → 100 (nothing stale)."""
+        tracked = [r for r in self.requirements if r.satisfied and r.evidence_status]
+        if not tracked:
+            return 100
+        fresh = sum(1 for r in tracked if r.evidence_status == "fresh")
+        return round(100 * fresh / len(tracked))
 
     @property
     def health_adjusted_coverage_percent(self) -> int:
@@ -502,6 +525,44 @@ async def _requirement_strengths(
     return out
 
 
+async def _requirement_evidence(
+    pool: asyncpg.Pool, req_ids: list[UUID]
+) -> dict[UUID, str]:
+    """{req_id: worst evidence freshness among satisfying *control* attachments}.
+
+    Requirements whose satisfying controls carry no expiry-tracked evidence are
+    absent from the map.
+    """
+    if not req_ids:
+        return {}
+    rows = await pool.fetch(
+        """SELECT e.req_id, at.valid_until
+           FROM (
+               SELECT source_asset_id AS req_id, target_asset_id AS ctrl_id
+               FROM relationships
+               WHERE source_asset_id = ANY($1::uuid[])
+                 AND relationship_type = ANY($2::text[])
+               UNION ALL
+               SELECT target_asset_id AS req_id, source_asset_id AS ctrl_id
+               FROM relationships
+               WHERE target_asset_id = ANY($1::uuid[])
+                 AND relationship_type = ANY($3::text[])
+           ) e
+           JOIN assets c ON c.id = e.ctrl_id AND c.type = 'control'
+           JOIN attachments at ON at.asset_id = c.id AND at.valid_until IS NOT NULL""",
+        req_ids, list(_OUTBOUND_SATISFIES), list(_INBOUND_SATISFIES),
+    )
+    by_req: dict[UUID, list[str]] = {}
+    for r in rows:
+        by_req.setdefault(r["req_id"], []).append(evidence_service.classify(r["valid_until"]))
+    out: dict[UUID, str] = {}
+    for rid, statuses in by_req.items():
+        w = evidence_service.worst(statuses)
+        if w is not None:
+            out[rid] = w
+    return out
+
+
 async def _crosswalks_for_requirements(
     pool: asyncpg.Pool, req_ids: list[UUID], *, exclude_framework: str | None = None
 ) -> dict[UUID, list[dict[str, Any]]]:
@@ -602,6 +663,7 @@ async def _requirement_statuses(
         })
 
     strengths = await _requirement_strengths(pool, req_ids)
+    evidence = await _requirement_evidence(pool, req_ids)
     return [
         RequirementStatus(
             id=r["id"],
@@ -609,6 +671,7 @@ async def _requirement_statuses(
             satisfied=bool(by_req.get(r["id"])),
             satisfiers=by_req.get(r["id"], []),
             satisfaction_strength=strengths.get(r["id"]),
+            evidence_status=evidence.get(r["id"]),
         )
         for r in req_rows
     ]

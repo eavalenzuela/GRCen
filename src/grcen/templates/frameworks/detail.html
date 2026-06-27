@@ -42,6 +42,11 @@
                 ⚠ {{ detail.health_adjusted_coverage_percent }}% health-adjusted ({{ detail.weak_count }} weak)
             </small>
             {% endif %}
+            {% if detail.stale_evidence_count %}
+            <br><small style="color:#b45309;" title="Requirements whose satisfying control evidence is aging or expired">
+                🕔 {{ detail.evidence_freshness_percent }}% evidence fresh ({{ detail.stale_evidence_count }} stale)
+            </small>
+            {% endif %}
         </div>
     </div>
     {% if detail.framework.description %}
@@ -106,6 +111,9 @@
                     <span style="color:#1d4ed8;" title="Covered by an equivalent, satisfied requirement in another framework">↔ via crosswalk</span>
                     {% else %}
                     <span style="color:#991b1b;">gap</span>
+                    {% endif %}
+                    {% if req.stale_evidence %}
+                    <br><small style="color:#b45309;" title="Satisfying control's evidence is {{ req.evidence_status }}">🕔 evidence {{ req.evidence_status }}</small>
                     {% endif %}
                 </td>
                 <td><a href="/assets/{{ req.id }}">{{ req.name }}</a></td>

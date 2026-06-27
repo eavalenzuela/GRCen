@@ -68,9 +68,11 @@ async def get_framework(
         "coverage_percent": detail.coverage_percent,
         "effective_coverage_percent": detail.effective_coverage_percent,
         "health_adjusted_coverage_percent": detail.health_adjusted_coverage_percent,
+        "evidence_freshness_percent": detail.evidence_freshness_percent,
         "satisfied_count": detail.satisfied_count,
         "borrowed_count": detail.borrowed_count,
         "weak_count": detail.weak_count,
+        "stale_evidence_count": detail.stale_evidence_count,
         "gap_count": detail.gap_count,
         "crosswalk_count": detail.crosswalk_count,
         "requirements": [
@@ -81,6 +83,7 @@ async def get_framework(
                 "coverage": r.coverage,
                 "graded": r.graded,
                 "satisfaction_strength": r.satisfaction_strength,
+                "evidence_status": r.evidence_status,
                 "satisfiers": [
                     {**s, "id": str(s["id"])} for s in r.satisfiers
                 ],

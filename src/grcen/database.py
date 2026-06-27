@@ -917,6 +917,17 @@ CREATE TABLE IF NOT EXISTS compliance_snapshots (
 );
 CREATE INDEX IF NOT EXISTS ix_compliance_snapshots_fw
     ON compliance_snapshots (framework_id, snapshot_date);
+
+-- Evidence freshness: when an attachment (a control screenshot, a SOC 2 report)
+-- was collected and when it stops being valid. collected_at backfills to
+-- created_at; valid_until NULL = no expiry tracked.
+DO $$ BEGIN
+    ALTER TABLE attachments ADD COLUMN collected_at TIMESTAMPTZ;
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN
+    ALTER TABLE attachments ADD COLUMN valid_until TIMESTAMPTZ;
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+UPDATE attachments SET collected_at = created_at WHERE collected_at IS NULL;
 """
 
 

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Evidence Freshness - GRCen{% endblock %}
+
+{% block content %}
+<h1>Evidence Freshness</h1>
+<p>Attachments with a validity window that are aging (expiring within 30 days) or
+   already expired. Stale evidence stops counting as proof for the controls it
+   backs (see each framework's coverage), so refresh these before an audit.</p>
+
+{% if not stale %}
+<div class="card"><p style="color:#166534;">No aging or expired evidence. ✓</p></div>
+{% else %}
+<table class="table">
+    <thead>
+        <tr><th>Status</th><th>Evidence</th><th>On asset</th><th>Valid until</th></tr>
+    </thead>
+    <tbody>
+    {% for e in stale %}
+        <tr>
+            <td>
+                {% if e.status == 'expired' %}
+                <span style="color:#991b1b;">● expired</span>
+                {% else %}
+                <span style="color:#b45309;">● aging</span>
+                {% endif %}
+            </td>
+            <td>{{ e.name }}</td>
+            <td><a href="/assets/{{ e.asset_id }}">{{ e.asset_name }}</a>
+                <small style="color:#6b7280;">({{ e.asset_type }})</small></td>
+            <td><small>{{ e.valid_until.strftime('%Y-%m-%d') if e.valid_until else '—' }}</small></td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+{% endblock %}

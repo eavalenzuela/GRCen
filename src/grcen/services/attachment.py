@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from uuid import UUID
 
 import asyncpg
@@ -16,6 +17,8 @@ async def create_attachment(
     name: str,
     url_or_path: str | None = None,
     encrypted: bool = False,
+    collected_at: datetime | None = None,
+    valid_until: datetime | None = None,
 ) -> Attachment:
     if (asset_id is None) == (relationship_id is None):
         raise ValueError(
@@ -38,8 +41,9 @@ async def create_attachment(
     row = await pool.fetchrow(
         """
         INSERT INTO attachments
-            (id, asset_id, relationship_id, kind, name, url_or_path, encrypted, organization_id)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            (id, asset_id, relationship_id, kind, name, url_or_path, encrypted,
+             organization_id, collected_at, valid_until)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9, now()), $10)
         RETURNING *
         """,
         uuid.uuid4(),
@@ -50,6 +54,8 @@ async def create_attachment(
         url_or_path,
         encrypted,
         organization_id,
+        collected_at,
+        valid_until,
     )
     return Attachment.from_row(row)
 

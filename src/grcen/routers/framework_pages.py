@@ -22,6 +22,7 @@ from grcen.services import (
     alert_service as alert_svc,
     compliance_snapshot_service,
     control_test_service,
+    evidence_service,
     framework_service,
     pdf_service,
 )
@@ -162,6 +163,25 @@ async def controls_library(
             "flash": _flash(request.query_params.get("flash")),
             "notif_count": notif_count,
         },
+    )
+
+
+@router.get("/evidence", response_class=HTMLResponse)
+async def evidence_freshness(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.VIEW)),
+):
+    """Evidence that is aging or expired — so stale proof can be refreshed."""
+    stale = await evidence_service.list_stale_evidence(
+        pool, organization_id=user.organization_id
+    )
+    notif_count = await alert_svc.count_unread_notifications(
+        pool, organization_id=user.organization_id, user_id=user.id
+    )
+    return templates.TemplateResponse(
+        request, "frameworks/evidence.html",
+        context={"user": user, "stale": stale, "notif_count": notif_count},
     )
 
 
