@@ -1,10 +1,27 @@
 {% extends "base.html" %}
 {% block title %}Frameworks - GRCen{% endblock %}
 
+{% macro covspark(values) %}
+    {% if values and values | length > 1 %}
+    {% set w = 60 %}{% set h = 16 %}{% set n = values | length %}
+    <svg width="{{ w }}" height="{{ h }}" style="vertical-align:middle;" viewBox="0 0 {{ w }} {{ h }}" preserveAspectRatio="none">
+        <polyline fill="none" stroke="#2563eb" stroke-width="1.5"
+            points="{% for v in values %}{{ (loop.index0 / (n - 1) * w) | round(1) }},{{ (h - (v / 100 * h)) | round(1) }} {% endfor %}" />
+    </svg>
+    {% endif %}
+{% endmacro %}
+
 {% block content %}
 <div class="page-header">
     <h1>Compliance Frameworks</h1>
 </div>
+
+{% if drift %}
+<div class="alert" style="padding:0.6rem 0.9rem;border-radius:6px;margin-bottom:1rem;background:#fee2e2;color:#991b1b;">
+    <strong>Coverage drift:</strong>
+    {% for d in drift %}{{ d.framework_name }} {{ d.from_pct }}%→{{ d.to_pct }}%{% if not loop.last %}; {% endif %}{% endfor %}
+</div>
+{% endif %}
 
 {% if not frameworks %}
 <div class="card">
@@ -54,7 +71,13 @@
                         {% if fw.borrowed_count %}
                         <span style="color:#1d4ed8;">· ↔ {{ fw.effective_coverage_percent }}% incl. {{ fw.borrowed_count }} via crosswalk</span>
                         {% endif %}
+                        {% set t = trends.get(fw.id | string) if trends else None %}
+                        {% if t and t.delta is not none and t.delta != 0 %}
+                        <span style="color:{{ '#16a34a' if t.delta > 0 else '#dc2626' }};"
+                              title="vs. last snapshot">{{ '▲' if t.delta > 0 else '▼' }}{{ t.delta | abs }}%</span>
+                        {% endif %}
                     </small>
+                    {% if t and t.sparkline %}<div>{{ covspark(t.sparkline) }}</div>{% endif %}
                 </td>
                 <td style="text-align:right;">{{ fw.requirement_count }}</td>
             </tr>

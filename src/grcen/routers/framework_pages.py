@@ -20,6 +20,7 @@ from grcen.routers.deps import (
 from grcen.services import (
     access_log_service,
     alert_service as alert_svc,
+    compliance_snapshot_service,
     control_test_service,
     framework_service,
     pdf_service,
@@ -42,13 +43,20 @@ async def frameworks_index(
 ):
     frameworks = await framework_service.list_frameworks(pool, organization_id=user.organization_id)
     matrix = await framework_service.crosswalk_matrix(pool, organization_id=user.organization_id)
+    trends = await compliance_snapshot_service.get_coverage_trends(
+        pool, frameworks, organization_id=user.organization_id
+    )
+    drift = await compliance_snapshot_service.coverage_drift(
+        pool, organization_id=user.organization_id
+    )
     notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     return templates.TemplateResponse(
         request,
         "frameworks/index.html",
         context={
             "user": user, "frameworks": frameworks,
-            "matrix": matrix, "notif_count": notif_count,
+            "matrix": matrix, "trends": trends, "drift": drift,
+            "notif_count": notif_count,
         },
     )
 
@@ -66,12 +74,15 @@ async def framework_detail(
     last_audited = await framework_service._last_audited_for_requirements(
         pool, [r.id for r in detail.requirements]
     )
+    timeline = await compliance_snapshot_service.get_coverage_timeline(
+        pool, framework_id, organization_id=user.organization_id
+    )
     notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     return templates.TemplateResponse(
         request,
         "frameworks/detail.html",
         context={
-            "user": user, "detail": detail,
+            "user": user, "detail": detail, "timeline": timeline,
             "last_audited": last_audited, "notif_count": notif_count,
         },
     )

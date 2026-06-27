@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from grcen.models.user import User
 from grcen.permissions import Permission
 from grcen.routers.deps import get_db, require_permission
-from grcen.services import framework_service
+from grcen.services import compliance_snapshot_service, framework_service
 
 router = APIRouter(prefix="/api/frameworks", tags=["frameworks"])
 
@@ -38,6 +38,17 @@ async def crosswalk_matrix(
     user: User = Depends(require_permission(Permission.VIEW)),
 ):
     return await framework_service.crosswalk_matrix(pool, organization_id=user.organization_id)
+
+
+@router.get("/{framework_id}/coverage-timeline", summary="Daily coverage snapshots for a framework")
+async def coverage_timeline(
+    framework_id: UUID,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.VIEW)),
+):
+    return await compliance_snapshot_service.get_coverage_timeline(
+        pool, framework_id, organization_id=user.organization_id
+    )
 
 
 @router.get(

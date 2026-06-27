@@ -44,6 +44,28 @@
     {% endif %}
 </div>
 
+{% if timeline and timeline | length > 1 %}
+<div class="card" style="margin-top:1.5rem;">
+    <h3 style="margin-top:0;">Coverage over time
+        <small style="color:#6b7280;font-weight:normal;">— {{ timeline | length }} snapshots</small>
+    </h3>
+    {% set w = 640 %}{% set h = 120 %}{% set n = timeline | length %}
+    <svg width="100%" viewBox="0 0 {{ w }} {{ h }}" style="max-width:{{ w }}px;">
+        <line x1="0" y1="{{ h }}" x2="{{ w }}" y2="{{ h }}" stroke="#e5e7eb"/>
+        <line x1="0" y1="0" x2="{{ w }}" y2="0" stroke="#f3f4f6"/>
+        <polyline fill="none" stroke="#2563eb" stroke-width="2"
+            points="{% for p in timeline %}{{ (loop.index0 / (n - 1) * w) | round(1) }},{{ (h - (p.effective_coverage_pct / 100 * h)) | round(1) }} {% endfor %}"/>
+        <polyline fill="none" stroke="#9ca3af" stroke-width="1" stroke-dasharray="3,2"
+            points="{% for p in timeline %}{{ (loop.index0 / (n - 1) * w) | round(1) }},{{ (h - (p.coverage_pct / 100 * h)) | round(1) }} {% endfor %}"/>
+    </svg>
+    <small style="color:#6b7280;">
+        <span style="color:#2563eb;">— effective</span> ·
+        <span style="color:#9ca3af;">-- direct</span> ·
+        {{ timeline[0].snapshot_date }} → {{ timeline[-1].snapshot_date }}
+    </small>
+</div>
+{% endif %}
+
 <div class="card" style="margin-top:1.5rem;">
     <div style="display:flex;justify-content:space-between;align-items:center;">
         <h3 style="margin:0;">Requirements

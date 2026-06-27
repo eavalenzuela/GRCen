@@ -67,6 +67,15 @@ async def _nightly_risk_snapshot():
     await capture_all_org_snapshots(pool)
 
 
+async def _nightly_compliance_snapshot():
+    from grcen.services.compliance_snapshot_service import (
+        capture_all_org_compliance_snapshots,
+    )
+
+    pool = await get_pool()
+    await capture_all_org_compliance_snapshots(pool)
+
+
 async def _flush_email_digests():
     from grcen.services.digest_service import flush_digests
 
@@ -102,6 +111,12 @@ async def lifespan(app: FastAPI):
         _nightly_risk_snapshot,
         CronTrigger(hour=0, minute=5),
         id="risk_snapshot_daily",
+    )
+    # Daily at 00:10 UTC — per-framework coverage snapshot for trend + drift.
+    scheduler.add_job(
+        _nightly_compliance_snapshot,
+        CronTrigger(hour=0, minute=10),
+        id="compliance_snapshot_daily",
     )
     # Hourly at :15 — flush queued digest emails. Off-cycle from the alert
     # ticker so a fresh batch can accumulate before each flush.

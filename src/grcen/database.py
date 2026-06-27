@@ -895,6 +895,28 @@ CREATE INDEX IF NOT EXISTS ix_control_test_runs_control
     ON control_test_runs (control_id, run_at DESC);
 CREATE INDEX IF NOT EXISTS ix_control_test_runs_org
     ON control_test_runs (organization_id);
+
+-- Compliance posture snapshots: one row per org/framework/day, the compliance
+-- analogue of risk_snapshots. Lets GRCen prove sustained coverage across an
+-- audit period, answer "what was coverage on the audit date?", and detect
+-- drift when a requirement flips satisfied→gap. framework_name is denormalised
+-- so history survives a rename/delete.
+CREATE TABLE IF NOT EXISTS compliance_snapshots (
+    organization_id      UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    framework_id         UUID NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
+    snapshot_date        DATE NOT NULL,
+    framework_name       VARCHAR(255) NOT NULL DEFAULT '',
+    requirement_count    INTEGER NOT NULL DEFAULT 0,
+    satisfied_count      INTEGER NOT NULL DEFAULT 0,
+    borrowed_count       INTEGER NOT NULL DEFAULT 0,
+    open_gap_count       INTEGER NOT NULL DEFAULT 0,
+    coverage_pct         INTEGER NOT NULL DEFAULT 0,
+    effective_coverage_pct INTEGER NOT NULL DEFAULT 0,
+    created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (organization_id, framework_id, snapshot_date)
+);
+CREATE INDEX IF NOT EXISTS ix_compliance_snapshots_fw
+    ON compliance_snapshots (framework_id, snapshot_date);
 """
 
 
