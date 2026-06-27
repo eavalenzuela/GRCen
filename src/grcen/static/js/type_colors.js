@@ -18,4 +18,5 @@ window.TYPE_COLORS = {
     control: '#22c55e',
     incident: '#f43f5e',
     framework: '#a855f7',
+    finding: '#fb923c',
 };

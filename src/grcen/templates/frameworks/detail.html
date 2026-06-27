@@ -169,6 +169,10 @@
             <li style="padding:0.25rem 0;">
                 <a href="/assets/{{ a.id }}">{{ a.name }}</a>
                 <small style="color:#6b7280;">({{ a.status }})</small>
+                {% set af = audit_findings.get(a.id | string) if audit_findings else None %}
+                {% if af and af.total %}
+                <small style="color:{{ '#b45309' if af.open else '#166534' }};">— {{ af.open }} open / {{ af.total }} findings</small>
+                {% endif %}
             </li>
         {% endfor %}
         </ul>

@@ -260,6 +260,9 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 -- Answer-library entries (feature_roadmap.md #21): posture metadata modeled as assets
 DO $$ BEGIN ALTER TYPE asset_type ADD VALUE 'answer';
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+-- Findings (audit/assessment findings with a CAPA lifecycle)
+DO $$ BEGIN ALTER TYPE asset_type ADD VALUE 'finding';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- Global tags and criticality columns
 DO $$ BEGIN

@@ -113,6 +113,26 @@ REGISTERS: dict[AssetType, RegisterDef] = {
         ),
         nav_primary=True,
     ),
+    AssetType.FINDING: RegisterDef(
+        type=AssetType.FINDING, slug="findings", label="Finding", plural="Findings",
+        columns=(
+            _m("meta.finding_status", "Status"),
+            _m("meta.severity", "Severity"),
+            _m("meta.source", "Source"),
+            _m("computed.next_review", "Due"),
+        ),
+        default_sort="meta.due_date", default_order="asc",
+        lifecycle_column="meta.finding_status",
+        bulk_fields=("status", "owner", "tags", "meta.finding_status",
+                     "meta.severity", "meta.due_date"),
+        metrics=(
+            MetricDef("Total", "total"),
+            MetricDef("Open", "meta_eq", field="finding_status", value="open", warn=True),
+            MetricDef("Overdue", "overdue_reviews", warn=True),
+            MetricDef("Critical", "meta_eq", field="severity", value="critical", warn=True),
+        ),
+        nav_primary=True,
+    ),
     AssetType.POLICY: RegisterDef(
         type=AssetType.POLICY, slug="policies", label="Policy", plural="Policies",
         columns=(
@@ -271,7 +291,7 @@ GROUPS: tuple[tuple[str, tuple[AssetType, ...]], ...] = (
     ("Third parties", (AssetType.VENDOR,)),
     ("Operations", (AssetType.INCIDENT, AssetType.PROCESS, AssetType.SYSTEM, AssetType.DEVICE)),
     ("Compliance", (AssetType.REQUIREMENT, AssetType.FRAMEWORK, AssetType.CONTROL)),
-    ("Governance", (AssetType.POLICY, AssetType.AUDIT)),
+    ("Governance", (AssetType.POLICY, AssetType.AUDIT, AssetType.FINDING)),
     ("Risk", (AssetType.RISK,)),
     ("Inventory", (AssetType.PERSON, AssetType.DATA_CATEGORY, AssetType.PRODUCT,
                    AssetType.INTELLECTUAL_PROPERTY, AssetType.ORGANIZATIONAL_UNIT)),

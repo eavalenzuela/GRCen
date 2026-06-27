@@ -22,6 +22,7 @@ REVIEW_DATE_FIELDS: dict[str, str] = {
     "vendor": "next_assessment_due",
     "control": "next_test_due",
     "framework": "certification_expiry",
+    "finding": "due_date",
     # audit uses end_date but audits are events, not recurring reviews
 }
 

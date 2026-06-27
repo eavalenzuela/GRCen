@@ -22,6 +22,7 @@ class AssetType(enum.StrEnum):
     CONTROL = "control"
     INCIDENT = "incident"
     FRAMEWORK = "framework"
+    FINDING = "finding"
     ANSWER = "answer"
 
 

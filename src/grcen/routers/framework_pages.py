@@ -23,6 +23,7 @@ from grcen.services import (
     compliance_snapshot_service,
     control_test_service,
     evidence_service,
+    findings_service,
     framework_service,
     pdf_service,
 )
@@ -78,12 +79,16 @@ async def framework_detail(
     timeline = await compliance_snapshot_service.get_coverage_timeline(
         pool, framework_id, organization_id=user.organization_id
     )
+    audit_findings = await findings_service.audit_finding_rollup(
+        pool, [a["id"] for a in detail.audits]
+    )
     notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     return templates.TemplateResponse(
         request,
         "frameworks/detail.html",
         context={
             "user": user, "detail": detail, "timeline": timeline,
+            "audit_findings": {str(k): v for k, v in audit_findings.items()},
             "last_audited": last_audited, "notif_count": notif_count,
         },
     )

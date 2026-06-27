@@ -20,6 +20,7 @@ from grcen.routers import (
     auth,
     controls,
     exports,
+    findings,
     frameworks,
     graph,
     imports,
@@ -176,6 +177,7 @@ def create_app() -> FastAPI:
     app.include_router(alerts.router)
     app.include_router(frameworks.router)
     app.include_router(controls.router)
+    app.include_router(findings.router)
     app.include_router(tags.router)
     app.include_router(saved_searches.router)
     app.include_router(access_log.router)
