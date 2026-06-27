@@ -35,6 +35,11 @@
             {% if detail.borrowed_count %}
             <small style="color:#1d4ed8;" title="Direct coverage plus gaps covered by an equivalent, satisfied requirement in another framework">
                 ↔ {{ detail.effective_coverage_percent }}% incl. {{ detail.borrowed_count }} via crosswalk
+            </small><br>
+            {% endif %}
+            {% if detail.weak_count %}
+            <small style="color:#b45309;" title="Coverage weighted by satisfying-control effectiveness; failing controls count for less">
+                ⚠ {{ detail.health_adjusted_coverage_percent }}% health-adjusted ({{ detail.weak_count }} weak)
             </small>
             {% endif %}
         </div>
@@ -93,7 +98,9 @@
         {% for req in detail.requirements %}
             <tr>
                 <td>
-                    {% if req.coverage == 'satisfied' %}
+                    {% if req.graded == 'satisfied_weak' %}
+                    <span style="color:#b45309;" title="Satisfied only by a weak / ineffective / untested control">⚠ weak</span>
+                    {% elif req.satisfied %}
                     <span style="color:#166534;">✓ satisfied</span>
                     {% elif req.coverage == 'covered_via_crosswalk' %}
                     <span style="color:#1d4ed8;" title="Covered by an equivalent, satisfied requirement in another framework">↔ via crosswalk</span>

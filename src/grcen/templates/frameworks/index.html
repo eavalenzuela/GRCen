@@ -71,6 +71,9 @@
                         {% if fw.borrowed_count %}
                         <span style="color:#1d4ed8;">· ↔ {{ fw.effective_coverage_percent }}% incl. {{ fw.borrowed_count }} via crosswalk</span>
                         {% endif %}
+                        {% if fw.weak_count %}
+                        <span style="color:#b45309;" title="Coverage weighted by control effectiveness">· ⚠ {{ fw.health_adjusted_coverage_percent }}% health-adj ({{ fw.weak_count }} weak)</span>
+                        {% endif %}
                         {% set t = trends.get(fw.id | string) if trends else None %}
                         {% if t and t.delta is not none and t.delta != 0 %}
                         <span style="color:{{ '#16a34a' if t.delta > 0 else '#dc2626' }};"

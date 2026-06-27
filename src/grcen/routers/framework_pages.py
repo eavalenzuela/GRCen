@@ -105,13 +105,14 @@ async def framework_gap_report_csv(
     buf = io.StringIO()
     writer = csv.writer(buf)
     writer.writerow([
-        "requirement_id", "requirement_name", "coverage", "satisfied",
+        "requirement_id", "requirement_name", "coverage", "graded", "satisfied",
         "satisfier_count", "satisfiers", "borrowed_from", "last_audited",
     ])
     for r in rows:
         writer.writerow([
-            r["requirement_id"], r["requirement_name"], r["coverage"], r["satisfied"],
-            r["satisfier_count"], r["satisfiers"], r["borrowed_from"], r["last_audited"],
+            r["requirement_id"], r["requirement_name"], r["coverage"], r["graded"],
+            r["satisfied"], r["satisfier_count"], r["satisfiers"],
+            r["borrowed_from"], r["last_audited"],
         ])
     await access_log_service.record(
         pool, user=user, action="export",

@@ -37,6 +37,9 @@ class FrameworkSummary:
     # Requirements that are a *direct* gap but cross-map (equivalent) to a
     # directly-satisfied requirement in another framework — "borrowed" coverage.
     borrowed_count: int = 0
+    # Satisfied-but-weak controls, and coverage weighted by control effectiveness.
+    weak_count: int = 0
+    health_adjusted_coverage_percent: int = 0
 
     @property
     def coverage_percent(self) -> int:
@@ -70,12 +73,29 @@ class RequirementStatus:
     # satisfied; borrowed_from holds those satisfied equivalents.
     covered_via_crosswalk: bool = False
     borrowed_from: list[dict[str, Any]] = field(default_factory=list)
+    # Max effectiveness weight (0..1) among satisfying *control* assets; None when
+    # satisfied only by a non-control (policy/system) or not satisfied at all.
+    satisfaction_strength: float | None = None
 
     @property
     def coverage(self) -> str:
         """One of: 'satisfied' | 'covered_via_crosswalk' | 'gap'."""
         if self.satisfied:
             return "satisfied"
+        if self.covered_via_crosswalk:
+            return "covered_via_crosswalk"
+        return "gap"
+
+    @property
+    def graded(self) -> str:
+        """Health-weighted tier: satisfied_strong | satisfied_weak | satisfied
+        (ungraded) | covered_via_crosswalk | gap."""
+        if self.satisfied:
+            if self.satisfaction_strength is None:
+                return "satisfied"  # backed by a non-control; can't grade health
+            if self.satisfaction_strength >= _STRONG_THRESHOLD:
+                return "satisfied_strong"
+            return "satisfied_weak"
         if self.covered_via_crosswalk:
             return "covered_via_crosswalk"
         return "gap"
@@ -115,6 +135,26 @@ class FrameworkDetail:
         return sum(1 for r in self.requirements if r.covered_via_crosswalk)
 
     @property
+    def weak_count(self) -> int:
+        """Satisfied on paper but by a weak/ineffective/untested control."""
+        return sum(1 for r in self.requirements if r.graded == "satisfied_weak")
+
+    @property
+    def health_adjusted_coverage_percent(self) -> int:
+        """Coverage weighted by satisfying-control effectiveness (failing controls
+        count for less). Borrowed and non-control-satisfied requirements count
+        fully; direct gaps count zero."""
+        if not self.requirements:
+            return 0
+        total = 0.0
+        for r in self.requirements:
+            if r.satisfied:
+                total += r.satisfaction_strength if r.satisfaction_strength is not None else 1.0
+            elif r.covered_via_crosswalk:
+                total += 1.0
+        return round(100 * total / len(self.requirements))
+
+    @property
     def effective_satisfied_count(self) -> int:
         return self.satisfied_count + self.borrowed_count
 
@@ -133,6 +173,17 @@ class FrameworkDetail:
 # Edges that mark a requirement as satisfied.
 _OUTBOUND_SATISFIES = ("satisfied_by", "implemented_by")
 _INBOUND_SATISFIES = ("satisfies",)
+
+# Control effectiveness → satisfaction weight (mirrors risk_service._EFFECTIVENESS_WEIGHT).
+# Used to grade coverage: a requirement satisfied only by a failing control is
+# "covered on paper" but contributes less than its full weight.
+_EFFECTIVENESS_WEIGHT = {
+    "effective": 1.0,
+    "partially_effective": 0.5,
+    "ineffective": 0.0,
+    "not_tested": 0.25,
+}
+_STRONG_THRESHOLD = 0.75
 
 
 def _parse_metadata(raw) -> dict:
@@ -308,16 +359,26 @@ async def list_frameworks(
             )
             continue
         satisfied_map = await _satisfied_requirements(pool, req_ids)
+        satisfied_ids = [rid for rid in req_ids if satisfied_map.get(rid)]
+        strengths = await _requirement_strengths(pool, satisfied_ids)
+        borrowed = await _borrowed_count_for(
+            pool, req_ids, satisfied_map, framework_name=fw["name"]
+        )
+        # Health-weighted: each satisfied requirement contributes its control
+        # strength (1.0 if satisfied by a non-control); borrowed counts fully.
+        weak = sum(1 for rid in satisfied_ids
+                   if rid in strengths and strengths[rid] < _STRONG_THRESHOLD)
+        weighted = sum(strengths.get(rid, 1.0) for rid in satisfied_ids) + borrowed
         summaries.append(
             FrameworkSummary(
                 id=fw["id"],
                 name=fw["name"],
                 metadata=_parse_metadata(fw["metadata"]),
                 requirement_count=len(req_ids),
-                satisfied_count=sum(1 for rid in req_ids if satisfied_map.get(rid)),
-                borrowed_count=await _borrowed_count_for(
-                    pool, req_ids, satisfied_map, framework_name=fw["name"]
-                ),
+                satisfied_count=len(satisfied_ids),
+                borrowed_count=borrowed,
+                weak_count=weak,
+                health_adjusted_coverage_percent=round(100 * weighted / len(req_ids)),
             )
         )
     return summaries
@@ -403,6 +464,42 @@ async def _satisfied_requirements(
         r["target_asset_id"] for r in in_rows
     }
     return {rid: rid in satisfied for rid in req_ids}
+
+
+async def _requirement_strengths(
+    pool: asyncpg.Pool, req_ids: list[UUID]
+) -> dict[UUID, float]:
+    """{req_id: max effectiveness weight among satisfying *control* assets}.
+
+    Requirements with no control satisfier (e.g. satisfied only by a policy) are
+    absent from the map — they can't be graded for control health.
+    """
+    if not req_ids:
+        return {}
+    rows = await pool.fetch(
+        """SELECT e.req_id, c.metadata AS meta
+           FROM (
+               SELECT source_asset_id AS req_id, target_asset_id AS ctrl_id
+               FROM relationships
+               WHERE source_asset_id = ANY($1::uuid[])
+                 AND relationship_type = ANY($2::text[])
+               UNION ALL
+               SELECT target_asset_id AS req_id, source_asset_id AS ctrl_id
+               FROM relationships
+               WHERE target_asset_id = ANY($1::uuid[])
+                 AND relationship_type = ANY($3::text[])
+           ) e
+           JOIN assets c ON c.id = e.ctrl_id AND c.type = 'control'""",
+        req_ids, list(_OUTBOUND_SATISFIES), list(_INBOUND_SATISFIES),
+    )
+    out: dict[UUID, float] = {}
+    for r in rows:
+        eff = _parse_metadata(r["meta"]).get("effectiveness")
+        weight = _EFFECTIVENESS_WEIGHT.get(eff) if isinstance(eff, str) else None
+        if weight is None:
+            continue
+        out[r["req_id"]] = max(out.get(r["req_id"], 0.0), weight)
+    return out
 
 
 async def _crosswalks_for_requirements(
@@ -504,12 +601,14 @@ async def _requirement_statuses(
             "via": row["via"],
         })
 
+    strengths = await _requirement_strengths(pool, req_ids)
     return [
         RequirementStatus(
             id=r["id"],
             name=r["name"],
             satisfied=bool(by_req.get(r["id"])),
             satisfiers=by_req.get(r["id"], []),
+            satisfaction_strength=strengths.get(r["id"]),
         )
         for r in req_rows
     ]
@@ -589,6 +688,7 @@ async def gap_report_rows(
             "requirement_id": str(r.id),
             "requirement_name": r.name,
             "coverage": r.coverage,
+            "graded": r.graded,
             "satisfied": "yes" if r.satisfied else "no",
             "satisfier_count": len(r.satisfiers),
             "satisfiers": sat_str,

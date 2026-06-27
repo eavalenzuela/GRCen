@@ -62,9 +62,9 @@ async def test_gap_report_csv_endpoint(pool, auth_client, small_framework):
     assert resp.status_code == 200
     assert resp.headers["content-type"].startswith("text/csv")
     body = resp.text
-    assert body.startswith("requirement_id,requirement_name,coverage,satisfied,")
-    assert "Req1,satisfied,yes" in body
-    assert "Req3,gap,no" in body
+    assert body.startswith("requirement_id,requirement_name,coverage,graded,satisfied,")
+    assert "Req1,satisfied," in body
+    assert "Req3,gap,gap,no" in body
 
 
 @pytest.mark.asyncio

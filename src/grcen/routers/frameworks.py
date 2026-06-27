@@ -67,8 +67,10 @@ async def get_framework(
         "framework": {**detail.framework, "id": str(detail.framework["id"])},
         "coverage_percent": detail.coverage_percent,
         "effective_coverage_percent": detail.effective_coverage_percent,
+        "health_adjusted_coverage_percent": detail.health_adjusted_coverage_percent,
         "satisfied_count": detail.satisfied_count,
         "borrowed_count": detail.borrowed_count,
+        "weak_count": detail.weak_count,
         "gap_count": detail.gap_count,
         "crosswalk_count": detail.crosswalk_count,
         "requirements": [
@@ -77,6 +79,8 @@ async def get_framework(
                 "name": r.name,
                 "satisfied": r.satisfied,
                 "coverage": r.coverage,
+                "graded": r.graded,
+                "satisfaction_strength": r.satisfaction_strength,
                 "satisfiers": [
                     {**s, "id": str(s["id"])} for s in r.satisfiers
                 ],
