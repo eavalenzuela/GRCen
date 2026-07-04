@@ -1,11 +1,17 @@
 """Encrypted database backup and restore.
 
 Pipes a `pg_dump` of the configured database through AES-256-GCM (one chunk
-per write) using the existing master encryption key. Output format:
+per write) using a key derived from the master encryption key. Output format
+(version 2):
 
-    GRCBKP\x01           magic + version
+    GRCBKP\x02           magic + version
+    [16-byte HKDF salt]  random per-backup salt for the key derivation
     [12-byte nonce][4-byte BE chunk-len][ciphertext+tag][...repeat...]
     [12-byte nonce][0x00000000 chunk-len]    EOF marker
+
+Each backup derives its own key via HKDF(master, salt), so no two backup
+files share a derived key. Version 1 files (magic ``GRCBKP\x01``) used the
+fixed salt ``backup-salt`` and remain restorable for backward compatibility.
 
 A fresh nonce per chunk so the GCM tag stays valid even on multi-chunk dumps,
 and the magic header lets `restore` reject corrupt or wrong-format input
@@ -25,23 +31,26 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from grcen.config import settings
 from grcen.services.encryption import is_encryption_enabled
 
-MAGIC = b"GRCBKP\x01"
+MAGIC = b"GRCBKP\x02"
+MAGIC_V1 = b"GRCBKP\x01"
 _CHUNK_SIZE = 64 * 1024  # 64 KiB plaintext chunks
 _INFO = b"grcen-backup"
+_SALT_SIZE = 16
+_LEGACY_SALT = b"backup-salt"  # fixed salt used by v1 files
 
 
 class BackupError(RuntimeError):
     pass
 
 
-def _backup_key() -> AESGCM:
+def _backup_key(salt: bytes = _LEGACY_SALT) -> AESGCM:
     """Derive a backup-only key from the master ENCRYPTION_KEY via HKDF."""
     if not is_encryption_enabled():
         raise BackupError("Backup encryption requires ENCRYPTION_KEY to be set.")
     import base64
     master = base64.urlsafe_b64decode(settings.ENCRYPTION_KEY)
     derived = HKDF(
-        algorithm=SHA256(), length=32, salt=b"backup-salt", info=_INFO
+        algorithm=SHA256(), length=32, salt=salt, info=_INFO
     ).derive(master)
     return AESGCM(derived)
 
@@ -75,12 +84,18 @@ def _spawn(cmd: list[str], extra_args: list[str], extra_env: dict[str, str], **k
 
 
 def encrypt_stream(plaintext_iter, out_path: Path) -> int:
-    """Write the plaintext chunks to *out_path* in encrypted-stream format."""
-    key = _backup_key()
+    """Write the plaintext chunks to *out_path* in encrypted-stream format.
+
+    Always writes the current (v2) format: a fresh random HKDF salt lives in
+    the header so this backup's derived key is unique to the file.
+    """
+    salt = os.urandom(_SALT_SIZE)
+    key = _backup_key(salt)
     bytes_written = 0
     with out_path.open("wb") as out:
         out.write(MAGIC)
-        bytes_written += len(MAGIC)
+        out.write(salt)
+        bytes_written += len(MAGIC) + _SALT_SIZE
         for chunk in plaintext_iter:
             if not chunk:
                 continue
@@ -98,11 +113,21 @@ def encrypt_stream(plaintext_iter, out_path: Path) -> int:
 
 
 def decrypt_stream(in_path: Path):
-    """Generator yielding decrypted chunks read from *in_path*."""
-    key = _backup_key()
+    """Generator yielding decrypted chunks read from *in_path*.
+
+    Handles both v2 files (per-file salt in the header) and legacy v1 files
+    (fixed salt).
+    """
     with in_path.open("rb") as src:
         head = src.read(len(MAGIC))
-        if head != MAGIC:
+        if head == MAGIC:
+            salt = src.read(_SALT_SIZE)
+            if len(salt) < _SALT_SIZE:
+                raise BackupError("Truncated backup file (salt header).")
+            key = _backup_key(salt)
+        elif head == MAGIC_V1:
+            key = _backup_key(_LEGACY_SALT)
+        else:
             raise BackupError("Not a GRCen backup file (magic header mismatch).")
         while True:
             nonce = src.read(12)

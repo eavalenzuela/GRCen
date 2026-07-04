@@ -119,6 +119,29 @@
 {% endif %}
 
 <div class="card" style="margin-top:1.5rem;">
+    <h3>Review calendar feed (iCal)</h3>
+    <p style="color:#6b7280;">Subscribe your calendar app (Outlook, Google Calendar, Thunderbird)
+       to upcoming review and due dates. Anyone with the URL can read the feed —
+       treat it like a password, and regenerate it if it leaks.</p>
+    {% if calendar_url %}
+    <p><code style="word-break:break-all;">{{ calendar_url }}</code></p>
+    <form method="post" action="/settings/calendar/enable" style="display:inline;">
+        {% include "partials/csrf.html" %}
+        <button type="submit" class="btn">Regenerate URL</button>
+    </form>
+    <form method="post" action="/settings/calendar/disable" style="display:inline;">
+        {% include "partials/csrf.html" %}
+        <button type="submit" class="btn btn-danger">Disable feed</button>
+    </form>
+    {% else %}
+    <form method="post" action="/settings/calendar/enable">
+        {% include "partials/csrf.html" %}
+        <button type="submit" class="btn">Generate feed URL</button>
+    </form>
+    {% endif %}
+</div>
+
+<div class="card" style="margin-top:1.5rem;">
     <h3>Active sessions</h3>
     <p style="color:#6b7280;">Each browser sign-in creates a session. Revoke any you don't recognize.</p>
     {% if sessions %}

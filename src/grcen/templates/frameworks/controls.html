@@ -7,7 +7,12 @@
 {% endmacro %}
 
 {% block content %}
-<h1>Control Library</h1>
+<div style="display:flex;justify-content:space-between;align-items:center;">
+    <h1>Control Library</h1>
+    {% if has_perm(user.role, Permission.EXPORT) %}
+    <a href="/controls/export.csv" class="btn btn-sm">Export CSV</a>
+    {% endif %}
+</div>
 <p>Every control asset, the requirements it covers, and its test history — the
    inverse of the per-framework gap view. Recording a test result rolls the
    control's <em>effectiveness</em> and <em>next test due</em> forward.</p>

@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Invitations - GRCen{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Organization Invitations</h1>
+</div>
+
+<p style="color:#6b7280;">Mint a single-use, expiring link that lets someone create their own
+account in this organization with the role you pick — no admin-typed passwords.</p>
+
+{% if flash %}
+<div class="alert" style="background:{% if flash.ok %}#dcfce7; color:#166534; border:1px solid #bbf7d0{% else %}#fee2e2; color:#991b1b; border:1px solid #fecaca{% endif %};">
+    {{ flash.message }}
+</div>
+{% endif %}
+
+{% if created_invitation %}
+<div class="card" style="border:2px solid #16a34a; margin-bottom:1.5rem;">
+    <h3>Invitation created — copy the link now</h3>
+    <p style="color:#991b1b;">The link is shown only once. Send it to the invitee over a trusted channel.</p>
+    <p><code style="word-break:break-all;">{{ created_invitation.url }}</code></p>
+</div>
+{% endif %}
+
+<form method="post" action="/admin/invitations" class="card">
+    {% include "partials/csrf.html" %}
+    <h3>New Invitation</h3>
+    <div class="form-group">
+        <label for="role">Role</label>
+        <select id="role" name="role">
+            <option value="viewer">Viewer</option>
+            <option value="editor">Editor</option>
+            <option value="auditor">Auditor</option>
+            <option value="admin">Admin</option>
+        </select>
+    </div>
+    <div class="form-group">
+        <label for="email">Invitee email (optional, informational)</label>
+        <input type="email" id="email" name="email" placeholder="alex@example.com">
+    </div>
+    <div class="form-group">
+        <label for="note">Note (optional)</label>
+        <input type="text" id="note" name="note" placeholder="New compliance analyst">
+    </div>
+    <div class="form-group">
+        <label for="ttl_days">Valid for (days)</label>
+        <input type="number" id="ttl_days" name="ttl_days" min="1" max="90" value="7" style="width:6rem;">
+    </div>
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Create Invitation</button>
+    </div>
+</form>
+
+<div class="card" style="margin-top:1.5rem;">
+    <h3>Issued Invitations</h3>
+    {% if invitations %}
+    <table class="table">
+        <thead>
+            <tr><th>Created</th><th>Role</th><th>Email / Note</th><th>Expires</th><th>Status</th><th>By</th><th></th></tr>
+        </thead>
+        <tbody>
+        {% for i in invitations %}
+            <tr>
+                <td>{{ i.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td>{{ i.role }}</td>
+                <td>{{ i.email }}{% if i.note %} <small style="color:#6b7280;">({{ i.note }})</small>{% endif %}</td>
+                <td>{{ i.expires_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td>
+                    {% if i.status == 'pending' %}<span style="color:#ca8a04;">pending</span>
+                    {% elif i.status == 'accepted' %}<span style="color:#16a34a;">accepted{% if i.accepted_by_username %} by {{ i.accepted_by_username }}{% endif %}</span>
+                    {% elif i.status == 'revoked' %}<span style="color:#991b1b;">revoked</span>
+                    {% else %}<span style="color:#6b7280;">expired</span>{% endif %}
+                </td>
+                <td>{{ i.created_by_username or '—' }}</td>
+                <td>
+                    {% if i.status == 'pending' %}
+                    <form method="post" action="/admin/invitations/{{ i.id }}/revoke" style="display:inline;">
+                        {% include "partials/csrf.html" %}
+                        <button type="submit" class="btn btn-sm btn-danger">Revoke</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color:#6b7280;">No invitations issued yet.</p>
+    {% endif %}
+</div>
+{% endblock %}

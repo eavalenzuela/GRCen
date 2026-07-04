@@ -170,12 +170,15 @@ def _cache_fresh() -> bool:
     return (_t.monotonic() - _db_cache_at) < _DB_CACHE_TTL
 
 
-def check_api_rate_limit(request: Request) -> tuple[int, int, float] | None:
+def check_api_rate_limit(request: Request) -> tuple[bool, int, int, float] | None:
     """Record a hit and decide whether to allow it.
 
-    Returns ``(remaining, limit, retry_after_seconds)`` on rejection (use the
-    retry hint for ``Retry-After``); returns None when the request is allowed.
-    Side-effect-free callers can use :func:`peek_api_rate_limit` instead.
+    Returns ``(allowed, limit, remaining, retry_after_seconds)`` — on rejection
+    ``allowed`` is False, ``remaining`` is 0, and the retry hint feeds
+    ``Retry-After``; on an allowed request ``remaining`` is the budget left in
+    the current window (so the middleware can advertise it in
+    ``X-RateLimit-*`` headers). Returns None when limiting doesn't apply at
+    all (disabled globally or a non-positive budget).
     """
     if not settings.RATE_LIMIT_ENABLED:
         return None
@@ -195,9 +198,9 @@ def check_api_rate_limit(request: Request) -> tuple[int, int, float] | None:
     if len(window) >= limit:
         # Oldest hit drops out at window[0] + 60s.
         retry_after = max(1.0, window[0] + _WINDOW_SECONDS - now)
-        return (0, limit, retry_after)
+        return (False, limit, 0, retry_after)
     window.append(now)
-    return None
+    return (True, limit, limit - len(window), 0.0)
 
 
 def _reset() -> None:

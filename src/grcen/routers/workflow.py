@@ -222,6 +222,7 @@ async def workflow_admin_save(
             require_approval_relationship_create=f"rel_create_{at.value}" in form,
             require_approval_relationship_delete=f"rel_delete_{at.value}" in form,
             approver_role=approver_role,
+            allow_self_approval=f"self_approve_{at.value}" in form,
         )
     return RedirectResponse("/admin/workflow", status_code=302)
 

@@ -200,3 +200,35 @@ async def test_common_baseline_installs_cross_mapped(pool):
     # Idempotent re-install.
     again = await content_packs.install_pack(pool, pack, organization_id=org)
     assert again.assets_created == 0
+
+
+@pytest.mark.asyncio
+async def test_install_records_version_and_uninstall_clears_it(pool, tmp_path):
+    pack = _write_fixture_pack(tmp_path)
+    org = await _org(pool)
+
+    assert await content_packs.installed_version(pool, pack, organization_id=org) is None
+    await content_packs.install_pack(pool, pack, organization_id=org, base_dir=tmp_path)
+    assert await content_packs.installed_version(pool, pack, organization_id=org) == "1.0"
+
+    # A newer bundled version shows as a mismatch against the recorded install.
+    newer = content_packs.ContentPack(
+        id=pack.id, title=pack.title, version="1.1",
+        summary=pack.summary, attribution=pack.attribution,
+        frameworks=pack.frameworks, controls=pack.controls, crosswalks=pack.crosswalks,
+    )
+    recorded = await content_packs.installed_version(pool, newer, organization_id=org)
+    assert recorded == "1.0" != newer.version
+
+    await content_packs.uninstall_pack(pool, pack, organization_id=org)
+    assert await content_packs.installed_version(pool, pack, organization_id=org) is None
+
+
+@pytest.mark.asyncio
+async def test_dry_run_does_not_record_version(pool, tmp_path):
+    pack = _write_fixture_pack(tmp_path)
+    org = await _org(pool)
+    await content_packs.install_pack(
+        pool, pack, organization_id=org, dry_run=True, base_dir=tmp_path
+    )
+    assert await content_packs.installed_version(pool, pack, organization_id=org) is None

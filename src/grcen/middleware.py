@@ -125,16 +125,25 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 pass
         result = check_api_rate_limit(request)
         if result is not None:
-            _, limit, retry_after = result
-            return JSONResponse(
-                {"detail": "Rate limit exceeded. Please slow down."},
-                status_code=429,
-                headers={
-                    "Retry-After": str(int(retry_after) + 1),
-                    "X-RateLimit-Limit": str(limit),
-                    "X-RateLimit-Remaining": "0",
-                },
-            )
+            allowed, limit, remaining, retry_after = result
+            if not allowed:
+                return JSONResponse(
+                    {"detail": "Rate limit exceeded. Please slow down."},
+                    status_code=429,
+                    headers={
+                        "Retry-After": str(int(retry_after) + 1),
+                        "X-RateLimit-Limit": str(limit),
+                        "X-RateLimit-Remaining": "0",
+                    },
+                )
+            response = await call_next(request)
+            # Advertise the budget on allowed API responses too, so clients can
+            # self-throttle instead of discovering the limit via a 429. Page
+            # routes skip the headers to keep HTML responses noise-free.
+            if request.url.path.startswith("/api/"):
+                response.headers["X-RateLimit-Limit"] = str(limit)
+                response.headers["X-RateLimit-Remaining"] = str(remaining)
+            return response
         return await call_next(request)
 
 

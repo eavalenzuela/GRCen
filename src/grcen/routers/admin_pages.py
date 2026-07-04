@@ -681,6 +681,41 @@ async def admin_smtp_settings_submit(
     return RedirectResponse("/admin/smtp-settings", status_code=302)
 
 
+@router.get("/admin/smtp-settings/preview", response_class=HTMLResponse)
+async def admin_email_preview(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+    kind: str = "alert",
+):
+    """Render the outbound email HTML with sample data so admins can see what
+    users will receive (with this org's branding applied) without sending
+    a real message."""
+    from types import SimpleNamespace
+
+    from grcen.services import digest_service, email_service, organization_service
+
+    org = await organization_service.get_by_id(pool, user.organization_id)
+    base_url = settings.APP_BASE_URL.rstrip("/")
+    if kind == "digest":
+        sample_items = [
+            {"title": "Annual policy review due", "asset_name": "Acceptable Use Policy",
+             "message": "Review window opens today.", "link": f"{base_url}/assets"},
+            {"title": "SOC 2 evidence refresh", "asset_name": "Access Control Matrix",
+             "message": None, "link": f"{base_url}/assets"},
+        ]
+        _, html = digest_service._render(sample_items, org=org)
+    else:
+        sample_alert = SimpleNamespace(
+            title="Annual policy review due",
+            message="This is a sample alert so you can preview the email template.",
+        )
+        _, html = email_service.render_alert_email(
+            sample_alert, "Acceptable Use Policy", f"{base_url}/assets", org=org
+        )
+    return HTMLResponse(content=html)
+
+
 # --- Webhook management ---
 
 
@@ -706,7 +741,7 @@ async def admin_webhooks_page(
 
     hooks = await webhook_service.list_webhooks(pool, organization_id=user.organization_id)
     deliveries = await pool.fetch(
-        """SELECT event, url, status_code, error, attempted_at
+        """SELECT event, url, status_code, error, attempt, attempted_at
            FROM webhook_deliveries
            ORDER BY attempted_at DESC LIMIT 20"""
     )
@@ -832,6 +867,224 @@ async def admin_webhook_test(
         detail = f"HTTP {status}" if status else (err or "error")
         msg = f"fail:Ping failed: {detail}"
     return RedirectResponse(f"/admin/webhooks?flash={msg}", status_code=302)
+
+
+# --- Org invitations ---
+
+
+@router.get("/admin/invitations", response_class=HTMLResponse)
+async def admin_invitations(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+    flash: str | None = None,
+):
+    from grcen.services import invitation_service
+
+    invitations = await invitation_service.list_invitations(
+        pool, organization_id=user.organization_id
+    )
+    notif_count = await alert_svc.count_unread_notifications(
+        pool, organization_id=user.organization_id, user_id=user.id
+    )
+    created = request.session.pop("created_invitation", None)
+    return templates.TemplateResponse(
+        request,
+        "admin/invitations.html",
+        context={
+            "user": user,
+            "invitations": invitations,
+            "flash": _decode_flash(flash),
+            "created_invitation": created,
+            "base_url": settings.APP_BASE_URL.rstrip("/"),
+            "notif_count": notif_count,
+        },
+    )
+
+
+@router.post("/admin/invitations")
+async def admin_invitations_create(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+):
+    from grcen.permissions import UserRole
+    from grcen.services import invitation_service
+
+    form = await request.form()
+    role_raw = str(form.get("role", "viewer"))
+    try:
+        role = UserRole(role_raw)
+    except ValueError:
+        role = UserRole.VIEWER
+    try:
+        ttl_days = int(str(form.get("ttl_days", "7")))
+    except (ValueError, TypeError):
+        ttl_days = 7
+    _, raw_token = await invitation_service.create_invitation(
+        pool,
+        organization_id=user.organization_id,
+        role=role,
+        email=str(form.get("email", "")).strip(),
+        note=str(form.get("note", "")).strip(),
+        created_by=user.id,
+        ttl_days=ttl_days,
+    )
+    await audit_svc.log_audit_event(
+        pool, user_id=user.id, username=user.username,
+        action="create", entity_type="org_invitation",
+        entity_id=None, entity_name=f"invite ({role.value})",
+    )
+    # The raw token exists only in this link — shown once on the next render.
+    request.session["created_invitation"] = {
+        "url": f"{settings.APP_BASE_URL.rstrip('/')}/invite/{raw_token}",
+    }
+    return RedirectResponse("/admin/invitations", status_code=302)
+
+
+@router.post("/admin/invitations/{invitation_id}/revoke")
+async def admin_invitation_revoke(
+    invitation_id: UUID,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+):
+    from grcen.services import invitation_service
+
+    ok = await invitation_service.revoke_invitation(
+        pool, invitation_id, organization_id=user.organization_id
+    )
+    msg = "ok:Invitation revoked" if ok else "fail:Invitation is not pending"
+    return RedirectResponse(f"/admin/invitations?flash={msg}", status_code=302)
+
+
+# --- OAuth 2.0 clients (client-credentials grant) ---
+
+
+@router.get("/admin/oauth-clients", response_class=HTMLResponse)
+async def admin_oauth_clients(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+    flash: str | None = None,
+):
+    from grcen.permissions import ROLE_PERMISSIONS
+    from grcen.services import oauth_service
+
+    clients = await oauth_service.list_clients(pool, organization_id=user.organization_id)
+    available_permissions = sorted(
+        ROLE_PERMISSIONS.get(user.role, set()), key=lambda p: p.value
+    )
+    notif_count = await alert_svc.count_unread_notifications(
+        pool, organization_id=user.organization_id, user_id=user.id
+    )
+    return templates.TemplateResponse(
+        request,
+        "admin/oauth_clients.html",
+        context={
+            "user": user,
+            "clients": clients,
+            "available_permissions": available_permissions,
+            "flash": _decode_flash(flash),
+            "created_client": request.session.pop("created_oauth_client", None),
+            "notif_count": notif_count,
+        },
+    )
+
+
+@router.post("/admin/oauth-clients")
+async def admin_oauth_clients_create(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+):
+    from grcen.permissions import ROLE_PERMISSIONS
+    from grcen.services import oauth_service
+
+    form = await request.form()
+    name = str(form.get("name", "")).strip()
+    permissions = form.getlist("permissions")
+    try:
+        ttl = int(str(form.get("token_ttl_seconds", "3600")))
+    except (ValueError, TypeError):
+        ttl = 3600
+    if not name:
+        return RedirectResponse(
+            "/admin/oauth-clients?flash=fail:Client name is required", status_code=302
+        )
+    if not permissions:
+        return RedirectResponse(
+            "/admin/oauth-clients?flash=fail:At least one permission is required",
+            status_code=302,
+        )
+    role_perms = {p.value for p in ROLE_PERMISSIONS.get(user.role, set())}
+    invalid = [p for p in permissions if p not in role_perms]
+    if invalid:
+        return RedirectResponse(
+            f"/admin/oauth-clients?flash=fail:Invalid permissions: {', '.join(invalid)}",
+            status_code=302,
+        )
+    _, client_id, raw_secret = await oauth_service.create_client(
+        pool,
+        organization_id=user.organization_id,
+        name=name,
+        permissions=[str(p) for p in permissions],
+        token_ttl_seconds=ttl,
+        created_by=user.id,
+    )
+    await audit_svc.log_audit_event(
+        pool, user_id=user.id, username=user.username,
+        action="create", entity_type="oauth_client",
+        entity_id=None, entity_name=name,
+    )
+    # Shown exactly once on the next page render.
+    request.session["created_oauth_client"] = {
+        "client_id": client_id, "client_secret": raw_secret,
+    }
+    return RedirectResponse("/admin/oauth-clients", status_code=302)
+
+
+@router.post("/admin/oauth-clients/{client_pk}/toggle")
+async def admin_oauth_client_toggle(
+    client_pk: UUID,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+):
+    from grcen.services import oauth_service
+
+    clients = await oauth_service.list_clients(pool, organization_id=user.organization_id)
+    target = next((c for c in clients if c.id == client_pk), None)
+    if target is None:
+        raise HTTPException(status_code=404, detail="Client not found")
+    await oauth_service.set_enabled(
+        pool, client_pk, not target.enabled, organization_id=user.organization_id
+    )
+    state = "disabled" if target.enabled else "enabled"
+    return RedirectResponse(
+        f"/admin/oauth-clients?flash=ok:Client {state}", status_code=302
+    )
+
+
+@router.post("/admin/oauth-clients/{client_pk}/delete")
+async def admin_oauth_client_delete(
+    client_pk: UUID,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+):
+    from grcen.services import oauth_service
+
+    deleted = await oauth_service.delete_client(
+        pool, client_pk, organization_id=user.organization_id
+    )
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Client not found")
+    await audit_svc.log_audit_event(
+        pool, user_id=user.id, username=user.username,
+        action="delete", entity_type="oauth_client",
+        entity_id=None, entity_name=str(client_pk),
+    )
+    return RedirectResponse(
+        "/admin/oauth-clients?flash=ok:Client deleted", status_code=302
+    )
 
 
 # --- Relationship evidence (attachments on relationships) ---

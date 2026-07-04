@@ -227,3 +227,38 @@ async def test_frameworks_index_requires_auth(client):
 async def test_viewer_can_access_frameworks(viewer_client):
     resp = await viewer_client.get("/frameworks")
     assert resp.status_code == 200
+
+
+# ── control-library CSV export ───────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_controls_export_csv(auth_client, pool, admin_user):
+    fw = await _mk_asset(pool, admin_user.id, "SOC2", AssetType.FRAMEWORK)
+    req = await _mk_asset(pool, admin_user.id, "CC6.1 Access", AssetType.REQUIREMENT)
+    ctl = await _mk_asset(
+        pool, admin_user.id, "MFA Everywhere", AssetType.CONTROL,
+        metadata_={"effectiveness": "effective"},
+    )
+    await _link(pool, fw, req, "parent_of")
+    await _link(pool, ctl, req, "satisfies")
+
+    resp = await auth_client.get("/controls/export.csv")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("text/csv")
+    body = resp.text
+    assert "MFA Everywhere" in body
+    assert "effective" in body
+    assert "SOC2: CC6.1 Access" in body
+
+    # The export is recorded in the data-access log.
+    row = await pool.fetchrow(
+        "SELECT action, entity_name FROM data_access_log WHERE entity_name = 'controls-export.csv'"
+    )
+    assert row is not None and row["action"] == "export"
+
+
+@pytest.mark.asyncio
+async def test_controls_export_denied_without_export_permission(viewer_client):
+    resp = await viewer_client.get("/controls/export.csv")
+    assert resp.status_code == 403

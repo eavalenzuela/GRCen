@@ -33,6 +33,7 @@ class WorkflowConfig:
     require_approval_relationship_create: bool = False
     require_approval_relationship_delete: bool = False
     approver_role: str | None = None
+    allow_self_approval: bool = False
 
 
 @dataclass
@@ -144,6 +145,7 @@ async def get_config(
         require_approval_relationship_create=row.get("require_approval_relationship_create") or False,
         require_approval_relationship_delete=row.get("require_approval_relationship_delete") or False,
         approver_role=row.get("approver_role"),
+        allow_self_approval=row.get("allow_self_approval") or False,
     )
 
 
@@ -166,6 +168,7 @@ async def list_configs(
             require_approval_relationship_create=r.get("require_approval_relationship_create") or False,
             require_approval_relationship_delete=r.get("require_approval_relationship_delete") or False,
             approver_role=r.get("approver_role"),
+            allow_self_approval=r.get("allow_self_approval") or False,
         )
         for r in rows
     }
@@ -183,6 +186,7 @@ async def upsert_config(
     require_approval_relationship_create: bool = False,
     require_approval_relationship_delete: bool = False,
     approver_role: str | None = None,
+    allow_self_approval: bool = False,
 ) -> None:
     if organization_id is None:
         from grcen.services import organization_service
@@ -195,8 +199,8 @@ async def upsert_config(
         INSERT INTO workflow_config (asset_type, organization_id, require_approval_create,
             require_approval_update, require_approval_delete, required_approvals,
             require_approval_relationship_create, require_approval_relationship_delete,
-            approver_role, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now())
+            approver_role, allow_self_approval, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now())
         ON CONFLICT (organization_id, asset_type) DO UPDATE SET
             require_approval_create = EXCLUDED.require_approval_create,
             require_approval_update = EXCLUDED.require_approval_update,
@@ -205,6 +209,7 @@ async def upsert_config(
             require_approval_relationship_create = EXCLUDED.require_approval_relationship_create,
             require_approval_relationship_delete = EXCLUDED.require_approval_relationship_delete,
             approver_role = EXCLUDED.approver_role,
+            allow_self_approval = EXCLUDED.allow_self_approval,
             updated_at = now()
         """,
         asset_type.value,
@@ -216,6 +221,7 @@ async def upsert_config(
         require_approval_relationship_create,
         require_approval_relationship_delete,
         role_val,
+        allow_self_approval,
     )
 
 
@@ -403,7 +409,12 @@ async def reject(
     if change.status != "pending":
         raise ValueError("Only pending changes can be rejected.")
     if change.submitted_by == approver.id:
-        raise PermissionError("Approvers may not act on their own pending change.")
+        cfg = await get_config(
+            pool, AssetType(change.asset_type),
+            organization_id=change.organization_id or approver.organization_id,
+        )
+        if not cfg.allow_self_approval:
+            raise PermissionError("Approvers may not act on their own pending change.")
     row = await pool.fetchrow(
         """UPDATE pending_changes
            SET status='rejected', decided_by=$1, decided_by_username=$2,
@@ -431,13 +442,19 @@ async def approve(
     """
     if change.status != "pending":
         raise ValueError("Only pending changes can be approved.")
-    if change.submitted_by == approver.id:
-        raise PermissionError("Approvers may not act on their own pending change.")
 
     asset_type = AssetType(change.asset_type)
     payload = change.payload or {}
     asset: Asset | None = None
     org_id = change.organization_id or approver.organization_id
+
+    cfg = await get_config(pool, asset_type, organization_id=org_id)
+    threshold = cfg.required_approvals or 1
+
+    # Self-approval is blocked unless the per-type override says otherwise
+    # (small-team escape hatch — see workflow_config.allow_self_approval).
+    if change.submitted_by == approver.id and not cfg.allow_self_approval:
+        raise PermissionError("Approvers may not act on their own pending change.")
 
     # Has this approver already weighed in?
     existing = await pool.fetchrow(
@@ -447,9 +464,6 @@ async def approve(
     )
     if existing:
         raise ValueError("You have already approved this change.")
-
-    cfg = await get_config(pool, asset_type, organization_id=org_id)
-    threshold = cfg.required_approvals or 1
 
     # Approver-role gating: when set, only that role can act. Superadmins
     # always count regardless of the per-org role mapping.

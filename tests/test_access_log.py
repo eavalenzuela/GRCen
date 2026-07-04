@@ -158,3 +158,38 @@ async def test_access_log_api_requires_view_audit(editor_client):
 async def test_auditor_can_read_access_log(auditor_client):
     resp = await auditor_client.get("/api/access-log/")
     assert resp.status_code == 200
+
+
+# ── sampled list logging ─────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_list_not_logged_by_default(auth_client, pool):
+    """DATA_ACCESS_LOG_LIST_SAMPLE_RATE=0 (default) keeps lists out of the log."""
+    resp = await auth_client.get("/api/assets/")
+    assert resp.status_code == 200
+    count = await pool.fetchval(
+        "SELECT count(*) FROM data_access_log WHERE action = 'list'"
+    )
+    assert count == 0
+
+
+@pytest.mark.asyncio
+async def test_list_logged_when_sampling_enabled(auth_client, pool):
+    """Rate 1 = log every list request."""
+    from grcen.config import settings
+
+    old = settings.DATA_ACCESS_LOG_LIST_SAMPLE_RATE
+    settings.DATA_ACCESS_LOG_LIST_SAMPLE_RATE = 1
+    try:
+        resp = await auth_client.get("/api/assets/")
+        assert resp.status_code == 200
+    finally:
+        settings.DATA_ACCESS_LOG_LIST_SAMPLE_RATE = old
+    rows = await pool.fetch(
+        "SELECT entity_type, entity_name, path FROM data_access_log WHERE action = 'list'"
+    )
+    assert len(rows) == 1
+    assert rows[0]["entity_type"] == "asset"
+    assert "asset list" in rows[0]["entity_name"]
+    assert rows[0]["path"] == "/api/assets/"

@@ -64,7 +64,8 @@ async def get_reviews(
         idx += 1
 
     rows = await pool.fetch(
-        f"""SELECT a.id, a.type, a.name, COALESCE(o.name, a.owner) AS owner, a.metadata
+        f"""SELECT a.id, a.type, a.name, a.owner_id,
+                   COALESCE(o.name, a.owner) AS owner, a.metadata
             FROM assets a LEFT JOIN assets o ON o.id = a.owner_id
             WHERE {where} ORDER BY a.name""",
         *vals,
@@ -97,6 +98,7 @@ async def get_reviews(
             "name": row["name"],
             "type": asset_type_val,
             "owner": row["owner"],
+            "owner_id": row["owner_id"],
             "due_date": due_date,
             "due_field": field_name,
             "status": rs,

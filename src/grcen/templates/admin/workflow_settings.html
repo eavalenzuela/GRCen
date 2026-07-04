@@ -68,6 +68,12 @@
                             <option value="viewer" {% if cfg.approver_role == 'viewer' %}selected{% endif %}>viewer only</option>
                         </select>
                     </label>
+                    &nbsp;|&nbsp;
+                    <label title="Small-team escape hatch: the submitter may approve their own change. Off = four-eyes rule.">
+                        <input type="checkbox" name="self_approve_{{ cfg.asset_type }}"
+                            {% if cfg.allow_self_approval %}checked{% endif %}>
+                        allow self-approval
+                    </label>
                 </td>
             </tr>
             {% endfor %}

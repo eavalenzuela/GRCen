@@ -1,5 +1,5 @@
 """Control test ledger: recording, write-back, cadence, overdue, continuity."""
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 
@@ -35,8 +35,11 @@ async def test_record_rolls_result_onto_control(pool):
     assert run["result"] == "pass"
     meta = await _meta(pool, cid)
     assert meta["effectiveness"] == "effective"
-    assert meta["last_tested"] == date.today().isoformat()
-    assert meta["next_test_due"] == (date.today() + timedelta(days=91)).isoformat()
+    # The service stamps dates from the run's UTC timestamp — compare against
+    # the same clock so this doesn't flake near UTC midnight in western zones.
+    utc_today = datetime.now(UTC).date()
+    assert meta["last_tested"] == utc_today.isoformat()
+    assert meta["next_test_due"] == (utc_today + timedelta(days=91)).isoformat()
 
 
 @pytest.mark.asyncio

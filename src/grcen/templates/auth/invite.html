@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Accept Invitation - GRCen{% endblock %}
+{% block content %}
+<div class="login-container">
+    {% if invalid %}
+    <h1>Invitation not valid</h1>
+    <p>This invitation link is invalid, expired, revoked, or already used.
+       Ask your administrator for a new one.</p>
+    <a href="/login" class="btn" style="width:100%; text-align:center; display:block;">Go to login</a>
+    {% else %}
+    <h1>Join {{ org_name }}</h1>
+    <p>You've been invited to join <strong>{{ org_name }}</strong> as
+       <strong>{{ role }}</strong>. Choose your credentials to finish.</p>
+    {% if error %}
+    <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
+    <form method="post" action="/invite/{{ token }}">
+        {% include "partials/csrf.html" %}
+        <div class="form-group">
+            <label for="username">Username</label>
+            <input type="text" id="username" name="username" required autofocus
+                   value="{{ suggested_email or '' }}">
+        </div>
+        <div class="form-group">
+            <label for="password">Password (min 8 characters)</label>
+            <input type="password" id="password" name="password" required minlength="8">
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%">Create account</button>
+    </form>
+    {% endif %}
+</div>
+{% endblock %}

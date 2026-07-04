@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}My Work - GRCen{% endblock %}
+
+{% block content %}
+<h1>My Work</h1>
+<p style="color:#6b7280;">Everything waiting on you, in one place.</p>
+
+{% if can_approve %}
+<div class="card" style="margin-top:1rem;">
+    <h3>Approvals waiting on an approver ({{ actionable | length }})</h3>
+    {% if actionable %}
+    <table class="table">
+        <thead><tr><th>Submitted</th><th>Action</th><th>Type</th><th>Title</th><th>By</th><th></th></tr></thead>
+        <tbody>
+        {% for c in actionable %}
+            <tr>
+                <td>{{ c.submitted_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td>{{ c.action }}</td>
+                <td>{{ c.asset_type | replace('_', ' ') }}</td>
+                <td>{{ c.title }}</td>
+                <td>{{ c.submitted_by_username }}</td>
+                <td><a href="/approvals/{{ c.id }}" class="btn btn-sm">Review</a></td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color:#6b7280;">Nothing waiting for approval.</p>
+    {% endif %}
+</div>
+{% endif %}
+
+{% if my_submissions %}
+<div class="card" style="margin-top:1.5rem;">
+    <h3>My submissions in flight ({{ my_submissions | length }})</h3>
+    <ul style="margin:0; padding-left:1.25rem;">
+    {% for c in my_submissions %}
+        <li><a href="/approvals/{{ c.id }}">{{ c.action }} {{ c.asset_type | replace('_', ' ') }}: {{ c.title }}</a></li>
+    {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+<div class="card" style="margin-top:1.5rem;">
+    <h3>My reviews due ({{ my_reviews | length }})</h3>
+    {% if not has_person_link %}
+    <p style="color:#6b7280;">Your account isn't linked to a Person asset, so ownership-based
+       items can't be matched. Ask an admin to link one from your user page.</p>
+    {% elif my_reviews %}
+    <table class="table">
+        <thead><tr><th>Asset</th><th>Type</th><th>Due</th><th>Status</th></tr></thead>
+        <tbody>
+        {% for r in my_reviews %}
+            <tr>
+                <td><a href="/assets/{{ r.id }}">{{ r.name }}</a></td>
+                <td>{{ r.type | replace('_', ' ') }}</td>
+                <td>{{ r.due_date }}</td>
+                <td>
+                    {% if r.status == 'overdue' %}<span style="color:#b91c1c;">overdue</span>
+                    {% else %}<span style="color:#ca8a04;">due soon</span>{% endif %}
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color:#6b7280;">No reviews due on assets you own. 🎉</p>
+    {% endif %}
+</div>
+
+{% if has_person_link %}
+<div class="card" style="margin-top:1.5rem;">
+    <h3>Open findings assigned to me ({{ my_findings | length }})</h3>
+    {% if my_findings %}
+    <table class="table">
+        <thead><tr><th>Finding</th><th>Status</th><th>Due</th></tr></thead>
+        <tbody>
+        {% for f in my_findings %}
+            <tr>
+                <td><a href="/assets/{{ f.id }}">{{ f.name }}</a></td>
+                <td>{{ f.finding_status or '—' }}</td>
+                <td>{{ f.due_date or '—' }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color:#6b7280;">No open findings assigned to you.</p>
+    {% endif %}
+</div>
+{% endif %}
+
+{% if answers_needing_review %}
+<div class="card" style="margin-top:1.5rem;">
+    <h3>Answer library</h3>
+    <p><a href="/answers">{{ answers_needing_review }} answer(s) need review</a> —
+       a substantiating control, policy, or system degraded.</p>
+</div>
+{% endif %}
+
+<div class="card" style="margin-top:1.5rem;">
+    <h3>Watched assets ({{ watched | length }})</h3>
+    {% if watched %}
+    <ul style="margin:0; padding-left:1.25rem;">
+    {% for w in watched %}
+        <li><a href="/assets/{{ w.id }}">{{ w.name }}</a>
+            <small style="color:#6b7280;">({{ w.type | replace('_', ' ') }}, watching since {{ w.watched_at.strftime('%Y-%m-%d') }})</small></li>
+    {% endfor %}
+    </ul>
+    {% else %}
+    <p style="color:#6b7280;">You aren't watching any assets. Use the Watch button on an asset's page
+       to get notified when it changes.</p>
+    {% endif %}
+</div>
+{% endblock %}

@@ -294,6 +294,58 @@ async def controls_library(
     )
 
 
+@router.get("/controls/export.csv")
+async def controls_library_csv(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.EXPORT)),
+):
+    """Control-library export: every control with the requirements it covers.
+
+    The auditor-facing counterpart of the /controls page — one row per
+    control, with effectiveness, test dates, and a semicolon-joined list of
+    "Framework: requirement" pairs it satisfies.
+    """
+    controls = await framework_service.list_controls_with_coverage(
+        pool, organization_id=user.organization_id
+    )
+    import csv
+    import io
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow([
+        "control_id", "control_name", "effectiveness", "last_tested",
+        "next_test_due", "requirement_count", "requirements",
+    ])
+    for c in controls:
+        meta = c.get("metadata") or {}
+        reqs = c.get("requirements") or []
+        writer.writerow([
+            c["id"], c["name"],
+            meta.get("effectiveness", ""),
+            meta.get("last_tested", ""),
+            meta.get("next_test_due", ""),
+            len(reqs),
+            "; ".join(
+                f"{r['framework_name']}: {r['name']}" if r.get("framework_name")
+                else r["name"]
+                for r in reqs
+            ),
+        ])
+    await access_log_service.record(
+        pool, user=user, action="export",
+        entity_type="control", entity_id=None,
+        entity_name="controls-export.csv",
+        path=str(request.url.path),
+        ip_address=request.client.host if request.client else None,
+    )
+    return Response(
+        content=buf.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="controls-export.csv"'},
+    )
+
+
 @router.get("/evidence", response_class=HTMLResponse)
 async def evidence_freshness(
     request: Request,

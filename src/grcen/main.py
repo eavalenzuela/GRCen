@@ -18,12 +18,14 @@ from grcen.routers import (
     assets,
     attachments,
     auth,
+    calendar,
     controls,
     exports,
     findings,
     frameworks,
     graph,
     imports,
+    oauth,
     oidc,
     org_views,
     pages,
@@ -182,6 +184,8 @@ def create_app() -> FastAPI:
     app.include_router(findings.router)
     app.include_router(risk_appetite.api_router)
     app.include_router(vendor_campaigns.portal_router)
+    app.include_router(calendar.feed_router)
+    app.include_router(oauth.router)
     app.include_router(tags.router)
     app.include_router(saved_searches.router)
     app.include_router(access_log.router)
@@ -531,7 +535,17 @@ async def _list_packs():
         installed = await content_packs.installed_asset_count(
             pool, pack, organization_id=org_id
         )
-        mark = f"installed: {installed} assets" if installed else "not installed"
+        if installed:
+            ver = await content_packs.installed_version(
+                pool, pack, organization_id=org_id
+            )
+            mark = f"installed: {installed} assets"
+            if ver:
+                mark += f" (v{ver})"
+                if ver != pack.version:
+                    mark += " — UPDATE AVAILABLE, re-install to upgrade"
+        else:
+            mark = "not installed"
         print(f"  {pack.id:<20} v{pack.version:<14} [{mark}]")
         print(f"      {pack.title} — {detail}")
     print("\nInstall with: grcen install-pack <id> [--org SLUG] [--dry-run] [--prune]")

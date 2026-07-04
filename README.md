@@ -17,8 +17,11 @@ GRCen is purpose-built to map assets (organizational assets, not just physical o
 - **Review workflows** — Track review dates across asset types with overdue/due-soon status indicators. Dashboard widget surfaces items needing attention.
 - **Bulk import & export** — Import assets and relationships from CSV or JSON. Export filtered datasets in multiple formats.
 - **Asset cloning** — Duplicate any asset with a single click, optionally including all its relationships.
-- **Schedulable alerts** — Set reminders for annual reviews, audits, certifications, or any recurring process.
-- **Role-based access control** — Four roles (Admin, Editor, Viewer, Auditor) with granular permissions.
+- **Schedulable alerts** — Set reminders for annual reviews, audits, certifications, or any recurring process. Delivered in-app, by email, and to HMAC-signed webhooks (with automatic retry on transient failures).
+- **Asset watching** — Watch any asset and get an in-app notification when it's updated or deleted.
+- **My Work page** — A per-user view of approvals waiting on you, reviews due on assets you own, findings assigned to you, and everything you watch.
+- **Calendar integration** — Subscribe Outlook / Google Calendar to your review and due dates via a per-user iCal feed.
+- **Role-based access control** — Four roles (Admin, Editor, Viewer, Auditor) with granular permissions, plus single-use invitation links so new teammates set their own credentials.
 - **SSO authentication (OIDC & SAML 2.0)** — Integrate with any OIDC-compliant identity provider (Keycloak, Azure AD, Google, etc.) or any SAML 2.0 IdP. Claim/attribute-based role mapping, automatic Person asset provisioning on first login, and local password auth as a fallback. Both protocols are configured entirely from the admin UI.
 - **Encryption at rest** — Optional application-level field encryption (AES-256-GCM) for sensitive data. Choose a compliance profile (Minimal, GDPR, Full) or select individual scopes. Covers SSO secrets, user PII, session metadata, audit snapshots, asset custom fields, and uploaded files. BYO encryption key via environment variable with zero-downtime key rotation. See **[configure_encryption.md](configure_encryption.md)**.
 - **Configurable audit trail** — Track who changed what and when. Admins choose which entity types are logged and whether to capture field-level diffs.
@@ -117,7 +120,15 @@ curl -X POST -H "Authorization: Bearer grcen_..." -H "Content-Type: application/
   "http://localhost:8000/api/imports/assets/bulk?dry_run=true"
 ```
 
-Note: when an asset type has workflow approval gating enabled, mutating REST calls return `202 Accepted` with a `pending_change_id` instead of applying the change immediately. Rate-limited responses return `429` with a `Retry-After` header.
+Machine integrations can also use the OAuth 2.0 client-credentials grant instead of long-lived static tokens: register a client under **Admin > OAuth Clients**, then exchange its credentials for a short-lived scoped token:
+
+```bash
+curl -X POST http://localhost:8000/api/oauth/token \
+  -d "grant_type=client_credentials&client_id=grcen_client_...&client_secret=..."
+# {"access_token": "grcen_...", "token_type": "Bearer", "expires_in": 3600}
+```
+
+Note: when an asset type has workflow approval gating enabled, mutating REST calls return `202 Accepted` with a `pending_change_id` instead of applying the change immediately. Rate-limited responses return `429` with a `Retry-After` header; allowed API responses advertise the remaining budget via `X-RateLimit-Limit` / `X-RateLimit-Remaining`.
 
 ## CLI Reference
 
@@ -132,7 +143,7 @@ Management commands are available via the `grcen` entrypoint (prefix with `docke
 | `grcen listorgs` | List organizations. |
 | `grcen generate-key` | Generate a base64url encryption key for `ENCRYPTION_KEY`. |
 | `grcen rotate-keys` | Re-encrypt data under a new key (zero-downtime rotation). |
-| `grcen backup <out>` | Write an encrypted backup (AES-256-GCM, keyed off `ENCRYPTION_KEY`). |
+| `grcen backup <out>` | Write an encrypted backup (AES-256-GCM, keyed off `ENCRYPTION_KEY` with a per-backup salt). |
 | `grcen restore <in>` | Restore from an encrypted backup. |
 
 ## Running Tests

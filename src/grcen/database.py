@@ -986,6 +986,78 @@ CREATE TABLE IF NOT EXISTS vendor_campaign_questions (
 );
 CREATE INDEX IF NOT EXISTS idx_vcampaign_questions_campaign
     ON vendor_campaign_questions(campaign_id);
+
+-- Webhook delivery retries: which attempt (1-based) a delivery row records.
+-- Transient failures (network error / HTTP 5xx) are retried with exponential
+-- backoff up to WEBHOOK_MAX_ATTEMPTS; each try gets its own row.
+DO $$ BEGIN
+    ALTER TABLE webhook_deliveries ADD COLUMN attempt INTEGER NOT NULL DEFAULT 1;
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+
+-- Workflow self-approval override: when true, the submitter of a pending
+-- change may approve/reject it themselves (small-team escape hatch; off by
+-- default so the four-eyes rule stays the norm).
+DO $$ BEGIN
+    ALTER TABLE workflow_config
+        ADD COLUMN allow_self_approval BOOLEAN NOT NULL DEFAULT false;
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+
+-- Per-user iCal feed token: unguessable path segment for the read-only
+-- /calendar/{token}/grcen.ics review-calendar feed. NULL until the user
+-- enables the feed from /settings.
+DO $$ BEGIN
+    ALTER TABLE users ADD COLUMN calendar_token VARCHAR(64);
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+CREATE UNIQUE INDEX IF NOT EXISTS ux_users_calendar_token
+    ON users (calendar_token) WHERE calendar_token IS NOT NULL;
+
+-- Asset watchers: users subscribed to change notifications for one asset.
+CREATE TABLE IF NOT EXISTS asset_watchers (
+    asset_id        UUID NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
+    user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (asset_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_asset_watchers_user ON asset_watchers(user_id);
+
+-- Self-service org invitations: an admin mints a single-use, expiring token
+-- for a role in their org; the invitee sets credentials on a public accept
+-- page. token_hash stores SHA-256(raw token) so a DB leak doesn't hand out
+-- live invite links.
+CREATE TABLE IF NOT EXISTS org_invitations (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    token_hash      VARCHAR(64) NOT NULL UNIQUE,
+    role            user_role NOT NULL DEFAULT 'viewer',
+    email           VARCHAR(255) NOT NULL DEFAULT '',
+    note            VARCHAR(255) NOT NULL DEFAULT '',
+    created_by      UUID REFERENCES users(id) ON DELETE SET NULL,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    expires_at      TIMESTAMPTZ NOT NULL,
+    accepted_at     TIMESTAMPTZ,
+    accepted_by     UUID REFERENCES users(id) ON DELETE SET NULL,
+    revoked_at      TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_org_invitations_org ON org_invitations(organization_id);
+
+-- OAuth 2.0 client-credentials grant: registered machine clients that exchange
+-- client_id + client_secret for a short-lived scoped api_token. Secrets are
+-- stored bcrypt-hashed, same as user passwords.
+CREATE TABLE IF NOT EXISTS oauth_clients (
+    id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id    UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    client_id          VARCHAR(64) NOT NULL UNIQUE,
+    client_secret_hash VARCHAR(100) NOT NULL,
+    name               VARCHAR(150) NOT NULL,
+    permissions        TEXT[] NOT NULL DEFAULT '{}',
+    token_ttl_seconds  INTEGER NOT NULL DEFAULT 3600,
+    enabled            BOOLEAN NOT NULL DEFAULT true,
+    created_by         UUID REFERENCES users(id) ON DELETE SET NULL,
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_oauth_clients_org ON oauth_clients(organization_id);
 """
 
 

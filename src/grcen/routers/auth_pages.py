@@ -29,11 +29,15 @@ async def login_page(
     request: Request,
     pool: asyncpg.Pool = Depends(get_db),
     user: User | None = Depends(get_current_user_or_none),
+    invited: int = 0,
 ):
     if user:
         return RedirectResponse("/", status_code=302)
+    context = await _sso_context(pool)
+    if invited:
+        context["notice"] = "Account created — log in with your new credentials."
     return templates.TemplateResponse(
-        request, "auth/login.html", context=await _sso_context(pool)
+        request, "auth/login.html", context=context
     )
 
 
@@ -213,3 +217,80 @@ async def logout(request: Request, pool: asyncpg.Pool = Depends(get_db)):
 # --- Dashboard ---
 
 
+
+
+# --- Org invitation accept (public, token-authorized) ---
+
+
+@router.get("/invite/{token}", response_class=HTMLResponse)
+async def invite_accept_page(
+    token: str,
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+):
+    from grcen.services import invitation_service, organization_service
+
+    invitation = await invitation_service.get_valid_by_token(pool, token)
+    if invitation is None:
+        return templates.TemplateResponse(
+            request, "auth/invite.html",
+            context={"invalid": True, "user": None}, status_code=404,
+        )
+    org = await organization_service.get_by_id(pool, invitation["organization_id"])
+    return templates.TemplateResponse(
+        request, "auth/invite.html",
+        context={
+            "invalid": False,
+            "user": None,
+            "token": token,
+            "org_name": org.name if org else "GRCen",
+            "role": invitation["role"],
+            "suggested_email": invitation["email"],
+            "error": None,
+        },
+    )
+
+
+@router.post("/invite/{token}")
+async def invite_accept_submit(
+    token: str,
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    _rl=Depends(check_login_rate_limit),
+):
+    from grcen.services import invitation_service, organization_service
+
+    form = await request.form()
+    username = str(form.get("username", ""))
+    password = str(form.get("password", ""))
+    try:
+        user = await invitation_service.accept_invitation(
+            pool, token, username=username, password=password
+        )
+    except invitation_service.InvitationError as e:
+        invitation = await invitation_service.get_valid_by_token(pool, token)
+        if invitation is None:
+            return templates.TemplateResponse(
+                request, "auth/invite.html",
+                context={"invalid": True, "user": None}, status_code=404,
+            )
+        org = await organization_service.get_by_id(pool, invitation["organization_id"])
+        return templates.TemplateResponse(
+            request, "auth/invite.html",
+            context={
+                "invalid": False,
+                "user": None,
+                "token": token,
+                "org_name": org.name if org else "GRCen",
+                "role": invitation["role"],
+                "suggested_email": invitation["email"],
+                "error": str(e),
+            },
+            status_code=400,
+        )
+    await audit_svc.log_audit_event(
+        pool, user_id=user.id, username=user.username,
+        action="invite_accept", entity_type="user",
+        entity_id=user.id, entity_name=user.username,
+    )
+    return RedirectResponse("/login?invited=1", status_code=302)

@@ -1,7 +1,7 @@
 from uuid import UUID
 
 import asyncpg
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from grcen.models.asset import AssetType
@@ -15,9 +15,12 @@ from grcen.schemas.asset import (
     AssetUpdate,
 )
 from grcen.services import (
+    access_log_service,
     asset as asset_svc,
     audit_service as audit_svc,
     redaction,
+    watcher_service,
+    webhook_service,
     workflow_service,
 )
 
@@ -32,6 +35,7 @@ _ASSET_FIELDS = ["name", "description", "status", "owner", "metadata"]
     summary="List assets with filtering and pagination",
 )
 async def list_assets(
+    request: Request,
     type: AssetType | None = None,
     q: str | None = None,
     status: str | None = None,
@@ -53,6 +57,11 @@ async def list_assets(
     )
     for a in items:
         a.metadata_ = redaction.redact_metadata(a.metadata_, a.type, user)
+    await access_log_service.record_list_sampled(
+        pool, user=user, entity_type="asset",
+        path=str(request.url.path), result_count=total,
+        ip_address=request.client.host if request.client else None,
+    )
     return AssetListResponse(
         items=[AssetResponse.model_validate(a, from_attributes=True) for a in items],
         total=total,
@@ -140,6 +149,11 @@ async def create_asset(
         entity_name=asset.name,
         changes=audit_svc.create_snapshot(asset.__dict__, _ASSET_FIELDS),
     )
+    webhook_service.dispatch_background(
+        pool, "asset.created",
+        webhook_service.asset_event_payload(asset, actor=user.username),
+        organization_id=user.organization_id,
+    )
     return AssetResponse.model_validate(asset, from_attributes=True)
 
 
@@ -217,6 +231,11 @@ async def update_asset(
             entity_name=asset.name,
             changes=diff,
         )
+        await watcher_service.notify_watchers(
+            pool, asset_id=asset.id, asset_name=asset.name,
+            organization_id=user.organization_id, action="update",
+            actor_id=user.id, actor_username=user.username,
+        )
     return AssetResponse.model_validate(asset, from_attributes=True)
 
 
@@ -255,6 +274,8 @@ async def delete_asset(
                 "asset_id": str(asset_id),
             },
         )
+    # Capture watcher ids before the delete — the rows cascade with the asset.
+    watchers = await watcher_service.watcher_ids(pool, asset_id)
     deleted = await asset_svc.delete_asset(
         pool, asset_id, organization_id=user.organization_id
     )
@@ -269,4 +290,14 @@ async def delete_asset(
         entity_id=old.id,
         entity_name=old.name,
         changes=audit_svc.delete_snapshot(old.__dict__, _ASSET_FIELDS),
+    )
+    await watcher_service.notify_watchers(
+        pool, asset_id=old.id, asset_name=old.name,
+        organization_id=user.organization_id, action="delete",
+        actor_id=user.id, actor_username=user.username, ids=watchers,
+    )
+    webhook_service.dispatch_background(
+        pool, "asset.deleted",
+        webhook_service.asset_event_payload(old, actor=user.username),
+        organization_id=user.organization_id,
     )

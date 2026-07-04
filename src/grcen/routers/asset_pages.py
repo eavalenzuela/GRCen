@@ -34,6 +34,8 @@ from grcen.services import (
     risk_service as risk_svc,
     saved_search_service,
     tag_service,
+    watcher_service,
+    webhook_service,
     workflow_service,
 )
 
@@ -85,6 +87,11 @@ async def asset_list(
     all_tags = await tag_service.list_tags_with_counts(pool, organization_id=user.organization_id)
     saved_searches = await saved_search_service.list_visible(
         pool, user.id, path="/assets", organization_id=user.organization_id
+    )
+    await access_log_service.record_list_sampled(
+        pool, user=user, entity_type="asset",
+        path=str(request.url.path), result_count=total,
+        ip_address=request.client.host if request.client else None,
     )
     # Register framework: a single asset type resolves to a RegisterDef, which
     # gives the list a name, curated columns (?columns=curated), and a metrics
@@ -464,6 +471,11 @@ async def asset_create_submit(
         entity_name=asset.name,
         changes=audit_svc.create_snapshot(asset.__dict__, _ASSET_FIELDS),
     )
+    webhook_service.dispatch_background(
+        pool, "asset.created",
+        webhook_service.asset_event_payload(asset, actor=user.username),
+        organization_id=user.organization_id,
+    )
     return RedirectResponse(f"/assets/{asset.id}", status_code=302)
 
 
@@ -521,6 +533,7 @@ async def asset_detail(
     relationship_types = suggested_relationship_types(
         await rel_svc.list_relationship_types(pool, organization_id=user.organization_id)
     )
+    watching = await watcher_service.is_watching(pool, asset_id, user.id)
     return templates.TemplateResponse(request, "assets/detail.html", context={
             "user": user,
             "asset": asset,
@@ -534,8 +547,33 @@ async def asset_detail(
             "linked_user": linked_user,
             "pending_changes": pending_changes,
             "sensitive_overrides": sensitive_overrides,
+            "watching": watching,
         },
     )
+
+
+@router.post("/assets/{asset_id}/watch")
+async def asset_watch_submit(
+    asset_id: UUID,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.VIEW)),
+):
+    ok = await watcher_service.watch(
+        pool, asset_id, user.id, organization_id=user.organization_id
+    )
+    if not ok:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    return RedirectResponse(f"/assets/{asset_id}", status_code=302)
+
+
+@router.post("/assets/{asset_id}/unwatch")
+async def asset_unwatch_submit(
+    asset_id: UUID,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.VIEW)),
+):
+    await watcher_service.unwatch(pool, asset_id, user.id)
+    return RedirectResponse(f"/assets/{asset_id}", status_code=302)
 
 
 @router.get("/assets/{asset_id}/edit", response_class=HTMLResponse)
@@ -640,6 +678,11 @@ async def asset_update_submit(
                 entity_name=updated.name,
                 changes=diff,
             )
+            await watcher_service.notify_watchers(
+                pool, asset_id=asset_id, asset_name=updated.name,
+                organization_id=user.organization_id, action="update",
+                actor_id=user.id, actor_username=user.username,
+            )
     return RedirectResponse(f"/assets/{asset_id}", status_code=302)
 
 
@@ -666,6 +709,8 @@ async def asset_delete_submit(
         except ValueError as e:
             raise HTTPException(status_code=409, detail=str(e))
         return RedirectResponse(f"/approvals/{change.id}?submitted=1", status_code=302)
+    # Capture watcher ids before the delete — the rows cascade with the asset.
+    watchers = await watcher_service.watcher_ids(pool, asset_id)
     await asset_svc.delete_asset(pool, asset_id, organization_id=user.organization_id)
     if old:
         await audit_svc.log_audit_event(
@@ -677,6 +722,16 @@ async def asset_delete_submit(
             entity_id=old.id,
             entity_name=old.name,
             changes=audit_svc.delete_snapshot(old.__dict__, _ASSET_FIELDS),
+        )
+        await watcher_service.notify_watchers(
+            pool, asset_id=old.id, asset_name=old.name,
+            organization_id=user.organization_id, action="delete",
+            actor_id=user.id, actor_username=user.username, ids=watchers,
+        )
+        webhook_service.dispatch_background(
+            pool, "asset.deleted",
+            webhook_service.asset_event_payload(old, actor=user.username),
+            organization_id=user.organization_id,
         )
     return RedirectResponse("/assets", status_code=302)
 

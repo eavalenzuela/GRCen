@@ -92,6 +92,14 @@ async def user_settings(
         ok, _, message = flash.partition(":")
         flash_ctx = {"ok": ok == "ok", "message": message or flash}
 
+    from grcen.config import settings as app_settings
+    from grcen.services import calendar_service
+    calendar_token = await calendar_service.get_token(pool, user.id)
+    calendar_url = (
+        f"{app_settings.APP_BASE_URL.rstrip('/')}/calendar/{calendar_token}/grcen.ics"
+        if calendar_token else None
+    )
+
     return templates.TemplateResponse(
         request,
         "settings.html",
@@ -107,7 +115,35 @@ async def user_settings(
             "sessions": sessions,
             "current_session_id": current_sid,
             "memberships": memberships,
+            "calendar_url": calendar_url,
         },
+    )
+
+
+@router.post("/settings/calendar/enable")
+async def calendar_feed_enable(
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Create (or rotate) the user's iCal review-feed token."""
+    from grcen.services import calendar_service
+
+    await calendar_service.enable_feed(pool, user.id)
+    return RedirectResponse(
+        "/settings?flash=ok:Calendar feed URL generated", status_code=302
+    )
+
+
+@router.post("/settings/calendar/disable")
+async def calendar_feed_disable(
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    from grcen.services import calendar_service
+
+    await calendar_service.disable_feed(pool, user.id)
+    return RedirectResponse(
+        "/settings?flash=ok:Calendar feed disabled", status_code=302
     )
 
 

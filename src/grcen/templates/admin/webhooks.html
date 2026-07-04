@@ -66,7 +66,7 @@
     <div class="form-group">
         <label for="event_filter">Event Filter (comma-separated)</label>
         <input type="text" id="event_filter" name="event_filter" placeholder="alert.fired (leave blank for all)">
-        <small>Supported events today: <code>alert.fired</code>, <code>ping</code>.</small>
+        <small>Supported events today: <code>alert.fired</code>, <code>asset.created</code>, <code>asset.deleted</code>, <code>ping</code>.</small>
     </div>
     <div class="form-group">
         <label><input type="checkbox" name="enabled" checked> Enabled</label>
@@ -80,13 +80,14 @@
     <h3>Recent Deliveries</h3>
     {% if deliveries %}
     <table class="table">
-        <thead><tr><th>When</th><th>Event</th><th>URL</th><th>Status</th><th>Error</th></tr></thead>
+        <thead><tr><th>When</th><th>Event</th><th>URL</th><th>Attempt</th><th>Status</th><th>Error</th></tr></thead>
         <tbody>
         {% for d in deliveries %}
             <tr>
                 <td>{{ d.attempted_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
                 <td>{{ d.event }}</td>
                 <td style="font-family:monospace; word-break:break-all;">{{ d.url }}</td>
+                <td>{{ d.attempt if d.attempt is defined else 1 }}</td>
                 <td>{{ d.status_code or '-' }}</td>
                 <td>{{ d.error or '' }}</td>
             </tr>

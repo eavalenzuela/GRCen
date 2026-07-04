@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}OAuth Clients - GRCen{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>OAuth 2.0 Clients</h1>
+</div>
+
+<p style="color:#6b7280;">Machine clients exchange their <code>client_id</code> +
+<code>client_secret</code> at <code>POST /api/oauth/token</code>
+(<code>grant_type=client_credentials</code>) for a short-lived, permission-scoped
+bearer token — no long-lived static tokens to leak.</p>
+
+{% if flash %}
+<div class="alert" style="background:{% if flash.ok %}#dcfce7; color:#166534; border:1px solid #bbf7d0{% else %}#fee2e2; color:#991b1b; border:1px solid #fecaca{% endif %};">
+    {{ flash.message }}
+</div>
+{% endif %}
+
+{% if created_client %}
+<div class="card" style="border:2px solid #16a34a; margin-bottom:1.5rem;">
+    <h3>Client created — copy the secret now</h3>
+    <p style="color:#991b1b;">The secret is shown only once. Store it somewhere safe.</p>
+    <p><strong>client_id:</strong> <code style="word-break:break-all;">{{ created_client.client_id }}</code></p>
+    <p><strong>client_secret:</strong> <code style="word-break:break-all;">{{ created_client.client_secret }}</code></p>
+</div>
+{% endif %}
+
+<div class="card">
+    <h3>Registered Clients</h3>
+    {% if clients %}
+    <table class="table">
+        <thead>
+            <tr><th>Name</th><th>Client ID</th><th>Permissions</th><th>Token TTL</th><th>Enabled</th><th></th></tr>
+        </thead>
+        <tbody>
+        {% for c in clients %}
+            <tr>
+                <td>{{ c.name }}</td>
+                <td style="font-family:monospace; word-break:break-all;">{{ c.client_id }}</td>
+                <td>{{ c.permissions | join(', ') }}</td>
+                <td>{{ c.token_ttl_seconds }}s</td>
+                <td>{{ 'yes' if c.enabled else 'no' }}</td>
+                <td>
+                    <form method="post" action="/admin/oauth-clients/{{ c.id }}/toggle" style="display:inline;">
+                        {% include "partials/csrf.html" %}
+                        <button type="submit" class="btn btn-sm">{{ 'Disable' if c.enabled else 'Enable' }}</button>
+                    </form>
+                    <form method="post" action="/admin/oauth-clients/{{ c.id }}/delete" style="display:inline;"
+                          onsubmit="return confirm('Delete this client? Existing issued tokens keep working until they expire.');">
+                        {% include "partials/csrf.html" %}
+                        <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                    </form>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color:#6b7280;">No OAuth clients registered yet.</p>
+    {% endif %}
+</div>
+
+<form method="post" action="/admin/oauth-clients" class="card" style="margin-top:1.5rem;">
+    {% include "partials/csrf.html" %}
+    <h3>Register Client</h3>
+    <div class="form-group">
+        <label for="name">Name</label>
+        <input type="text" id="name" name="name" required placeholder="ci-pipeline">
+    </div>
+    <div class="form-group">
+        <label>Permissions (scope of issued tokens)</label>
+        {% for perm in available_permissions %}
+        <label style="display:inline-block; margin-right:1rem;">
+            <input type="checkbox" name="permissions" value="{{ perm.value }}"> {{ perm.value | replace('_', ' ') | title }}
+        </label>
+        {% endfor %}
+    </div>
+    <div class="form-group">
+        <label for="token_ttl_seconds">Token lifetime (seconds, 60&ndash;86400)</label>
+        <input type="number" id="token_ttl_seconds" name="token_ttl_seconds"
+               min="60" max="86400" value="3600" style="width:8rem;">
+    </div>
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Create Client</button>
+    </div>
+</form>
+{% endblock %}

@@ -88,3 +88,45 @@ def test_backup_requires_encryption_key(tmp_path: Path, monkeypatch):
     with pytest.raises(backup_service.BackupError) as exc:
         backup_service.encrypt_stream([b"x"], tmp_path / "out.bin")
     assert "ENCRYPTION_KEY" in str(exc.value)
+
+
+def test_v2_files_have_unique_salts(tmp_path: Path, encryption_on):
+    """Each backup gets its own random HKDF salt in the header."""
+    a = tmp_path / "a.bin"
+    b = tmp_path / "b.bin"
+    backup_service.encrypt_stream([b"same plaintext"], a)
+    backup_service.encrypt_stream([b"same plaintext"], b)
+    magic_len = len(backup_service.MAGIC)
+    salt_a = a.read_bytes()[magic_len:magic_len + 16]
+    salt_b = b.read_bytes()[magic_len:magic_len + 16]
+    assert salt_a != salt_b
+    # And both still round-trip.
+    assert b"".join(backup_service.decrypt_stream(a)) == b"same plaintext"
+    assert b"".join(backup_service.decrypt_stream(b)) == b"same plaintext"
+
+
+def test_legacy_v1_files_still_restore(tmp_path: Path, encryption_on):
+    """A v1 file (fixed salt, GRCBKP\\x01 magic) decrypts transparently."""
+    import struct
+
+    target = tmp_path / "legacy.bin"
+    key = backup_service._backup_key()  # legacy fixed salt
+    plaintext = b"v1 era dump"
+    nonce = os.urandom(12)
+    ct = key.encrypt(nonce, plaintext, b"backup")
+    with target.open("wb") as out:
+        out.write(backup_service.MAGIC_V1)
+        out.write(nonce)
+        out.write(struct.pack(">I", len(ct)))
+        out.write(ct)
+        out.write(os.urandom(12))
+        out.write(struct.pack(">I", 0))
+
+    assert b"".join(backup_service.decrypt_stream(target)) == plaintext
+
+
+def test_truncated_salt_header_rejected(tmp_path: Path, encryption_on):
+    target = tmp_path / "cut.bin"
+    target.write_bytes(backup_service.MAGIC + b"\x00" * 4)  # header cut short
+    with pytest.raises(backup_service.BackupError):
+        list(backup_service.decrypt_stream(target))

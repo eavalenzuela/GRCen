@@ -203,3 +203,60 @@ async def test_approvals_list_records_each_approver(pool, two_admins_and_editor)
     approvals = await workflow_service.list_approvals(pool, change_id)
     usernames = {a.approver_username for a in approvals}
     assert usernames == {fx["a1"].username, fx["a2"].username}
+
+
+# ── self-approval override ──────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_self_approval_blocked_by_default(pool, two_admins_and_editor):
+    """Four-eyes rule: without the override, the submitter can't approve."""
+    fx = two_admins_and_editor
+    await workflow_service.upsert_config(
+        pool, AssetType.POLICY, require_approval_create=True,
+        require_approval_update=False, require_approval_delete=False,
+    )
+    submit = await fx["ca1"].post(
+        "/api/assets/", json={"type": "policy", "name": "Mine"}
+    )
+    change_id = submit.json()["pending_change_id"]
+    resp = await fx["ca1"].post(f"/api/approvals/{change_id}/approve", json={})
+    assert resp.status_code == 400
+    assert "own pending change" in resp.text
+
+
+@pytest.mark.asyncio
+async def test_self_approval_allowed_when_override_set(pool, two_admins_and_editor):
+    """allow_self_approval=True lets the submitter one-shot their own change."""
+    fx = two_admins_and_editor
+    await workflow_service.upsert_config(
+        pool, AssetType.POLICY, require_approval_create=True,
+        require_approval_update=False, require_approval_delete=False,
+        allow_self_approval=True,
+    )
+    submit = await fx["ca1"].post(
+        "/api/assets/", json={"type": "policy", "name": "Solo Approved"}
+    )
+    change_id = submit.json()["pending_change_id"]
+    resp = await fx["ca1"].post(f"/api/approvals/{change_id}/approve", json={})
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "approved"
+    listing = (await fx["ca1"].get("/api/assets/?type=policy")).json()
+    assert any(a["name"] == "Solo Approved" for a in listing["items"])
+
+
+@pytest.mark.asyncio
+async def test_self_reject_allowed_when_override_set(pool, two_admins_and_editor):
+    fx = two_admins_and_editor
+    await workflow_service.upsert_config(
+        pool, AssetType.POLICY, require_approval_create=True,
+        require_approval_update=False, require_approval_delete=False,
+        allow_self_approval=True,
+    )
+    submit = await fx["ca1"].post(
+        "/api/assets/", json={"type": "policy", "name": "Changed my mind"}
+    )
+    change_id = submit.json()["pending_change_id"]
+    resp = await fx["ca1"].post(f"/api/approvals/{change_id}/reject", json={})
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "rejected"

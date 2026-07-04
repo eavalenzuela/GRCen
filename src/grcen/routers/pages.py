@@ -16,6 +16,7 @@ from grcen.routers import (
     content_packs_pages,
     dashboard_pages,
     framework_pages,
+    my_work,
     register_pages,
     relationship_pages,
     reports_pages,
@@ -30,6 +31,7 @@ router = APIRouter()
 for _sub in (
     auth_pages,
     dashboard_pages,
+    my_work,
     asset_pages,
     register_pages,
     relationship_pages,

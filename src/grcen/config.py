@@ -66,6 +66,19 @@ class Settings(BaseSettings):
     ENCRYPTION_KEY: str = ""
     ENCRYPTION_KEY_RETIRED: str = ""  # previous key, decrypt-only, for rotation
 
+    # Outbound webhook retries: transient failures (network error / HTTP 5xx)
+    # are retried up to MAX_ATTEMPTS total tries with exponential backoff
+    # (BACKOFF_SECONDS * 2^(attempt-1) between tries). 4xx responses are not
+    # retried — they won't heal on their own.
+    WEBHOOK_MAX_ATTEMPTS: int = 3
+    WEBHOOK_RETRY_BACKOFF_SECONDS: float = 2.0
+
+    # Sampled data-access logging for list endpoints. 0 (default) keeps the
+    # current behaviour — list reads are not access-logged, only detail views,
+    # downloads, and exports. A value N > 0 logs roughly 1-in-N list requests
+    # so heavy API scraping shows up without drowning the log.
+    DATA_ACCESS_LOG_LIST_SAMPLE_RATE: int = 0
+
     # Public base URL used when building links in outbound emails.
     APP_BASE_URL: str = "http://localhost:8000"
 

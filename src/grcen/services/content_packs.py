@@ -222,6 +222,37 @@ def fragments_present(pack: ContentPack, *, base_dir: Path = DATA_DIR) -> bool:
 # ── install / uninstall ──────────────────────────────────────────────────────
 
 
+def _version_key(pack: ContentPack, organization_id: UUID) -> str:
+    """app_settings key recording which pack version an org has installed."""
+    return f"content_pack_version:{organization_id}:{pack.id}"
+
+
+async def installed_version(
+    pool: asyncpg.Pool, pack: ContentPack, *, organization_id: UUID
+) -> str | None:
+    """The pack version recorded at install time, or None if never recorded.
+
+    Installs that predate version tracking have assets but no recorded
+    version; callers should treat that as "unknown" rather than "outdated".
+    """
+    return await pool.fetchval(
+        "SELECT value FROM app_settings WHERE key = $1",
+        _version_key(pack, organization_id),
+    )
+
+
+async def _record_installed_version(
+    pool: asyncpg.Pool, pack: ContentPack, organization_id: UUID
+) -> None:
+    await pool.execute(
+        """INSERT INTO app_settings (key, value, updated_at)
+           VALUES ($1, $2, now())
+           ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = now()""",
+        _version_key(pack, organization_id),
+        pack.version,
+    )
+
+
 async def install_pack(
     pool: asyncpg.Pool,
     pack: ContentPack,
@@ -233,7 +264,7 @@ async def install_pack(
 ) -> catalog_sync.CatalogSyncResult:
     """Project a pack into the asset graph under its own ``source`` tag."""
     catalog = load_catalog(pack, base_dir=base_dir)
-    return await catalog_sync.sync_catalog(
+    result = await catalog_sync.sync_catalog(
         pool,
         catalog,
         organization_id=organization_id,
@@ -241,6 +272,12 @@ async def install_pack(
         dry_run=dry_run,
         prune=prune,
     )
+    if not dry_run and not result.errors:
+        if organization_id is None:
+            from grcen.services import organization_service
+            organization_id = await organization_service.get_default_org_id(pool)
+        await _record_installed_version(pool, pack, organization_id)
+    return result
 
 
 async def installed_asset_count(
@@ -277,6 +314,10 @@ async def uninstall_pack(
                 "DELETE FROM assets WHERE source = $1 AND organization_id = $2",
                 pack.source,
                 organization_id,
+            )
+            await conn.execute(
+                "DELETE FROM app_settings WHERE key = $1",
+                _version_key(pack, organization_id),
             )
     return {
         "assets": int(assets.split()[-1]),

@@ -34,6 +34,17 @@ def _patch_httpx_with_transport(transport: httpx.MockTransport):
 
     return patch("grcen.services.webhook_service.httpx.AsyncClient", factory)
 
+
+@pytest.fixture(autouse=True)
+def _no_retry_backoff():
+    """Zero the retry backoff so failure-path tests don't sleep for real."""
+    from grcen.config import settings
+
+    old = settings.WEBHOOK_RETRY_BACKOFF_SECONDS
+    settings.WEBHOOK_RETRY_BACKOFF_SECONDS = 0.0
+    yield
+    settings.WEBHOOK_RETRY_BACKOFF_SECONDS = old
+
 # ── CRUD ─────────────────────────────────────────────────────────────────
 
 
@@ -199,6 +210,117 @@ async def test_send_to_webhook_logs_connection_error(pool):
     assert ok is False
     assert status is None
     assert err and "ConnectError" in err
+
+
+# ── retry / backoff ──────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_send_to_webhook_retries_transient_failures(pool):
+    """5xx responses are retried; each attempt gets its own delivery row."""
+    hook = await webhook_service.create_webhook(
+        pool, name="h", url="https://hooks.test/x"
+    )
+    calls = {"n": 0}
+
+    def handler(req):
+        calls["n"] += 1
+        if calls["n"] < 3:
+            return httpx.Response(500, text="boom")
+        return httpx.Response(200, text="ok")
+
+    transport = httpx.MockTransport(handler)
+    with _patch_httpx_with_transport(transport):
+        ok, status, err = await webhook_service.send_to_webhook(pool, hook, "ping", {})
+
+    assert ok is True
+    assert status == 200
+    assert err is None
+    assert calls["n"] == 3
+    rows = await pool.fetch(
+        "SELECT attempt, status_code FROM webhook_deliveries ORDER BY attempt"
+    )
+    assert [r["attempt"] for r in rows] == [1, 2, 3]
+    assert [r["status_code"] for r in rows] == [500, 500, 200]
+
+
+@pytest.mark.asyncio
+async def test_send_to_webhook_gives_up_after_max_attempts(pool):
+    hook = await webhook_service.create_webhook(
+        pool, name="h", url="https://hooks.test/x"
+    )
+    calls = {"n": 0}
+
+    def handler(req):
+        calls["n"] += 1
+        return httpx.Response(503, text="still down")
+
+    transport = httpx.MockTransport(handler)
+    with _patch_httpx_with_transport(transport):
+        ok, status, err = await webhook_service.send_to_webhook(pool, hook, "ping", {})
+
+    from grcen.config import settings
+
+    assert ok is False
+    assert status == 503
+    assert calls["n"] == settings.WEBHOOK_MAX_ATTEMPTS
+    count = await pool.fetchval("SELECT count(*) FROM webhook_deliveries")
+    assert count == settings.WEBHOOK_MAX_ATTEMPTS
+
+
+@pytest.mark.asyncio
+async def test_send_to_webhook_does_not_retry_4xx(pool):
+    """A 4xx is a hard rejection — retrying won't heal it."""
+    hook = await webhook_service.create_webhook(
+        pool, name="h", url="https://hooks.test/x"
+    )
+    calls = {"n": 0}
+
+    def handler(req):
+        calls["n"] += 1
+        return httpx.Response(404, text="no such hook")
+
+    transport = httpx.MockTransport(handler)
+    with _patch_httpx_with_transport(transport):
+        ok, status, err = await webhook_service.send_to_webhook(pool, hook, "ping", {})
+
+    assert ok is False
+    assert status == 404
+    assert calls["n"] == 1
+    count = await pool.fetchval("SELECT count(*) FROM webhook_deliveries")
+    assert count == 1
+
+
+# ── asset lifecycle events ───────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_rest_asset_create_and_delete_dispatch_events(auth_client):
+    """The single-asset REST routes fire asset.created / asset.deleted."""
+    with patch(
+        "grcen.services.webhook_service.dispatch", new=AsyncMock(return_value=1)
+    ) as mock_dispatch:
+        resp = await auth_client.post(
+            "/api/assets/",
+            json={"type": "system", "name": "Webhooked System"},
+        )
+        assert resp.status_code == 201
+        asset_id = resp.json()["id"]
+
+        resp = await auth_client.delete(f"/api/assets/{asset_id}")
+        assert resp.status_code == 204
+
+        # dispatch_background schedules tasks on the running loop; yield so
+        # they run before we assert.
+        import asyncio as _asyncio
+        await _asyncio.sleep(0)
+
+    events = [call.args[1] for call in mock_dispatch.await_args_list]
+    assert events == ["asset.created", "asset.deleted"]
+    created_payload = mock_dispatch.await_args_list[0].args[2]
+    assert created_payload["name"] == "Webhooked System"
+    assert created_payload["type"] == "system"
+    assert created_payload["id"] == asset_id
 
 
 # ── dispatch + filter ────────────────────────────────────────────────────

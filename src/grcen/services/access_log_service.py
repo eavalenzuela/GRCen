@@ -57,6 +57,45 @@ async def record(
         log.exception("Failed to record access-log entry")
 
 
+def should_sample_list() -> bool:
+    """Whether this list request should be access-logged.
+
+    List endpoints are high-volume, so they are sampled rather than logged
+    per-request. ``DATA_ACCESS_LOG_LIST_SAMPLE_RATE`` = N logs roughly 1-in-N
+    list reads; 0 (the default) disables list logging entirely, preserving
+    the historical behaviour.
+    """
+    import random
+
+    from grcen.config import settings
+
+    rate = settings.DATA_ACCESS_LOG_LIST_SAMPLE_RATE
+    if rate <= 0:
+        return False
+    return random.randrange(rate) == 0
+
+
+async def record_list_sampled(
+    pool: asyncpg.Pool,
+    *,
+    user: User | None,
+    entity_type: str,
+    path: str | None = None,
+    ip_address: str | None = None,
+    result_count: int | None = None,
+) -> None:
+    """Sampled best-effort logging for list endpoints (see should_sample_list)."""
+    if not should_sample_list():
+        return
+    name = f"{entity_type} list"
+    if result_count is not None:
+        name += f" ({result_count} rows)"
+    await record(
+        pool, user=user, action="list", entity_type=entity_type,
+        entity_name=name, path=path, ip_address=ip_address,
+    )
+
+
 async def get_retention_days(pool: asyncpg.Pool) -> int | None:
     """Return the configured retention window for data_access_log, in days.
 

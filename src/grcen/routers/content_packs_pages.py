@@ -50,12 +50,26 @@ async def content_packs_page(
     packs = []
     for pack in content_packs.list_packs():
         present = content_packs.fragments_present(pack)
+        installed = await content_packs.installed_asset_count(
+            pool, pack, organization_id=user.organization_id
+        )
+        installed_ver = (
+            await content_packs.installed_version(
+                pool, pack, organization_id=user.organization_id
+            )
+            if installed
+            else None
+        )
         packs.append({
             "pack": pack,
             "present": present,
             "stats": content_packs.pack_stats(pack) if present else None,
-            "installed": await content_packs.installed_asset_count(
-                pool, pack, organization_id=user.organization_id
+            "installed": installed,
+            "installed_version": installed_ver,
+            # Only claim an update when we *know* the recorded version differs;
+            # pre-tracking installs (no recorded version) stay "unknown".
+            "update_available": bool(
+                installed and installed_ver and installed_ver != pack.version
             ),
         })
     notif_count = await alert_svc.count_unread_notifications(

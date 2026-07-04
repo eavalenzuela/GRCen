@@ -42,6 +42,7 @@
             {% if has_perm(user.role, Permission.APPROVE) or has_perm(user.role, Permission.EDIT) %}
             <a href="/approvals">Approvals</a>
             {% endif %}
+            <a href="/my-work">My Work</a>
             <a href="/notifications" class="notif-link">
                 Notifications
                 <span id="notif-badge"
@@ -62,7 +63,9 @@
         <span class="admin-bar-label">Admin</span>
         {% if has_perm(user.role, Permission.MANAGE_USERS) %}
         <a href="/admin/users">Users</a>
+        <a href="/admin/invitations">Invitations</a>
         <a href="/admin/tokens">Tokens</a>
+        <a href="/admin/oauth-clients">OAuth Clients</a>
         <a href="/admin/oidc-settings">SSO</a>
         <a href="/admin/smtp-settings">SMTP</a>
         <a href="/admin/webhooks">Webhooks</a>

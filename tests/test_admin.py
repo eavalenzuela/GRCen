@@ -112,3 +112,25 @@ async def test_admin_cannot_delete_self(auth_client, pool):
     from grcen.services.auth import get_user_by_id
     still_exists = await get_user_by_id(pool, admin.id)
     assert still_exists is not None
+
+
+@pytest.mark.asyncio
+async def test_email_preview_renders_alert_sample(auth_client):
+    resp = await auth_client.get("/admin/smtp-settings/preview?kind=alert")
+    assert resp.status_code == 200
+    assert "Annual policy review due" in resp.text
+    assert "Acceptable Use Policy" in resp.text
+
+
+@pytest.mark.asyncio
+async def test_email_preview_renders_digest_sample(auth_client):
+    resp = await auth_client.get("/admin/smtp-settings/preview?kind=digest")
+    assert resp.status_code == 200
+    assert "Annual policy review due" in resp.text
+    assert "SOC 2 evidence refresh" in resp.text
+
+
+@pytest.mark.asyncio
+async def test_email_preview_requires_admin(viewer_client):
+    resp = await viewer_client.get("/admin/smtp-settings/preview")
+    assert resp.status_code == 403

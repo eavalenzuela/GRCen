@@ -8,6 +8,7 @@ is recorded in ``webhook_deliveries`` — failures never propagate.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
 import json
@@ -220,6 +221,15 @@ def _matches_filter(hook: Webhook, event: str) -> bool:
     return event in hook.event_filter
 
 
+def _is_transient(status_code: int | None) -> bool:
+    """Whether a failed attempt is worth retrying.
+
+    Network errors (no status code) and 5xx responses are transient; a 4xx
+    means the receiver rejected the request outright and a retry won't heal it.
+    """
+    return status_code is None or status_code >= 500
+
+
 async def send_to_webhook(
     pool: asyncpg.Pool,
     hook: Webhook,
@@ -227,7 +237,14 @@ async def send_to_webhook(
     data: dict[str, Any],
     alert_id: UUID | None = None,
 ) -> tuple[bool, int | None, str | None]:
-    """Send one webhook.  Returns (ok, status_code, error)."""
+    """Send one webhook, retrying transient failures with exponential backoff.
+
+    Up to ``settings.WEBHOOK_MAX_ATTEMPTS`` total tries; every attempt is
+    recorded in ``webhook_deliveries`` with its 1-based ``attempt`` number.
+    Returns (ok, status_code, error) from the final attempt.
+    """
+    from grcen.config import settings
+
     delivery_id = str(uuid.uuid4())
     envelope = {
         "event": event,
@@ -246,36 +263,53 @@ async def send_to_webhook(
     if hook.secret:
         headers["X-GRCen-Signature"] = sign_payload(hook.secret, body)
 
+    org_row = await pool.fetchrow(
+        "SELECT organization_id FROM webhooks WHERE id = $1", hook.id
+    )
+    organization_id = org_row["organization_id"] if org_row else None
+
+    max_attempts = max(1, settings.WEBHOOK_MAX_ATTEMPTS)
     status_code: int | None = None
     response_body: str | None = None
     error: str | None = None
     ok = False
-    try:
-        async with httpx.AsyncClient(timeout=_TIMEOUT_SECONDS) as client:
-            resp = await client.post(hook.url, content=body, headers=headers)
-        status_code = resp.status_code
-        response_body = resp.text[:_RESPONSE_BODY_LIMIT]
-        ok = 200 <= resp.status_code < 300
-        if not ok:
-            error = f"HTTP {resp.status_code}"
-    except Exception as exc:
-        error = f"{type(exc).__name__}: {exc}"
-        log.warning("Webhook POST to %s failed: %s", hook.url, error)
+    for attempt in range(1, max_attempts + 1):
+        status_code = None
+        response_body = None
+        error = None
+        ok = False
+        try:
+            async with httpx.AsyncClient(timeout=_TIMEOUT_SECONDS) as client:
+                resp = await client.post(hook.url, content=body, headers=headers)
+            status_code = resp.status_code
+            response_body = resp.text[:_RESPONSE_BODY_LIMIT]
+            ok = 200 <= resp.status_code < 300
+            if not ok:
+                error = f"HTTP {resp.status_code}"
+        except Exception as exc:
+            error = f"{type(exc).__name__}: {exc}"
+            log.warning(
+                "Webhook POST to %s failed (attempt %d/%d): %s",
+                hook.url, attempt, max_attempts, error,
+            )
 
-    org_row = await pool.fetchrow(
-        "SELECT organization_id FROM webhooks WHERE id = $1", hook.id
-    )
-    await _log_delivery(
-        pool,
-        webhook_id=hook.id,
-        alert_id=alert_id,
-        event=event,
-        url=hook.url,
-        status_code=status_code,
-        response_body=response_body,
-        error=error,
-        organization_id=org_row["organization_id"] if org_row else None,
-    )
+        await _log_delivery(
+            pool,
+            webhook_id=hook.id,
+            alert_id=alert_id,
+            event=event,
+            url=hook.url,
+            status_code=status_code,
+            response_body=response_body,
+            error=error,
+            attempt=attempt,
+            organization_id=organization_id,
+        )
+        if ok or not _is_transient(status_code) or attempt == max_attempts:
+            break
+        backoff = settings.WEBHOOK_RETRY_BACKOFF_SECONDS * (2 ** (attempt - 1))
+        if backoff > 0:
+            await asyncio.sleep(backoff)
     return ok, status_code, error
 
 
@@ -307,6 +341,44 @@ async def dispatch(
     return sent
 
 
+# Keep strong references to in-flight background dispatch tasks so the event
+# loop doesn't garbage-collect them mid-send.
+_background_tasks: set[asyncio.Task] = set()
+
+
+def dispatch_background(
+    pool: asyncpg.Pool,
+    event: str,
+    data: dict[str, Any],
+    *,
+    organization_id: UUID | None = None,
+) -> None:
+    """Fire-and-forget :func:`dispatch` off the request path.
+
+    Request handlers (e.g. asset create/delete) use this so a slow or retrying
+    webhook never delays the HTTP response. Errors are already swallowed and
+    logged inside ``dispatch``/``send_to_webhook``.
+    """
+    task = asyncio.get_running_loop().create_task(
+        dispatch(pool, event, data, organization_id=organization_id)
+    )
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+
+
+def asset_event_payload(asset, *, actor: str = "") -> dict[str, Any]:
+    """Envelope ``data`` for ``asset.created`` / ``asset.deleted`` events."""
+    return {
+        "id": str(asset.id),
+        "type": asset.type.value,
+        "name": asset.name,
+        "status": asset.status.value,
+        "criticality": asset.criticality,
+        "tags": asset.tags or [],
+        "actor": actor,
+    }
+
+
 async def _log_delivery(
     pool: asyncpg.Pool,
     *,
@@ -317,6 +389,7 @@ async def _log_delivery(
     status_code: int | None,
     response_body: str | None,
     error: str | None,
+    attempt: int = 1,
     organization_id: UUID | None = None,
 ) -> None:
     if organization_id is None:
@@ -324,8 +397,8 @@ async def _log_delivery(
         organization_id = await organization_service.get_default_org_id(pool)
     await pool.execute(
         """INSERT INTO webhook_deliveries
-               (id, webhook_id, alert_id, event, url, status_code, response_body, error, organization_id)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)""",
+               (id, webhook_id, alert_id, event, url, status_code, response_body, error, attempt, organization_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)""",
         uuid.uuid4(),
         webhook_id,
         alert_id,
@@ -334,5 +407,6 @@ async def _log_delivery(
         status_code,
         response_body,
         error,
+        attempt,
         organization_id,
     )

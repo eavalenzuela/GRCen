@@ -4,6 +4,13 @@
 <div class="page-header">
     <h1>{{ asset.name }}</h1>
     <div class="actions">
+        <form method="post" action="/assets/{{ asset.id }}/{{ 'unwatch' if watching else 'watch' }}" style="display:inline">
+            {% include "partials/csrf.html" %}
+            <button type="submit" class="btn"
+                    title="{{ 'Stop receiving' if watching else 'Receive' }} in-app notifications when this asset changes">
+                {{ 'Unwatch' if watching else 'Watch' }}
+            </button>
+        </form>
         {% if has_perm(user.role, Permission.VIEW_GRAPH) %}
         <a href="/graph/{{ asset.id }}" class="btn">View Graph</a>
         {% endif %}
