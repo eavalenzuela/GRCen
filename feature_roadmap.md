@@ -261,5 +261,17 @@ their linked Person). Options are documented on the `/settings` calendar card. T
 `tests/test_calendar_feed.py`. Deferred: true push-to-calendar via the Google Calendar / MS
 Graph API — net-new OAuth surface, tracked as a follow-up.
 
+### CSPM misconfiguration sync (I4 second wave) — **SHIPPED**
+`services/cspm_sync.py` (`sync_findings`): consumes a CSPM export (Wiz, Prisma, AWS Security Hub,
+Steampipe) — cloud-posture *misconfigurations* — into Finding assets under `source='cspm:<vendor>'`,
+each linked `System --affected_by--> Finding` by resolving the affected cloud resource
+(`resource_id`/ARN → System `cloud_resource_id` → `external_id` → name; i.e. the keys the CMDB /
+cloud-inventory sync populates, I3). Check id → `scan_id`, provider → `scanner`, framework/resource
+context in the description + metadata. Same resolve-on-disappearance lifecycle as `vuln_sync`, and
+because `risk_aggregation` (I4) rolls up *all* open findings, CSPM misconfigs feed the risk register
+with no extra wiring. CLI `grcen sync-cspm <file>` and `POST /api/sync/cspm`. Contract in the
+`cspm_sync` module docstring. Tests `tests/test_cspm_sync.py` (incl. the CSPM→risk-aggregation
+interlock). Remaining: mapping a CSPM check to its GRCen Control (evidence linkage).
+
 ## Known Stale / Cleanup
 - `CLAUDE.md` has been refreshed but the rest of `configure_*.md` and `security_features_and_requirements.md` should be reviewed in the same pass when we make significant changes to those areas.

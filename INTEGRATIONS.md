@@ -93,7 +93,7 @@ Legend: **✅ exists** · **◐ partial** · **⬜ greenfield**
 | **CMDB / IT asset inventory** — ServiceNow CMDB, Device42, Snipe-IT | System, Device (+ `depends_on`, owner) | `cmdb:<vendor>` | `system:`/`device:<ci_id>` | — (fields shipped in I0b) | ✅ `cmdb_sync` (I3) |
 | **Cloud inventory** — AWS Config, Azure Resource Graph, GCP Asset Inventory | System / Device (resources) | `cloud:<provider>` | ARN / resource id | — (uses the same `cmdb_sync` contract) | ✅ via `cmdb_sync` (I3); dedicated pullers TBD |
 | **Vuln scanners / "Qualys-likes"** — Qualys, Tenable/Nessus, Rapid7, **uvt** | Finding (`affected_by` ← System), aggregated → **Risk** | `uvt` or `qualys` / `tenable` | `finding:<finding_id>` | — (fields shipped in I0b) | ✅ `vuln_sync` + `risk_aggregation` (I4) |
-| **CSPM** — Wiz, Prisma, Security Hub, Steampipe | Finding (misconfig) → System; Control evidence | `cspm:<vendor>` | check id + resource | Finding fields above | ⬜ (autocomply's simulated AWS collector feeds control evidence) |
+| **CSPM** — Wiz, Prisma, Security Hub, Steampipe | Finding (misconfig) `affected_by` ← cloud System, aggregated → Risk | `cspm:<vendor>` | `finding:<finding_id>` | — (resolves by `cloud_resource_id`/`external_id`) | ✅ `cspm_sync` |
 | **MDM / EDR** — Intune, Jamf, Kandji, CrowdStrike, SentinelOne | Device (+ device-compliance Finding) | `mdm:<vendor>` / `edr:<vendor>` | device id | Device `ip_address`, `external_id`, `compliance_state` | ⬜ |
 | **ITSM / ticketing** — Jira, ServiceNow, Linear | Finding **status sync (inbound)** | — | ticket key | — (`external_ticket*` shipped) | ✅ `ticketing_service` (E3) via `POST /api/sync/tickets` |
 | **Procurement / TPRM** — OneTrust, Whistic, SecurityScorecard | Vendor (+ risk rating) | `tprm:<vendor>` | vendor id | Vendor `risk_rating`, `external_id` | ⬜ (outbound questionnaire campaigns exist ✅) |
@@ -117,7 +117,8 @@ The external connectors that exist today are autocomply's catalog sync, **SCIM U
 provisioned and **deprovisioned** from both an IdP (SCIM) and an HRIS roster (leaver → Person
 archived + login disabled); Systems/Devices come from the CMDB with `depends_on` + ownership;
 and scanner findings link onto those Systems by CI id (resolved on remediation). Findings push
-to an ITSM (Jira/ServiceNow) and sync ticket status back (E3). CSPM, MDM/EDR, inbound-TPRM, and
+to an ITSM (Jira/ServiceNow) and sync ticket status back (E3). CSPM misconfigurations land as
+Findings on their cloud System (`cspm_sync`, resolved by resource id). MDM/EDR, inbound-TPRM, and
 SIEM connectors remain greenfield.
 
 ---
@@ -244,8 +245,8 @@ SIEM connectors remain greenfield.
   `/settings`. Tests: `tests/test_calendar_feed.py`. *Remaining (deferred):* push-to-calendar via
   the Google/MS Graph API — net-new OAuth surface.
 
-**Second wave:** MDM/EDR → Device; CSPM misconfig → Finding; inbound TPRM vendor-risk; data
-catalog → Data Category; SIEM syslog/CEF forwarder; auto-email + reminders for vendor
+**Second wave:** ✅ CSPM misconfig → Finding (`cspm_sync`). Remaining: MDM/EDR → Device; inbound
+TPRM vendor-risk; data catalog → Data Category; SIEM syslog/CEF forwarder; auto-email + reminders for vendor
 campaigns.
 
 ---

@@ -82,8 +82,10 @@ disabled); **CMDB / cloud-inventory sync** (`services/cmdb_sync.py` + `routers/s
 links, `external_id`=CI id so uvt findings resolve onto them, decommission-on-disappearance);
 and **vuln findings from uvt** (`services/vuln_sync.py` + `routers/sync.py`, CLI `grcen
 sync-vulns` or `POST /api/sync/vulns`, Finding assets linked `affected_by`→System, findings
-archived as remediated when they drop out; `services/risk_aggregation.py` rolls open findings
-into Risk assets on the register/heatmap — CLI `grcen aggregate-risks` + a nightly job).
+archived as remediated when they drop out; `services/cspm_sync.py` does the same for CSPM cloud
+misconfigurations, resolving the affected System by cloud resource id; `services/risk_aggregation.py`
+rolls open findings into Risk assets on the register/heatmap — CLI `grcen aggregate-risks` + a
+nightly job).
 Egress hangs off `services/webhook_service.py`
 (centralized `WEBHOOK_EVENTS` catalog incl. `asset.updated`; per-webhook `format` =
 `grcen`/`slack`/`teams` posts native Slack/Teams messages, E1), `alert_service`'s `_deliver_*`
