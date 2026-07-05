@@ -1008,6 +1008,24 @@ DO $$ BEGIN
     ALTER TABLE webhooks ADD COLUMN format VARCHAR(16) NOT NULL DEFAULT 'grcen';
 EXCEPTION WHEN duplicate_column THEN NULL; END $$;
 
+-- SCIM Groups (I1): IdP-provisioned groups whose membership drives GRCen role
+-- via a configurable displayName→role map (app_settings 'scim_group_role_map').
+CREATE TABLE IF NOT EXISTS scim_groups (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    external_id     VARCHAR(255),
+    display_name    VARCHAR(255) NOT NULL,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_scim_groups_name
+    ON scim_groups (organization_id, display_name);
+CREATE TABLE IF NOT EXISTS scim_group_members (
+    group_id UUID NOT NULL REFERENCES scim_groups(id) ON DELETE CASCADE,
+    user_id  UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    PRIMARY KEY (group_id, user_id)
+);
+
 -- Workflow self-approval override: when true, the submitter of a pending
 -- change may approve/reject it themselves (small-team escape hatch; off by
 -- default so the four-eyes rule stays the norm).

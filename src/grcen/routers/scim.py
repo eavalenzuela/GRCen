@@ -151,3 +151,89 @@ async def delete_user(
     except ScimError as e:
         return _error(e)
     return Response(status_code=204)
+
+
+# ── Groups (I1: membership → role sync) ──────────────────────────────────
+
+
+@router.get("/Groups")
+async def list_groups(
+    request: Request, pool=Depends(get_db), user: User = Depends(_sync_required)
+):
+    def _int(name: str, default: int) -> int:
+        try:
+            return int(request.query_params.get(name, default))
+        except (TypeError, ValueError):
+            return default
+
+    try:
+        result = await scim_service.list_groups(
+            pool, user.organization_id,
+            filter_str=request.query_params.get("filter"),
+            start_index=_int("startIndex", 1),
+            count=_int("count", 100),
+        )
+    except ScimError as e:
+        return _error(e)
+    return _scim(result)
+
+
+@router.post("/Groups")
+async def create_group(
+    request: Request, pool=Depends(get_db), user: User = Depends(_sync_required)
+):
+    try:
+        payload = await _json_body(request)
+        resource = await scim_service.create_group(pool, user.organization_id, payload)
+    except ScimError as e:
+        return _error(e)
+    return _scim(resource, status=201)
+
+
+@router.get("/Groups/{group_id}")
+async def get_group(
+    group_id: UUID, pool=Depends(get_db), user: User = Depends(_sync_required)
+):
+    try:
+        return _scim(await scim_service.get_group(pool, user.organization_id, group_id))
+    except ScimError as e:
+        return _error(e)
+
+
+@router.put("/Groups/{group_id}")
+async def replace_group(
+    group_id: UUID, request: Request,
+    pool=Depends(get_db), user: User = Depends(_sync_required),
+):
+    try:
+        payload = await _json_body(request)
+        return _scim(
+            await scim_service.replace_group(pool, user.organization_id, group_id, payload)
+        )
+    except ScimError as e:
+        return _error(e)
+
+
+@router.patch("/Groups/{group_id}")
+async def patch_group(
+    group_id: UUID, request: Request,
+    pool=Depends(get_db), user: User = Depends(_sync_required),
+):
+    try:
+        payload = await _json_body(request)
+        return _scim(
+            await scim_service.patch_group(pool, user.organization_id, group_id, payload)
+        )
+    except ScimError as e:
+        return _error(e)
+
+
+@router.delete("/Groups/{group_id}")
+async def delete_group(
+    group_id: UUID, pool=Depends(get_db), user: User = Depends(_sync_required)
+):
+    try:
+        await scim_service.delete_group(pool, user.organization_id, group_id)
+    except ScimError as e:
+        return _error(e)
+    return Response(status_code=204)

@@ -160,17 +160,22 @@ Remaining: a generic `POST /api/sync/<source>` HTTP surface (lands with the firs
 `cvss_vector`/`scanner`/`scan_id`/`affected_asset`/`first_seen`/`last_seen`. Additive (metadata
 JSONB), so they surface in forms/detail/columns/export with no schema change.
 
-### I1. IdP SCIM 2.0 (Users) — **SHIPPED (Users)**
-`routers/scim.py` + `services/scim_service.py`: SCIM 2.0 `/scim/v2/Users`
-(create/get/list+filter/PUT/PATCH/DELETE) + `ServiceProviderConfig`, authenticated by a
-`sync`-scoped API token (org-bound, so provisioning is tenant-scoped). Each SCIM user maps to a
-GRCen login plus an externally-owned Person (`source='scim'`, `source_ref` = `externalId` ||
-`userName`, projected through I0). `active:false` / `DELETE` soft-deprovision — the login is
-deactivated and the Person archived (never hard-deleted, preserving audit history and any
-human-authored edges) — closing the deprovisioning gap that login-time OIDC/SAML JIT leaves
+### I1. IdP SCIM 2.0 (Users + Groups) — **SHIPPED**
+`routers/scim.py` + `services/scim_service.py`: SCIM 2.0 `/scim/v2/Users` **and**
+`/scim/v2/Groups` (create/get/list+filter/PUT/PATCH/DELETE) + `ServiceProviderConfig`,
+authenticated by a `sync`-scoped API token (org-bound, so provisioning is tenant-scoped). Each
+SCIM user maps to a GRCen login plus an externally-owned Person (`source='scim'`, `source_ref` =
+`externalId` || `userName`, projected through I0). `active:false` / `DELETE` soft-deprovision —
+the login is deactivated and the Person archived (never hard-deleted, preserving audit history
+and human-authored edges) — closing the deprovisioning gap that login-time OIDC/SAML JIT leaves
 open. Enterprise-extension attributes (employeeNumber, department, manager, title) map to the
-I0b Person fields. Tests `tests/test_scim.py`. Remaining: Groups → role sync, per-org SCIM
-config UI. See `INTEGRATIONS.md` Part C for the rest of the connector roadmap.
+I0b Person fields. **Groups → role sync:** `scim_groups` / `scim_group_members` back the Group
+resource; a group's `displayName` maps to a GRCen role via a configurable map
+(`app_settings['scim_group_role_map']`, edited at `/admin/scim-settings`), and each member's
+login role is recomputed to the highest-privilege role among their groups (removed from every
+mapped group → the SCIM default role). SCIM Group PATCH member add/remove (incl. the
+`members[value eq "id"]` path form) is handled. Tests `tests/test_scim.py`. Remaining: per-org
+SCIM config (currently global). See `INTEGRATIONS.md` Part C for the rest of the roadmap.
 
 ### I2. HRIS roster sync — **SHIPPED**
 `services/hris_sync.py` (`sync_roster`) — the bulk counterpart to SCIM. Projects an HRIS roster

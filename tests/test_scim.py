@@ -11,8 +11,13 @@ from httpx import ASGITransport, AsyncClient
 
 from grcen.main import app
 from grcen.permissions import UserRole
+from grcen.services import organization_service, scim_service
 from grcen.services.auth import create_user, get_user_by_id
 from grcen.services.token_service import create_token
+
+
+async def _org(pool):
+    return await organization_service.get_default_org_id(pool)
 
 
 async def _sync_token(pool) -> str:
@@ -215,3 +220,148 @@ async def test_service_provider_config(pool):
         r = await c.get("/scim/v2/ServiceProviderConfig", headers={"Authorization": f"Bearer {raw}"})
         assert r.status_code == 200
         assert r.json()["patch"]["supported"] is True
+
+
+# ── Groups → role sync (I1) ──────────────────────────────────────────────
+
+
+async def _member(pool, role=UserRole.VIEWER):
+    return await create_user(pool, f"m_{uuid.uuid4().hex[:8]}", "pw", role=role)
+
+
+@pytest.mark.asyncio
+async def test_group_membership_sets_role(pool):
+    org = await _org(pool)
+    await scim_service.set_group_role_map(pool, {"Admins": "admin"})
+    u = await _member(pool)
+    grp = await scim_service.create_group(
+        pool, org, {"displayName": "Admins", "members": [{"value": str(u.id)}]})
+    assert grp["displayName"] == "Admins"
+    assert any(m["value"] == str(u.id) for m in grp["members"])
+    assert (await get_user_by_id(pool, u.id)).role == UserRole.ADMIN
+
+
+@pytest.mark.asyncio
+async def test_highest_privilege_role_wins(pool):
+    org = await _org(pool)
+    await scim_service.set_group_role_map(pool, {"Admins": "admin", "Editors": "editor"})
+    u = await _member(pool)
+    await scim_service.create_group(
+        pool, org, {"displayName": "Editors", "members": [{"value": str(u.id)}]})
+    assert (await get_user_by_id(pool, u.id)).role == UserRole.EDITOR
+    await scim_service.create_group(
+        pool, org, {"displayName": "Admins", "members": [{"value": str(u.id)}]})
+    assert (await get_user_by_id(pool, u.id)).role == UserRole.ADMIN
+
+
+@pytest.mark.asyncio
+async def test_patch_add_and_remove_member_recomputes_role(pool):
+    org = await _org(pool)
+    await scim_service.set_group_role_map(pool, {"Admins": "admin"})  # default = viewer
+    u = await _member(pool)
+    grp = await scim_service.create_group(pool, org, {"displayName": "Admins"})
+    gid = uuid.UUID(grp["id"])
+
+    added = await scim_service.patch_group(pool, org, gid, {
+        "Operations": [{"op": "add", "path": "members", "value": [{"value": str(u.id)}]}]})
+    assert any(m["value"] == str(u.id) for m in added["members"])
+    assert (await get_user_by_id(pool, u.id)).role == UserRole.ADMIN
+
+    await scim_service.patch_group(pool, org, gid, {
+        "Operations": [{"op": "remove", "path": "members", "value": [{"value": str(u.id)}]}]})
+    # removed from the only role-granting group → back to the default (viewer)
+    assert (await get_user_by_id(pool, u.id)).role == UserRole.VIEWER
+
+
+@pytest.mark.asyncio
+async def test_patch_remove_via_path_filter(pool):
+    org = await _org(pool)
+    await scim_service.set_group_role_map(pool, {"Admins": "admin"})
+    u = await _member(pool)
+    grp = await scim_service.create_group(
+        pool, org, {"displayName": "Admins", "members": [{"value": str(u.id)}]})
+    gid = uuid.UUID(grp["id"])
+    await scim_service.patch_group(pool, org, gid, {
+        "Operations": [{"op": "remove", "path": f'members[value eq "{u.id}"]'}]})
+    g = await scim_service.get_group(pool, org, gid)
+    assert not any(m["value"] == str(u.id) for m in g["members"])
+    assert (await get_user_by_id(pool, u.id)).role == UserRole.VIEWER
+
+
+@pytest.mark.asyncio
+async def test_put_replaces_members(pool):
+    org = await _org(pool)
+    await scim_service.set_group_role_map(pool, {"Admins": "admin"})
+    u1 = await _member(pool)
+    u2 = await _member(pool)
+    grp = await scim_service.create_group(
+        pool, org, {"displayName": "Admins", "members": [{"value": str(u1.id)}]})
+    gid = uuid.UUID(grp["id"])
+    await scim_service.replace_group(
+        pool, org, gid, {"displayName": "Admins", "members": [{"value": str(u2.id)}]})
+    assert (await get_user_by_id(pool, u1.id)).role == UserRole.VIEWER   # removed → default
+    assert (await get_user_by_id(pool, u2.id)).role == UserRole.ADMIN    # added → admin
+
+
+@pytest.mark.asyncio
+async def test_delete_group_recomputes_members(pool):
+    org = await _org(pool)
+    await scim_service.set_group_role_map(pool, {"Admins": "admin"})
+    u = await _member(pool)
+    grp = await scim_service.create_group(
+        pool, org, {"displayName": "Admins", "members": [{"value": str(u.id)}]})
+    assert (await get_user_by_id(pool, u.id)).role == UserRole.ADMIN
+    await scim_service.delete_group(pool, org, uuid.UUID(grp["id"]))
+    assert (await get_user_by_id(pool, u.id)).role == UserRole.VIEWER
+
+
+@pytest.mark.asyncio
+async def test_duplicate_group_conflicts(pool):
+    org = await _org(pool)
+    await scim_service.create_group(pool, org, {"displayName": "Team"})
+    with pytest.raises(scim_service.ScimError) as ei:
+        await scim_service.create_group(pool, org, {"displayName": "Team"})
+    assert ei.value.status == 409
+
+
+@pytest.mark.asyncio
+async def test_http_group_crud_and_filter(pool):
+    raw = await _sync_token(pool)
+    u = await _member(pool)
+    async with _client() as c:
+        h = {"Authorization": f"Bearer {raw}"}
+        created = await c.post(
+            "/scim/v2/Groups",
+            json={"displayName": "Engineers", "externalId": "grp-1",
+                  "members": [{"value": str(u.id)}]},
+            headers=h)
+        assert created.status_code == 201, created.text
+        gid = created.json()["id"]
+        assert created.json()["externalId"] == "grp-1"
+
+        assert (await c.get(f"/scim/v2/Groups/{gid}", headers=h)).status_code == 200
+
+        lr = await c.get("/scim/v2/Groups", params={"filter": 'displayName eq "Engineers"'}, headers=h)
+        assert lr.json()["totalResults"] == 1
+        assert lr.json()["Resources"][0]["id"] == gid
+
+        assert (await c.delete(f"/scim/v2/Groups/{gid}", headers=h)).status_code == 204
+        assert (await c.get(f"/scim/v2/Groups/{gid}", headers=h)).status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_admin_scim_settings_page_and_save(auth_client, pool):
+    from tests.conftest import _extract_csrf_from_session_cookie
+
+    resp = await auth_client.get("/admin/scim-settings")
+    assert resp.status_code == 200
+    assert "SCIM" in resp.text
+
+    resp = await auth_client.post("/admin/scim-settings", data={
+        "default_role": "editor",
+        "role_map": '{"GRCen Admins": "admin"}',
+        "csrf_token": _extract_csrf_from_session_cookie(auth_client),
+    })
+    assert resp.status_code in (302, 303)
+    assert (await scim_service.get_default_role(pool)).value == "editor"
+    assert await scim_service.get_group_role_map(pool) == {"GRCen Admins": "admin"}

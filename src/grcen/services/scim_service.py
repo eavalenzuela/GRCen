@@ -32,11 +32,16 @@ from grcen.services import auth as auth_svc
 from grcen.services import external_sync
 
 USER_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0:User"
+GROUP_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0:Group"
 ENTERPRISE_SCHEMA = "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"
 LIST_RESPONSE_SCHEMA = "urn:ietf:params:scim:api:messages:2.0:ListResponse"
 ERROR_SCHEMA = "urn:ietf:params:scim:api:messages:2.0:Error"
 
 SOURCE = "scim"
+
+# Role precedence (highest privilege first) for resolving a user's role from the
+# roles their groups map to.
+_ROLE_PRIORITY = [UserRole.ADMIN, UserRole.EDITOR, UserRole.AUDITOR, UserRole.VIEWER]
 
 
 class ScimError(Exception):
@@ -406,3 +411,303 @@ async def deactivate_user(
             "WHERE id = $1 AND organization_id = $2",
             user.person_asset_id, organization_id,
         )
+
+
+# ── Groups → role sync (I1) ───────────────────────────────────────────────
+#
+# An IdP provisions Groups and memberships via SCIM; GRCen maps a group's
+# displayName to a role (configurable ``app_settings['scim_group_role_map']``,
+# a {displayName: role} JSON object) and each member's login role becomes the
+# highest-privilege role among the groups they belong to. Removed from every
+# role-granting group → reset to the SCIM default role.
+
+
+async def get_group_role_map(pool: asyncpg.Pool) -> dict[str, str]:
+    row = await pool.fetchrow(
+        "SELECT value FROM app_settings WHERE key = 'scim_group_role_map'"
+    )
+    if row and row["value"]:
+        try:
+            data = json.loads(row["value"])
+            return data if isinstance(data, dict) else {}
+        except (TypeError, ValueError):
+            return {}
+    return {}
+
+
+async def set_group_role_map(pool: asyncpg.Pool, mapping: dict) -> None:
+    await pool.execute(
+        """INSERT INTO app_settings (key, value, updated_at)
+           VALUES ('scim_group_role_map', $1, now())
+           ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = now()""",
+        json.dumps(mapping),
+    )
+
+
+async def set_default_role(pool: asyncpg.Pool, role: str) -> None:
+    if role not in {r.value for r in UserRole}:
+        role = UserRole.VIEWER.value
+    await pool.execute(
+        """INSERT INTO app_settings (key, value, updated_at)
+           VALUES ('scim_default_role', $1, now())
+           ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = now()""",
+        role,
+    )
+
+
+async def recompute_user_role(
+    pool: asyncpg.Pool, organization_id: UUID, user_id: UUID
+) -> None:
+    """Set the user's role from their group memberships. Highest-privilege role
+    among mapped groups wins; if they belong to no role-granting group, reset to
+    the SCIM default (so removal from the admin group actually demotes)."""
+    mapping = await get_group_role_map(pool)
+    rows = await pool.fetch(
+        """SELECT g.display_name FROM scim_group_members m
+           JOIN scim_groups g ON g.id = m.group_id
+           WHERE m.user_id = $1 AND g.organization_id = $2""",
+        user_id, organization_id,
+    )
+    candidates: list[UserRole] = []
+    for r in rows:
+        mapped = mapping.get(r["display_name"])
+        if mapped:
+            try:
+                candidates.append(UserRole(mapped))
+            except ValueError:
+                pass
+    role = (
+        min(candidates, key=lambda x: _ROLE_PRIORITY.index(x))
+        if candidates else await get_default_role(pool)
+    )
+    await auth_svc.update_user_role(pool, user_id, role)
+
+
+def parse_group(payload: object) -> dict:
+    if not isinstance(payload, dict):
+        raise ScimError(400, "request body must be a JSON object")
+    display_name = payload.get("displayName")
+    if not display_name or not isinstance(display_name, str):
+        raise ScimError(400, "displayName is required", scim_type="invalidValue")
+    members: list[str] = []
+    for m in payload.get("members") or []:
+        if isinstance(m, dict) and m.get("value"):
+            members.append(str(m["value"]))
+    return {
+        "display_name": display_name,
+        "external_id": payload.get("externalId") or None,
+        "member_ids": members,
+    }
+
+
+async def _valid_member_ids(pool, organization_id: UUID, ids: list[str]) -> list[UUID]:
+    """Keep only ids that are real users in this org (ignore unknown/foreign)."""
+    out: list[UUID] = []
+    for raw in ids:
+        try:
+            uid = UUID(str(raw))
+        except (ValueError, TypeError):
+            continue
+        row = await pool.fetchrow(
+            "SELECT 1 FROM users WHERE id = $1 AND organization_id = $2", uid, organization_id)
+        if row:
+            out.append(uid)
+    return out
+
+
+async def _group_members(pool, group_id: UUID) -> list[dict]:
+    return [
+        dict(r) for r in await pool.fetch(
+            """SELECT m.user_id, u.username FROM scim_group_members m
+               JOIN users u ON u.id = m.user_id
+               WHERE m.group_id = $1 ORDER BY u.username""",
+            group_id,
+        )
+    ]
+
+
+def to_scim_group(group_row, member_rows) -> dict:
+    resource: dict = {
+        "schemas": [GROUP_SCHEMA],
+        "id": str(group_row["id"]),
+        "displayName": group_row["display_name"],
+        "members": [
+            {"value": str(m["user_id"]), "display": m["username"]} for m in member_rows
+        ],
+        "meta": {
+            "resourceType": "Group",
+            "location": f"/scim/v2/Groups/{group_row['id']}",
+        },
+    }
+    if group_row["external_id"]:
+        resource["externalId"] = group_row["external_id"]
+    return resource
+
+
+async def _load_group(pool, organization_id: UUID, group_id: UUID):
+    row = await pool.fetchrow(
+        "SELECT * FROM scim_groups WHERE id = $1 AND organization_id = $2",
+        group_id, organization_id)
+    if row is None:
+        raise ScimError(404, f"Group {group_id} not found")
+    return row
+
+
+async def create_group(pool: asyncpg.Pool, organization_id: UUID, payload: object) -> dict:
+    parsed = parse_group(payload)
+    dup = await pool.fetchrow(
+        "SELECT 1 FROM scim_groups WHERE organization_id = $1 AND display_name = $2",
+        organization_id, parsed["display_name"])
+    if dup:
+        raise ScimError(409, f"group '{parsed['display_name']}' already exists",
+                        scim_type="uniqueness")
+    row = await pool.fetchrow(
+        """INSERT INTO scim_groups (organization_id, external_id, display_name)
+           VALUES ($1, $2, $3) RETURNING *""",
+        organization_id, parsed["external_id"], parsed["display_name"])
+    member_ids = await _valid_member_ids(pool, organization_id, parsed["member_ids"])
+    for uid in member_ids:
+        await pool.execute(
+            "INSERT INTO scim_group_members (group_id, user_id) VALUES ($1, $2) "
+            "ON CONFLICT DO NOTHING", row["id"], uid)
+    for uid in member_ids:
+        await recompute_user_role(pool, organization_id, uid)
+    return to_scim_group(row, await _group_members(pool, row["id"]))
+
+
+async def get_group(pool: asyncpg.Pool, organization_id: UUID, group_id: UUID) -> dict:
+    row = await _load_group(pool, organization_id, group_id)
+    return to_scim_group(row, await _group_members(pool, group_id))
+
+
+async def list_groups(
+    pool: asyncpg.Pool, organization_id: UUID, *,
+    filter_str: str | None = None, start_index: int = 1, count: int = 100,
+) -> dict:
+    parsed = _parse_filter(filter_str)
+    if filter_str and parsed is None:
+        rows = []
+    elif parsed is not None:
+        attr, val = parsed[0].lower(), parsed[1]
+        if attr == "displayname":
+            rows = await pool.fetch(
+                "SELECT * FROM scim_groups WHERE organization_id = $1 AND display_name = $2",
+                organization_id, val)
+        elif attr == "externalid":
+            rows = await pool.fetch(
+                "SELECT * FROM scim_groups WHERE organization_id = $1 AND external_id = $2",
+                organization_id, val)
+        else:
+            rows = []
+    else:
+        rows = await pool.fetch(
+            "SELECT * FROM scim_groups WHERE organization_id = $1 ORDER BY display_name",
+            organization_id)
+    resources = [to_scim_group(r, await _group_members(pool, r["id"])) for r in rows]
+    total = len(resources)
+    start = max(start_index, 1)
+    page = resources[start - 1: start - 1 + count]
+    return {
+        "schemas": [LIST_RESPONSE_SCHEMA],
+        "totalResults": total,
+        "startIndex": start,
+        "itemsPerPage": len(page),
+        "Resources": page,
+    }
+
+
+async def _set_members(pool, organization_id, group_id, new_ids: list[UUID]) -> set[UUID]:
+    """Replace the group's members with new_ids. Returns the set of affected
+    users (added ∪ removed) so callers can recompute their roles."""
+    existing = {r["user_id"] for r in await pool.fetch(
+        "SELECT user_id FROM scim_group_members WHERE group_id = $1", group_id)}
+    target = set(new_ids)
+    for uid in target - existing:
+        await pool.execute(
+            "INSERT INTO scim_group_members (group_id, user_id) VALUES ($1, $2) "
+            "ON CONFLICT DO NOTHING", group_id, uid)
+    for uid in existing - target:
+        await pool.execute(
+            "DELETE FROM scim_group_members WHERE group_id = $1 AND user_id = $2",
+            group_id, uid)
+    return existing ^ target
+
+
+async def replace_group(pool, organization_id: UUID, group_id: UUID, payload: object) -> dict:
+    await _load_group(pool, organization_id, group_id)
+    parsed = parse_group(payload)
+    await pool.execute(
+        """UPDATE scim_groups SET display_name = $1, external_id = $2, updated_at = now()
+           WHERE id = $3 AND organization_id = $4""",
+        parsed["display_name"], parsed["external_id"], group_id, organization_id)
+    member_ids = await _valid_member_ids(pool, organization_id, parsed["member_ids"])
+    affected = await _set_members(pool, organization_id, group_id, member_ids)
+    for uid in affected:
+        await recompute_user_role(pool, organization_id, uid)
+    row = await _load_group(pool, organization_id, group_id)
+    return to_scim_group(row, await _group_members(pool, group_id))
+
+
+_MEMBER_REMOVE_RE = re.compile(r'members\[\s*value\s+eq\s+"([^"]+)"\s*\]', re.IGNORECASE)
+
+
+async def patch_group(pool, organization_id: UUID, group_id: UUID, payload: object) -> dict:
+    await _load_group(pool, organization_id, group_id)
+    ops = payload.get("Operations") if isinstance(payload, dict) else None
+    if not isinstance(ops, list):
+        raise ScimError(400, "PATCH requires an Operations array", scim_type="invalidValue")
+
+    affected: set[UUID] = set()
+    for op in ops:
+        if not isinstance(op, dict):
+            continue
+        operation = (op.get("op") or "").lower()
+        path = op.get("path") or ""
+        value = op.get("value")
+
+        # displayName replace
+        if operation == "replace" and (path == "displayName"
+                                       or (not path and isinstance(value, dict) and "displayName" in value)):
+            new_name = value if path == "displayName" else value.get("displayName")
+            if new_name:
+                await pool.execute(
+                    "UPDATE scim_groups SET display_name = $1, updated_at = now() "
+                    "WHERE id = $2 AND organization_id = $3",
+                    str(new_name), group_id, organization_id)
+            continue
+
+        # member add / remove
+        m = _MEMBER_REMOVE_RE.match(path)
+        if operation == "remove" and m:
+            ids = await _valid_member_ids(pool, organization_id, [m.group(1)])
+        else:
+            raw = [v.get("value") for v in (value or []) if isinstance(v, dict) and v.get("value")]
+            ids = await _valid_member_ids(pool, organization_id, raw)
+        if not ids:
+            continue
+        for uid in ids:
+            if operation == "remove":
+                await pool.execute(
+                    "DELETE FROM scim_group_members WHERE group_id = $1 AND user_id = $2",
+                    group_id, uid)
+            else:  # add / replace members
+                await pool.execute(
+                    "INSERT INTO scim_group_members (group_id, user_id) VALUES ($1, $2) "
+                    "ON CONFLICT DO NOTHING", group_id, uid)
+            affected.add(uid)
+
+    for uid in affected:
+        await recompute_user_role(pool, organization_id, uid)
+    row = await _load_group(pool, organization_id, group_id)
+    return to_scim_group(row, await _group_members(pool, group_id))
+
+
+async def delete_group(pool, organization_id: UUID, group_id: UUID) -> None:
+    await _load_group(pool, organization_id, group_id)
+    members = [r["user_id"] for r in await pool.fetch(
+        "SELECT user_id FROM scim_group_members WHERE group_id = $1", group_id)]
+    await pool.execute(
+        "DELETE FROM scim_groups WHERE id = $1 AND organization_id = $2",
+        group_id, organization_id)
+    for uid in members:
+        await recompute_user_role(pool, organization_id, uid)

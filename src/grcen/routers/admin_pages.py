@@ -730,6 +730,59 @@ async def admin_itsm_settings_submit(
     return RedirectResponse("/admin/itsm-settings?flash=ok:ITSM settings saved", status_code=302)
 
 
+@router.get("/admin/scim-settings", response_class=HTMLResponse)
+async def admin_scim_settings(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+    flash: str | None = None,
+):
+    import json as _json
+
+    from grcen.permissions import UserRole
+    from grcen.services import scim_service
+
+    default_role = (await scim_service.get_default_role(pool)).value
+    role_map = await scim_service.get_group_role_map(pool)
+    notif_count = await alert_svc.count_unread_notifications(
+        pool, organization_id=user.organization_id, user_id=user.id)
+    return templates.TemplateResponse(
+        request,
+        "admin/scim_settings.html",
+        context={
+            "user": user, "default_role": default_role,
+            "role_map_json": _json.dumps(role_map, indent=2) if role_map else "{}",
+            "roles": [r.value for r in UserRole],
+            "flash": _decode_flash(flash), "notif_count": notif_count,
+        },
+    )
+
+
+@router.post("/admin/scim-settings")
+async def admin_scim_settings_submit(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+):
+    import json as _json
+
+    from grcen.services import scim_service
+
+    form = await request.form()
+    await scim_service.set_default_role(pool, str(form.get("default_role", "viewer")))
+    raw = str(form.get("role_map", "")).strip()
+    try:
+        mapping = _json.loads(raw) if raw else {}
+        if not isinstance(mapping, dict):
+            raise ValueError
+    except ValueError:
+        return RedirectResponse(
+            "/admin/scim-settings?flash=fail:Group role map must be a JSON object",
+            status_code=302)
+    await scim_service.set_group_role_map(pool, mapping)
+    return RedirectResponse("/admin/scim-settings?flash=ok:SCIM settings saved", status_code=302)
+
+
 @router.get("/admin/smtp-settings/preview", response_class=HTMLResponse)
 async def admin_email_preview(
     request: Request,

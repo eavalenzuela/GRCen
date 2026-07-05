@@ -88,7 +88,7 @@ Legend: **✅ exists** · **◐ partial** · **⬜ greenfield**
 |---|---|---|---|---|---|
 | **Control/compliance SoR** — autocomply (also Vanta/Drata-shaped) | Framework, Requirement, Control, crosswalks | `autocomply` | `framework:` / `requirement:` / `control:<ref>` | — (contract-defined) | ✅ `catalog_sync` |
 | **Content packs** (cold-start baselines) | Framework, Requirement, Control | `grcen-pack:<id>` | same | — | ✅ `content_packs` |
-| **IdP / Directory** — Entra ID, Okta, Google Workspace | User + Person, group → role | `scim` (Person) / *(users table)* | `oidc_sub` / `saml_sub` / SCIM `externalId` | Groups → role sync | ◐ SSO JIT + **SCIM Users** |
+| **IdP / Directory** — Entra ID, Okta, Google Workspace | User + Person + **group → role** | `scim` (Person) / *(users table)* | `oidc_sub` / `saml_sub` / SCIM `externalId` | — | ✅ SSO JIT + **SCIM Users & Groups** (I1) |
 | **HRIS** — Workday, BambooHR, HiBob, Rippling, ADP | Person, Organizational Unit | `hris:<vendor>` | `employee_id` / `worker_id` | — (identity fields + edges + leaver handling shipped) | ✅ `hris_sync` (I2) |
 | **CMDB / IT asset inventory** — ServiceNow CMDB, Device42, Snipe-IT | System, Device (+ `depends_on`, owner) | `cmdb:<vendor>` | `system:`/`device:<ci_id>` | — (fields shipped in I0b) | ✅ `cmdb_sync` (I3) |
 | **Cloud inventory** — AWS Config, Azure Resource Graph, GCP Asset Inventory | System / Device (resources) | `cloud:<provider>` | ARN / resource id | — (uses the same `cmdb_sync` contract) | ✅ via `cmdb_sync` (I3); dedicated pullers TBD |
@@ -173,14 +173,15 @@ SIEM connectors remain greenfield.
 
 **Highest-value ingress:**
 
-- **I1. IdP SCIM 2.0 — Users.** ◐ **Shipped (Users)** — `routers/scim.py` +
-  `services/scim_service.py`: SCIM 2.0 `/scim/v2/Users` (create / get / list+filter / PUT /
-  PATCH / DELETE) + `ServiceProviderConfig`, authenticated by a `sync`-scoped API token
-  (org-bound). Each SCIM user maps to a GRCen login **and** an externally-owned Person
-  (`source='scim'`, `source_ref` = `externalId`||`userName`, via I0). `active:false` / DELETE
-  soft-deprovision — login disabled, Person archived — closing the deprovisioning gap that
-  login-time OIDC/SAML JIT leaves open. Tests: `tests/test_scim.py`. *Remaining:* Groups → role
-  sync, per-org SCIM config UI.
+- **I1. IdP SCIM 2.0.** ✅ **Shipped** — `routers/scim.py` + `services/scim_service.py`: SCIM 2.0
+  `/scim/v2/Users` **and** `/scim/v2/Groups` (create / get / list+filter / PUT / PATCH / DELETE)
+  + `ServiceProviderConfig`, authenticated by a `sync`-scoped API token (org-bound). Each SCIM
+  user maps to a GRCen login **and** an externally-owned Person (`source='scim'`, via I0);
+  `active:false` / DELETE soft-deprovision (login disabled, Person archived) — closing the
+  login-time-JIT deprovisioning gap. **Groups → role sync:** a group's `displayName` maps to a
+  role via a configurable map (`/admin/scim-settings`); a member's login role becomes the
+  highest-privilege role among their groups (removed from all mapped groups → default). Tests:
+  `tests/test_scim.py`. *Remaining (deferred):* per-org SCIM config (currently global).
 - **I2. HRIS sync.** ✅ **Shipped** — `services/hris_sync.py` (`sync_roster`): the bulk
   counterpart to SCIM. Projects a roster → People (+ Org Units), `manages` / `member_of` /
   `parent_of` edges, all idempotent via I0. Movers re-point edges (stale ones pruned); **leavers
