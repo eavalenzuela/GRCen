@@ -189,6 +189,10 @@ docker compose exec -T db psql -U grcen -c "CREATE DATABASE grcen_test"
 
 Contributions are welcome — see **[CONTRIBUTING.md](CONTRIBUTING.md)** for development setup, coding standards, and the security review expectations for auth/crypto/input-handling changes.
 
+## Changelog
+
+Notable changes are recorded in **[CHANGELOG.md](CHANGELOG.md)**.
+
 ## License
 
 GRCen is released under the MIT License. See **[LICENSE](LICENSE)**.
