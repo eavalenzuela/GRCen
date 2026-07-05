@@ -136,6 +136,10 @@ async def clean_tables(pool):
     """)
     from grcen.services import smtp_settings as _smtp_settings
     _smtp_settings._cache = None
+    # Reset ITSM config (defaults come from itsm_settings._DEFAULTS)
+    await pool.execute("DELETE FROM itsm_config")
+    from grcen.services import itsm_settings as _itsm_settings
+    _itsm_settings._cache = None
     # Reset encryption config cache
     from grcen.services import encryption_config as _enc_cfg
     _enc_cfg._cache = None

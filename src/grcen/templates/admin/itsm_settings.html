@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}ITSM / Ticketing - GRCen{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>ITSM / Ticketing Integration</h1>
+</div>
+
+{% if flash %}
+<div class="alert" style="background:{% if flash.ok %}#dcfce7; color:#166534; border:1px solid #bbf7d0{% else %}#fee2e2; color:#991b1b; border:1px solid #fecaca{% endif %};">
+    {{ flash.message }}
+</div>
+{% endif %}
+
+<div class="card">
+    <p style="color:#6b7280;">
+        Push a finding to your ticketing system (Jira / ServiceNow / a generic JSON endpoint)
+        from its detail page or <code>POST /api/findings/{id}/ticket</code>. Ticket status flows
+        back via <code>POST /api/sync/tickets</code> (a <code>sync</code>-scoped token).
+    </p>
+</div>
+
+<form method="post" action="/admin/itsm-settings" class="card">
+    {% include "partials/csrf.html" %}
+    <div class="form-group">
+        <label for="provider">Provider</label>
+        <select id="provider" name="provider">
+            {% for p in providers %}
+            <option value="{{ p }}" {% if itsm.provider == p %}selected{% endif %}>{{ p }}</option>
+            {% endfor %}
+        </select>
+        <small>jira / servicenow use basic auth (user + token); generic POSTs a JSON body with a Bearer token.</small>
+    </div>
+    <div class="form-group">
+        <label for="base_url">Base URL</label>
+        <input type="url" id="base_url" name="base_url" value="{{ itsm.base_url }}"
+               placeholder="https://acme.atlassian.net">
+    </div>
+    <div class="form-group">
+        <label for="project_key">Project key / table</label>
+        <input type="text" id="project_key" name="project_key" value="{{ itsm.project_key }}"
+               placeholder="Jira project key (SEC) or ServiceNow table (incident)">
+    </div>
+    <div class="form-group">
+        <label for="issue_type">Issue type (Jira)</label>
+        <input type="text" id="issue_type" name="issue_type" value="{{ itsm.issue_type }}"
+               placeholder="Task">
+    </div>
+    <div class="form-group">
+        <label for="auth_user">Auth user (email)</label>
+        <input type="text" id="auth_user" name="auth_user" value="{{ itsm.auth_user }}"
+               placeholder="jira-user@acme.com">
+    </div>
+    <div class="form-group">
+        <label for="auth_token">API token</label>
+        <input type="password" id="auth_token" name="auth_token"
+               value="{{ '********' if itsm.auth_token else '' }}"
+               placeholder="Leave as ******** to keep current">
+    </div>
+    <div class="form-group">
+        <label><input type="checkbox" name="enabled" {% if itsm.enabled == 'true' %}checked{% endif %}> Enabled</label>
+    </div>
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Save</button>
+    </div>
+</form>
+{% endblock %}

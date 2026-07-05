@@ -17,7 +17,7 @@ from fastapi.responses import JSONResponse
 from grcen.models.user import User
 from grcen.permissions import Permission
 from grcen.routers.deps import get_db, require_permission
-from grcen.services import cmdb_sync, hris_sync, vuln_sync
+from grcen.services import cmdb_sync, hris_sync, ticketing_service, vuln_sync
 from grcen.services.cmdb_sync import CmdbSyncResult
 from grcen.services.hris_sync import HrisSyncResult
 from grcen.services.vuln_sync import VulnSyncResult
@@ -101,6 +101,27 @@ async def sync_cmdb(
         organization_id=user.organization_id,
         dry_run=_flag(request, "dry_run", False),
         archive_missing=_flag(request, "archive_missing", True),
+    )
+    status = 200 if not result.errors else 400
+    return JSONResponse(dataclasses.asdict(result), status_code=status)
+
+
+@router.post("/tickets", summary="Sync external ticket statuses onto findings")
+async def sync_tickets(
+    request: Request,
+    pool=Depends(get_db),
+    user: User = Depends(_sync_required),
+) -> JSONResponse:
+    """Body = ``{"tickets": [{"ticket_key": "...", "status": "..."}]}``. Maps
+    each ticket's status onto the finding it's linked to (E3 inbound)."""
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"errors": ["invalid JSON body"]}, status_code=400)
+
+    tickets = body.get("tickets") if isinstance(body, dict) else None
+    result = await ticketing_service.sync_ticket_statuses(
+        pool, tickets, organization_id=user.organization_id
     )
     status = 200 if not result.errors else 400
     return JSONResponse(dataclasses.asdict(result), status_code=status)

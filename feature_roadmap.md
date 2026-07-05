@@ -226,5 +226,17 @@ period. `GET /frameworks/{id}/evidence-package.zip` (EXPORT-gated, access-logged
 button on the framework detail page. Tests `tests/test_evidence_package.py`. Remaining: scheduled
 delivery (email the package on a cadence via an APScheduler job, like the digest flush).
 
+### E3. External ticketing (push + status sync) — **SHIPPED**
+`services/ticketing_service.py`. **Outbound:** `push_finding` builds a provider-specific payload
+(Jira `/rest/api/2/issue`, ServiceNow `/api/now/table/*`, or a generic JSON POST), creates the
+ticket, and stamps `external_ticket` / `external_ticket_url` / `external_ticket_status` onto the
+finding — `POST /api/findings/{id}/ticket` (EDIT-gated). **Inbound:** `sync_ticket_statuses`
+maps an ITSM status feed (`{"tickets":[{ticket_key,status}]}`) onto `finding_status` via a
+default status map — `POST /api/sync/tickets` (`sync`-scoped), closing the loop without a bespoke
+webhook receiver. Provider config + encrypted API token in `itsm_settings` (new `itsm_config`
+table, `itsm_secrets` encryption scope), admin page `/admin/itsm-settings`. Finding gains
+`external_ticket*` custom fields. Tests `tests/test_ticketing.py`. Remaining: auto-push on finding
+raise (per-severity rule); a configurable status map.
+
 ## Known Stale / Cleanup
 - `CLAUDE.md` has been refreshed but the rest of `configure_*.md` and `security_features_and_requirements.md` should be reviewed in the same pass when we make significant changes to those areas.

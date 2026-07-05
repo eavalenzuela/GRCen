@@ -438,6 +438,12 @@ CREATE TABLE IF NOT EXISTS smtp_config (
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS itsm_config (
+    key         VARCHAR(50) PRIMARY KEY,
+    value       TEXT NOT NULL DEFAULT '',
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 INSERT INTO smtp_config (key, value) VALUES
     ('host', ''),
     ('port', '587'),

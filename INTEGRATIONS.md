@@ -95,7 +95,7 @@ Legend: **✅ exists** · **◐ partial** · **⬜ greenfield**
 | **Vuln scanners / "Qualys-likes"** — Qualys, Tenable/Nessus, Rapid7, **uvt** | Finding (`affected_by` ← System) | `uvt` or `qualys` / `tenable` | `finding:<finding_id>` | — (fields shipped in I0b) | ◐ `vuln_sync` (I4); Risk aggregation deferred |
 | **CSPM** — Wiz, Prisma, Security Hub, Steampipe | Finding (misconfig) → System; Control evidence | `cspm:<vendor>` | check id + resource | Finding fields above | ⬜ (autocomply's simulated AWS collector feeds control evidence) |
 | **MDM / EDR** — Intune, Jamf, Kandji, CrowdStrike, SentinelOne | Device (+ device-compliance Finding) | `mdm:<vendor>` / `edr:<vendor>` | device id | Device `ip_address`, `external_id`, `compliance_state` | ⬜ |
-| **ITSM / ticketing** — Jira, ServiceNow ITSM, Linear | Finding / CAPA / Risk **status sync (inbound)** | `itsm:<vendor>` | ticket key | Finding `external_ticket` | ⬜ (no inbound receiver exists) |
+| **ITSM / ticketing** — Jira, ServiceNow, Linear | Finding **status sync (inbound)** | — | ticket key | — (`external_ticket*` shipped) | ✅ `ticketing_service` (E3) via `POST /api/sync/tickets` |
 | **Procurement / TPRM** — OneTrust, Whistic, SecurityScorecard | Vendor (+ risk rating) | `tprm:<vendor>` | vendor id | Vendor `risk_rating`, `external_id` | ⬜ (outbound questionnaire campaigns exist ✅) |
 | **Data catalog / DSPM** — BigID, Collibra, Macie | Data Category (+ data-flow edges) | `dspm:<vendor>` | dataset id | — | ⬜ |
 | **Evidence stores** — autocomply evidence, GDrive/Confluence/S3 | Attachments on Control / Requirement | — | — | freshness fields exist (`collected_at`, `valid_until`) | ◐ lands as attachments |
@@ -116,8 +116,9 @@ The external connectors that exist today are autocomply's catalog sync, **SCIM U
 (I4) — the last four built on the reusable `external_sync` primitive (I0). People are
 provisioned and **deprovisioned** from both an IdP (SCIM) and an HRIS roster (leaver → Person
 archived + login disabled); Systems/Devices come from the CMDB with `depends_on` + ownership;
-and scanner findings link onto those Systems by CI id (resolved on remediation). CSPM, MDM/EDR,
-ITSM, inbound-TPRM, and SIEM connectors remain greenfield.
+and scanner findings link onto those Systems by CI id (resolved on remediation). Findings push
+to an ITSM (Jira/ServiceNow) and sync ticket status back (E3). CSPM, MDM/EDR, inbound-TPRM, and
+SIEM connectors remain greenfield.
 
 ---
 
@@ -131,7 +132,7 @@ ITSM, inbound-TPRM, and SIEM connectors remain greenfield.
 | **Calendar (push)** | same, pushed into Google / Outlook | Google Calendar / MS Graph API | ⬜ net-new |
 | **Slack / MS Teams (native)** | any event, as a chat message | per-webhook `format=slack\|teams` → formatter branch in `send_to_webhook` | ✅ (E1) |
 | **Webhooks / SIEM / SOAR** | asset + alert events | `webhook_service` (HMAC, retry) | ◐ 5 events (`asset.updated` added, E1); catalog centralized; still no finding/risk events or syslog/CEF |
-| **External ticketing push** | create Jira / ServiceNow ticket on finding raise or risk treatment; store ticket id | net-new alongside `findings_service` | ⬜ |
+| **External ticketing push** | create Jira / ServiceNow / generic ticket from a finding; store ticket ref | `ticketing_service.push_finding` → `POST /api/findings/{id}/ticket` | ✅ (E3) |
 | **Scheduled report delivery** | email board pack / auditor bundle on a cadence | APScheduler job (mirror `_flush_email_digests`) | ⬜ (all reports are pull-only today) |
 | **PDF reports** | framework, gap, asset dossier, audit dossier | `pdf_service` | ✅ |
 | **CSV exports** | SoA, control-library summary, gap, access-log, questionnaire, asset export | inline `csv.writer` routes | ✅ |
@@ -223,8 +224,15 @@ ITSM, inbound-TPRM, and SIEM connectors remain greenfield.
   `?since=&until=` period scoping. `GET /frameworks/{id}/evidence-package.zip` (EXPORT-gated,
   access-logged) + a button on the framework detail page. Tests: `tests/test_evidence_package.py`.
   *Remaining:* scheduled delivery (email the package on a cadence via an APScheduler job).
-- **E3. External ticketing push** (Jira / ServiceNow) for findings/CAPA, plus inbound status
-  sync (pairs with the ITSM ingress row).
+- **E3. External ticketing.** ✅ **Shipped** — `services/ticketing_service.py`: **outbound**
+  `push_finding` creates a Jira / ServiceNow / generic ticket from a finding and stamps
+  `external_ticket` + URL onto it (`POST /api/findings/{id}/ticket`, EDIT-gated); **inbound**
+  `sync_ticket_statuses` maps an ITSM status feed onto `finding_status`
+  (`POST /api/sync/tickets`, `sync`-scoped — closing the loop without a bespoke webhook
+  receiver). Provider config + encrypted API token in `itsm_settings` (`itsm_secrets` scope),
+  admin page at `/admin/itsm-settings`. Finding fields `external_ticket*` added. Tests:
+  `tests/test_ticketing.py`. *Remaining:* auto-push on finding raise (per-severity rule);
+  richer status-map config.
 - **E4. Calendar enrichments** (audit dates, per-user "my assets" filter, VALARM reminders) +
   optional push-to-calendar.
 

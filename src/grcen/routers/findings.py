@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from grcen.models.user import User
 from grcen.permissions import Permission
 from grcen.routers.deps import get_db, require_permission
-from grcen.services import findings_service
+from grcen.services import findings_service, ticketing_service
 
 router = APIRouter(prefix="/api/findings", tags=["findings"])
 
@@ -42,3 +42,19 @@ async def close(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     return {"finding_status": meta["finding_status"], "verified_by": meta["verified_by"]}
+
+
+@router.post("/{finding_id}/ticket", summary="Create an external ITSM ticket for a finding")
+async def create_ticket(
+    finding_id: UUID,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.EDIT)),
+):
+    """Push the finding to the configured ITSM (Jira/ServiceNow/generic) and
+    stamp the ticket key + URL onto it."""
+    try:
+        return await ticketing_service.push_finding(
+            pool, finding_id, organization_id=user.organization_id
+        )
+    except ticketing_service.TicketingError as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.detail)

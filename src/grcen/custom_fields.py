@@ -530,6 +530,12 @@ CUSTOM_FIELDS: dict[AssetType, list[FieldDef]] = {
         FieldDef("corrective_action_plan", "Corrective Action Plan", "text"),
         FieldDef("verified_by", "Verified By", "text"),
         FieldDef("verified_at", "Verified At", "date"),
+        # External ITSM ticket (Jira/ServiceNow) — set by the ticketing push (E3),
+        # status updated by the inbound ticket-status sync.
+        FieldDef("external_ticket", "External Ticket", "text",
+                 help_text="ITSM ticket key/number (e.g. SEC-123, INC0010001)"),
+        FieldDef("external_ticket_url", "External Ticket URL", "text"),
+        FieldDef("external_ticket_status", "External Ticket Status", "text"),
     ],
     AssetType.FRAMEWORK: [
         FieldDef("version", "Version", "text"),

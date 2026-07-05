@@ -93,6 +93,20 @@ SCOPE_WEBHOOK_SECRETS = EncryptionScope(
     ),
 )
 
+SCOPE_ITSM_SECRETS = EncryptionScope(
+    name="itsm_secrets",
+    display_name="ITSM API Token",
+    description="API token for the external ticketing integration (Jira/ServiceNow)",
+    targets=(
+        FieldTarget(
+            table="itsm_config",
+            column="value",
+            filter_key_column="key",
+            filter_key_values=("auth_token",),
+        ),
+    ),
+)
+
 SCOPE_USER_PII = EncryptionScope(
     name="user_pii",
     display_name="User PII",
@@ -155,6 +169,7 @@ ALL_SCOPES: dict[str, EncryptionScope] = {
         SCOPE_SSO_SECRETS,
         SCOPE_SMTP_SECRETS,
         SCOPE_WEBHOOK_SECRETS,
+        SCOPE_ITSM_SECRETS,
         SCOPE_USER_PII,
         SCOPE_SESSION_PII,
         SCOPE_AUDIT_PII,
@@ -169,8 +184,8 @@ ALL_SCOPES: dict[str, EncryptionScope] = {
 PROFILE_MINIMAL = EncryptionProfile(
     name="minimal",
     display_name="Minimal (Secrets Only)",
-    description="Encrypts SSO, SMTP, and webhook secrets.  No PII encryption.",
-    scope_names=("sso_secrets", "smtp_secrets", "webhook_secrets"),
+    description="Encrypts SSO, SMTP, webhook, and ITSM secrets.  No PII encryption.",
+    scope_names=("sso_secrets", "smtp_secrets", "webhook_secrets", "itsm_secrets"),
 )
 
 PROFILE_GDPR = EncryptionProfile(
@@ -184,6 +199,7 @@ PROFILE_GDPR = EncryptionProfile(
         "sso_secrets",
         "smtp_secrets",
         "webhook_secrets",
+        "itsm_secrets",
         "user_pii",
         "session_pii",
         "audit_pii",
@@ -198,6 +214,7 @@ PROFILE_FULL = EncryptionProfile(
         "sso_secrets",
         "smtp_secrets",
         "webhook_secrets",
+        "itsm_secrets",
         "user_pii",
         "session_pii",
         "audit_pii",

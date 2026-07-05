@@ -681,6 +681,55 @@ async def admin_smtp_settings_submit(
     return RedirectResponse("/admin/smtp-settings", status_code=302)
 
 
+@router.get("/admin/itsm-settings", response_class=HTMLResponse)
+async def admin_itsm_settings(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+    flash: str | None = None,
+):
+    from grcen.services import itsm_settings
+
+    cfg = await itsm_settings.get_settings(pool)
+    notif_count = await alert_svc.count_unread_notifications(
+        pool, organization_id=user.organization_id, user_id=user.id)
+    return templates.TemplateResponse(
+        request,
+        "admin/itsm_settings.html",
+        context={
+            "user": user, "itsm": cfg, "providers": itsm_settings.PROVIDERS,
+            "flash": _decode_flash(flash), "notif_count": notif_count,
+        },
+    )
+
+
+@router.post("/admin/itsm-settings")
+async def admin_itsm_settings_submit(
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.MANAGE_USERS)),
+):
+    from grcen.services import itsm_settings
+
+    form = await request.form()
+    # Preserve the existing token if the placeholder was submitted.
+    token = str(form.get("auth_token", "")).strip()
+    if token == "********":
+        current = await itsm_settings.get_settings(pool)
+        token = current.auth_token
+    await itsm_settings.update_settings(
+        pool,
+        provider=str(form.get("provider", "generic")).strip() or "generic",
+        base_url=str(form.get("base_url", "")).strip(),
+        project_key=str(form.get("project_key", "")).strip(),
+        issue_type=str(form.get("issue_type", "Task")).strip() or "Task",
+        auth_user=str(form.get("auth_user", "")).strip(),
+        auth_token=token,
+        enabled="true" if "enabled" in form else "false",
+    )
+    return RedirectResponse("/admin/itsm-settings?flash=ok:ITSM settings saved", status_code=302)
+
+
 @router.get("/admin/smtp-settings/preview", response_class=HTMLResponse)
 async def admin_email_preview(
     request: Request,
