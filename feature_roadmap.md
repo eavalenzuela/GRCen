@@ -182,6 +182,17 @@ with optional owned-asset reassignment (`--reassign-to`). Delivered as CLI `grce
 I0's generic HTTP ingress surface). Roster contract in the `hris_sync` module docstring. Tests
 `tests/test_hris_sync.py`.
 
+### I3. CMDB / cloud-inventory sync — **SHIPPED**
+`services/cmdb_sync.py` (`sync_inventory`): the infrastructure counterpart to the HRIS People
+sync. Projects a CMDB / cloud inventory (systems + devices) into System and Device assets with
+real hostnames / IPs / resource-ids, `depends_on` CI-dependency edges, and owner-by-name linkage
+to a Person/OU. Each asset's `metadata.external_id` defaults to its CI id, so a uvt/scanner
+finding (I4) referencing that id resolves straight onto the CMDB-synced host — the two connectors
+join up with no extra plumbing. Decommissioned records (status) and CIs that drop out of the
+inventory are archived (`archive_missing`, default on; a devices-only sync never archives
+Systems). CLI `grcen sync-cmdb <file>` and `POST /api/sync/cmdb`. Contract in the `cmdb_sync`
+module docstring. Tests `tests/test_cmdb_sync.py`.
+
 ### I4. Vuln findings via uvt — **SHIPPED (Findings)**
 `services/vuln_sync.py` (`sync_findings`): consumes the sibling **uvt** tracker's triaged
 findings export → Finding assets (via I0), each linked `System --affected_by--> Finding` by

@@ -90,8 +90,8 @@ Legend: **✅ exists** · **◐ partial** · **⬜ greenfield**
 | **Content packs** (cold-start baselines) | Framework, Requirement, Control | `grcen-pack:<id>` | same | — | ✅ `content_packs` |
 | **IdP / Directory** — Entra ID, Okta, Google Workspace | User + Person, group → role | `scim` (Person) / *(users table)* | `oidc_sub` / `saml_sub` / SCIM `externalId` | Groups → role sync | ◐ SSO JIT + **SCIM Users** |
 | **HRIS** — Workday, BambooHR, HiBob, Rippling, ADP | Person, Organizational Unit | `hris:<vendor>` | `employee_id` / `worker_id` | — (identity fields + edges + leaver handling shipped) | ✅ `hris_sync` (I2) |
-| **CMDB / IT asset inventory** — ServiceNow CMDB, Device42, Snipe-IT | System, Device, Product | `cmdb:<vendor>` | `sys_id` / CI id | System `hostname`, `ip_address`, `fqdn`, `external_id`; Device `ip_address`, `external_id` | ⬜ |
-| **Cloud inventory** — AWS Config, Azure Resource Graph, GCP Asset Inventory | System / Device (resources) | `cloud:<provider>` | ARN / resource id | System `cloud_resource_id`, `account` (`region` exists) | ⬜ (autocomply covers the control-evidence side only) |
+| **CMDB / IT asset inventory** — ServiceNow CMDB, Device42, Snipe-IT | System, Device (+ `depends_on`, owner) | `cmdb:<vendor>` | `system:`/`device:<ci_id>` | — (fields shipped in I0b) | ✅ `cmdb_sync` (I3) |
+| **Cloud inventory** — AWS Config, Azure Resource Graph, GCP Asset Inventory | System / Device (resources) | `cloud:<provider>` | ARN / resource id | — (uses the same `cmdb_sync` contract) | ✅ via `cmdb_sync` (I3); dedicated pullers TBD |
 | **Vuln scanners / "Qualys-likes"** — Qualys, Tenable/Nessus, Rapid7, **uvt** | Finding (`affected_by` ← System) | `uvt` or `qualys` / `tenable` | `finding:<finding_id>` | — (fields shipped in I0b) | ◐ `vuln_sync` (I4); Risk aggregation deferred |
 | **CSPM** — Wiz, Prisma, Security Hub, Steampipe | Finding (misconfig) → System; Control evidence | `cspm:<vendor>` | check id + resource | Finding fields above | ⬜ (autocomply's simulated AWS collector feeds control evidence) |
 | **MDM / EDR** — Intune, Jamf, Kandji, CrowdStrike, SentinelOne | Device (+ device-compliance Finding) | `mdm:<vendor>` / `edr:<vendor>` | device id | Device `ip_address`, `external_id`, `compliance_state` | ⬜ |
@@ -112,11 +112,12 @@ per-scanner connectors remain an option for deployments not running uvt.
 ### What's confirmed absent today
 
 The external connectors that exist today are autocomply's catalog sync, **SCIM Users** (I1),
-**HRIS roster sync** (I2), and **vuln findings from uvt** (I4) — the last three built on the
-reusable `external_sync` primitive (I0). People are provisioned and **deprovisioned** from both
-an IdP (SCIM) and an HRIS roster (leaver → Person archived + login disabled), and scanner
-findings land as Findings linked to the Systems they affect (resolved on remediation). CMDB,
-cloud-inventory, CSPM, MDM/EDR, ITSM, inbound-TPRM, and SIEM connectors remain greenfield.
+**HRIS roster sync** (I2), **CMDB / cloud-inventory sync** (I3), and **vuln findings from uvt**
+(I4) — the last four built on the reusable `external_sync` primitive (I0). People are
+provisioned and **deprovisioned** from both an IdP (SCIM) and an HRIS roster (leaver → Person
+archived + login disabled); Systems/Devices come from the CMDB with `depends_on` + ownership;
+and scanner findings link onto those Systems by CI id (resolved on remediation). CSPM, MDM/EDR,
+ITSM, inbound-TPRM, and SIEM connectors remain greenfield.
 
 ---
 
@@ -187,7 +188,13 @@ cloud-inventory, CSPM, MDM/EDR, ITSM, inbound-TPRM, and SIEM connectors remain g
   `POST /api/sync/hris` (`routers/sync.py`, `sync`-scoped token — this also lands I0's remaining
   generic HTTP ingress surface). Roster contract in the `hris_sync` module docstring. Tests:
   `tests/test_hris_sync.py`.
-- **I3. CMDB / cloud-inventory sync** — System / Device with real hostnames, IPs, resource ids.
+- **I3. CMDB / cloud-inventory sync.** ✅ **Shipped** — `services/cmdb_sync.py`
+  (`sync_inventory`): projects a CMDB/cloud inventory → System + Device assets with real
+  hostnames / IPs / resource-ids, `depends_on` CI edges, and owner-by-name linkage; sets each
+  asset's `external_id` = CI id so uvt findings (I4) resolve straight onto it. Decommissioned or
+  dropped-out CIs are archived (`archive_missing`, default on; a devices-only sync never touches
+  Systems). CLI `grcen sync-cmdb <file>` and `POST /api/sync/cmdb`. Contract in the `cmdb_sync`
+  module docstring. Tests: `tests/test_cmdb_sync.py` (incl. the cross-connector uvt↔CMDB join).
 - **I4. Vuln findings via uvt.** ◐ **Shipped (Findings)** — `services/vuln_sync.py`
   (`sync_findings`): consumes uvt's triaged findings export → Finding assets (via I0), each
   linked `System --affected_by--> Finding` by resolving the affected host (external_id →
