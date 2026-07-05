@@ -64,6 +64,21 @@ GRCen (pronounced "gurken") is a free and open-source GRC (Governance, Risk, Com
 - REST API: full CRUD for assets/relationships, `/api/graph/{id}` subgraph queries, bulk endpoints at `/api/imports/assets/bulk` and `/api/imports/relationships/bulk` (with `dry_run`), relationship preview at `/api/imports/relationships/preview`, authenticated `/docs` OpenAPI UI, Bearer token auth via `/api/tokens` with per-token permission scoping. Machine clients can also use the OAuth 2.0 client-credentials grant: register at `/admin/oauth-clients` (bcrypt-hashed secret, per-client permission scope + token TTL) and exchange at `POST /api/oauth/token` for a short-lived scoped bearer token. Allowed API responses carry `X-RateLimit-Limit` / `X-RateLimit-Remaining` headers.
 - Control-library CSV export at `/controls/export.csv` (control → effectiveness, test dates, framework:requirement pairs), access-logged.
 
+## External Integrations
+
+`INTEGRATIONS.md` is the living map of how GRCen connects to the systems around it — ingress
+(HRIS, CMDB, cloud/CSPM, vuln scanners incl. the sibling **uvt**, IdP/SCIM, ITSM, TPRM) and
+egress (Slack/Teams, calendar, ticketing, SIEM, auditor evidence bundles). The reusable
+ingress seam is the `source` / `source_ref` provenance + `(organization_id, source,
+source_ref)` upsert, now factored into `services/external_sync.py` (`upsert_external_asset` /
+`upsert_external_edge` + `prune_stale_*`; writers today are `catalog_sync`/content-packs and
+the SCIM connector). The first authoritative-source connector — **SCIM 2.0 user provisioning**
+(`routers/scim.py` + `services/scim_service.py`, `sync`-scoped token, Person under
+`source='scim'`, soft-deprovision on `active:false`/DELETE) — ships on it. Egress hangs off
+`services/webhook_service.py` (4-event catalog), `alert_service`'s `_deliver_*` fan-out,
+`calendar_service`, and the `pdf_service` / `board_service` exports. Remaining enterprise
+sources (HRIS, CMDB, scanners, …) are greenfield — see `INTEGRATIONS.md` Part C.
+
 ## Known Gaps (see `feature_roadmap.md` for the full list)
 
 - WebAuthn / FIDO2 for MFA, Redis-backed rate limiter, per-org SSO/SMTP/webhook/encryption overrides, tenancy-aware Postgres RLS policy

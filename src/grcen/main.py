@@ -33,6 +33,7 @@ from grcen.routers import (
     risk_appetite,
     saml,
     saved_searches,
+    scim,
     tags,
     tokens,
     vendor_campaigns,
@@ -192,6 +193,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router)
     app.include_router(oidc.router)
     app.include_router(saml.router)
+    app.include_router(scim.router)
     app.include_router(tokens.router)
     app.include_router(workflow.api_router)
 

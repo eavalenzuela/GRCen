@@ -21,6 +21,7 @@ class Permission(str, Enum):
     MANAGE_USERS = "manage_users"
     VIEW_AUDIT = "view_audit"
     APPROVE = "approve"  # Approve or reject pending workflow changes
+    SYNC = "sync"  # Ingest/provision from an external system (SCIM, connectors)
     MANAGE_ORGS = "manage_orgs"  # Cross-org admin: create/delete orgs, view all tenants
 
 

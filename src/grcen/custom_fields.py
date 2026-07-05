@@ -22,6 +22,13 @@ CUSTOM_FIELDS: dict[AssetType, list[FieldDef]] = {
         FieldDef("manager", "Manager", "text"),
         FieldDef("title", "Job Title", "text"),
         FieldDef("department", "Department", "text"),
+        # External-identity fields populated by an HRIS/IdP sync (SCIM, HRIS
+        # connector). employee_id is the stable external key; a sync also lands
+        # its provenance in assets.source/source_ref.
+        FieldDef("employee_id", "Employee ID", "text",
+                 help_text="External HRIS/IdP identifier (SCIM externalId / employeeNumber)"),
+        FieldDef("location", "Location", "text"),
+        FieldDef("cost_center", "Cost Center", "text"),
         FieldDef("email", "Email", "text", sensitive=True),
         FieldDef(
             "employment_type",
@@ -97,6 +104,14 @@ CUSTOM_FIELDS: dict[AssetType, list[FieldDef]] = {
         ),
         FieldDef("provider", "Provider", "text"),
         FieldDef("region", "Region", "text"),
+        # Infrastructure identity — populated by a CMDB / cloud-inventory sync.
+        FieldDef("hostname", "Hostname", "text"),
+        FieldDef("ip_address", "IP Address", "text"),
+        FieldDef("fqdn", "FQDN", "text"),
+        FieldDef("cloud_resource_id", "Cloud Resource ID", "text",
+                 help_text="ARN / instance / resource id from a cloud-inventory sync"),
+        FieldDef("external_id", "External ID", "text",
+                 help_text="CMDB CI id (e.g. ServiceNow sys_id)"),
         FieldDef(
             "criticality",
             "Criticality",
@@ -138,6 +153,9 @@ CUSTOM_FIELDS: dict[AssetType, list[FieldDef]] = {
         FieldDef("manufacturer", "Manufacturer", "text"),
         FieldDef("model", "Model", "text"),
         FieldDef("os", "Operating System", "text"),
+        FieldDef("ip_address", "IP Address", "text"),
+        FieldDef("external_id", "External ID", "text",
+                 help_text="CMDB/MDM device id"),
         FieldDef("location", "Location", "text"),
         FieldDef("serial_number", "Serial Number", "text"),
         FieldDef("quantity", "Quantity", "integer"),
@@ -493,6 +511,19 @@ CUSTOM_FIELDS: dict[AssetType, list[FieldDef]] = {
             "enum",
             choices=["audit", "self_assessment", "pentest", "automated", "incident", "other"],
         ),
+        # Scanner/vuln fields — populated by a vuln-tracker (uvt) or scanner sync.
+        FieldDef("cve_id", "CVE ID", "text"),
+        FieldDef("cvss_score", "CVSS Score", "text",
+                 help_text="Base score 0.0–10.0 (text preserves the decimal)"),
+        FieldDef("cvss_vector", "CVSS Vector", "text"),
+        FieldDef("scanner", "Scanner", "text",
+                 help_text="Producing tool, e.g. qualys / tenable / uvt"),
+        FieldDef("scan_id", "Scan/Finding ID", "text",
+                 help_text="External finding id from the scanner"),
+        FieldDef("affected_asset", "Affected Asset", "text",
+                 help_text="Host/resource the finding was raised against"),
+        FieldDef("first_seen", "First Seen", "date"),
+        FieldDef("last_seen", "Last Seen", "date"),
         FieldDef("identified_date", "Identified Date", "date"),
         FieldDef("due_date", "Remediation Due", "date"),
         FieldDef("root_cause", "Root Cause", "text"),

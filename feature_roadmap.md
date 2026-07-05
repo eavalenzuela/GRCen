@@ -140,5 +140,37 @@ Review/due dates as a subscribable calendar: users generate a per-user capabilit
 
 ---
 
+## Tier 6 — External System Integrations
+
+The full ingress/egress ecosystem map lives in `INTEGRATIONS.md`; this tier tracks the connector
+build. The reusable ingress seam is the `(source, source_ref)` provenance upsert.
+
+### I0. Generic external-upsert primitive — **SHIPPED**
+`services/external_sync.py`: `upsert_external_asset` / `upsert_external_edge` (idempotent on
+`(organization_id, source, source_ref)`; the source owns `status`, unlike the narrower
+`catalog_sync` projection which deliberately leaves human archival alone) + `prune_stale_assets`
+/ `prune_stale_edges`. New `sync` permission (Admin-held, and grantable to a scoped API token).
+Every future connector (HRIS, CMDB, scanner) builds on this. Tests `tests/test_external_sync.py`.
+Remaining: a generic `POST /api/sync/<source>` HTTP surface (lands with the first bulk connector).
+
+### I0b. External-identity fields — **SHIPPED**
+`custom_fields.py` gained the fields an external source needs to key/populate: Person
+`employee_id`/`location`/`cost_center`; System `hostname`/`ip_address`/`fqdn`/`external_id`/
+`cloud_resource_id`; Device `ip_address`/`external_id`; Finding `cve_id`/`cvss_score`/
+`cvss_vector`/`scanner`/`scan_id`/`affected_asset`/`first_seen`/`last_seen`. Additive (metadata
+JSONB), so they surface in forms/detail/columns/export with no schema change.
+
+### I1. IdP SCIM 2.0 (Users) — **SHIPPED (Users)**
+`routers/scim.py` + `services/scim_service.py`: SCIM 2.0 `/scim/v2/Users`
+(create/get/list+filter/PUT/PATCH/DELETE) + `ServiceProviderConfig`, authenticated by a
+`sync`-scoped API token (org-bound, so provisioning is tenant-scoped). Each SCIM user maps to a
+GRCen login plus an externally-owned Person (`source='scim'`, `source_ref` = `externalId` ||
+`userName`, projected through I0). `active:false` / `DELETE` soft-deprovision — the login is
+deactivated and the Person archived (never hard-deleted, preserving audit history and any
+human-authored edges) — closing the deprovisioning gap that login-time OIDC/SAML JIT leaves
+open. Enterprise-extension attributes (employeeNumber, department, manager, title) map to the
+I0b Person fields. Tests `tests/test_scim.py`. Remaining: Groups → role sync, per-org SCIM
+config UI. See `INTEGRATIONS.md` Part C for the rest of the connector roadmap.
+
 ## Known Stale / Cleanup
 - `CLAUDE.md` has been refreshed but the rest of `configure_*.md` and `security_features_and_requirements.md` should be reviewed in the same pass when we make significant changes to those areas.

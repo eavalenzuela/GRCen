@@ -196,6 +196,21 @@ async def set_user_active(pool: asyncpg.Pool, user_id: UUID, active: bool) -> Us
     return _decrypt_user_email(User.from_row(row)) if row else None
 
 
+async def set_user_email(
+    pool: asyncpg.Pool, user_id: UUID, email: str | None
+) -> User | None:
+    """Set a user's email (encrypting + blind-indexing when PII scope is active)."""
+    stored_email, email_idx = await _prepare_email(pool, email)
+    row = await pool.fetchrow(
+        """UPDATE users SET email = $1, email_blind_idx = $2, updated_at = now()
+           WHERE id = $3 RETURNING *""",
+        stored_email,
+        email_idx,
+        user_id,
+    )
+    return _decrypt_user_email(User.from_row(row)) if row else None
+
+
 async def set_email_notifications_enabled(
     pool: asyncpg.Pool, user_id: UUID, enabled: bool
 ) -> User | None:
@@ -240,6 +255,11 @@ async def get_user_by_email(pool: asyncpg.Pool, email: str) -> User | None:
         )
     else:
         row = await pool.fetchrow("SELECT * FROM users WHERE email = $1", email)
+    return _decrypt_user_email(User.from_row(row)) if row else None
+
+
+async def get_user_by_username(pool: asyncpg.Pool, username: str) -> User | None:
+    row = await pool.fetchrow("SELECT * FROM users WHERE username = $1", username)
     return _decrypt_user_email(User.from_row(row)) if row else None
 
 

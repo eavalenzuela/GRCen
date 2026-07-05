@@ -89,6 +89,24 @@ GRCen supports both OIDC and SAML 2.0 identity providers. Both are configured en
 
 Both protocols support automatic user provisioning and Person asset creation on first login, role synchronization on each login, and can be enabled simultaneously. Admins can manage linked user accounts from the user edit page.
 
+### SCIM 2.0 Provisioning (optional)
+
+OIDC/SAML provision a user on their *first login* but never hear about a leaver. SCIM closes
+that gap: your IdP pushes user create / update / **deactivate** to GRCen directly. Point your
+IdP's SCIM connector at:
+
+- **Base URL:** `https://<your-host>/scim/v2`
+- **Bearer token:** a GRCen API token scoped to the `sync` permission — create one under
+  **Settings > API Tokens** (or `POST /api/tokens` with `"permissions": ["sync"]`). The token
+  is org-bound, so provisioning stays within that organization.
+
+Each SCIM user maps to a GRCen login **and** a Person asset (tagged `source='scim'`, so it's
+recognized as externally-owned). Setting `active: false` (or a SCIM `DELETE`) soft-deprovisions:
+the login is deactivated and the Person archived, never hard-deleted. Enterprise-extension
+attributes (`employeeNumber`, `department`, `manager`, `title`) populate the matching Person
+fields. Group→role sync is not yet implemented — provisioned users get the default SCIM role.
+See **[INTEGRATIONS.md](INTEGRATIONS.md)** for where this sits in the wider integration roadmap.
+
 ## REST API
 
 GRCen exposes a full REST API alongside the web UI. Interactive OpenAPI docs are served (behind authentication) at `/docs` and `/redoc`; the raw schema is at `/api/openapi.json`.
@@ -129,6 +147,15 @@ curl -X POST http://localhost:8000/api/oauth/token \
 ```
 
 Note: when an asset type has workflow approval gating enabled, mutating REST calls return `202 Accepted` with a `pending_change_id` instead of applying the change immediately. Rate-limited responses return `429` with a `Retry-After` header; allowed API responses advertise the remaining budget via `X-RateLimit-Limit` / `X-RateLimit-Remaining`.
+
+## Integrations
+
+GRCen is the org-graph layer of a wider stack, and it aggregates data from — and pushes it out
+to — the systems around it. **[INTEGRATIONS.md](INTEGRATIONS.md)** maps the full ecosystem:
+which authoritative systems feed which asset types (HR tools, CMDBs, vulnerability scanners,
+IdPs, …), where GRCen operationalizes what it aggregates (Slack, calendar, auditor exports,
+ticketing, SIEM), what exists today versus what's greenfield, and a prioritized roadmap for
+the gaps.
 
 ## CLI Reference
 
