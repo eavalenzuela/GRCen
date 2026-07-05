@@ -215,5 +215,16 @@ JSON envelope unchanged. Any event can now reach Slack in Slack format, configur
 watcher notification. Tests `tests/test_webhooks.py`. Remaining: domain events (`finding.*`,
 `risk.appetite_breached`, `review.due`) need lifecycle emit points; a syslog/CEF SIEM egress.
 
+### E2. Auditor evidence package — **SHIPPED**
+`services/evidence_package.py` (`build_package`): assembles one ZIP per compliance framework —
+`manifest.json` + `README.txt`, the Statement of Applicability, the framework-scoped control
+library, the **per-run control test ledger** (every recorded run, not just the latest summary —
+the piece GRCen couldn't export before), the **audit trail** (change history) for the framework's
+assets, and the actual **evidence files** (encrypted attachments decrypted in) with an
+`evidence/_index.csv`. Optional `?since=&until=` scopes the ledger + audit trail to an audit
+period. `GET /frameworks/{id}/evidence-package.zip` (EXPORT-gated, access-logged) + a download
+button on the framework detail page. Tests `tests/test_evidence_package.py`. Remaining: scheduled
+delivery (email the package on a cadence via an APScheduler job, like the digest flush).
+
 ## Known Stale / Cleanup
 - `CLAUDE.md` has been refreshed but the rest of `configure_*.md` and `security_features_and_requirements.md` should be reviewed in the same pass when we make significant changes to those areas.

@@ -12,6 +12,11 @@
         <a href="/frameworks/{{ detail.framework.id }}/soa" class="btn btn-sm">SoA</a>
         &nbsp; | &nbsp;
         <a href="/frameworks/{{ detail.framework.id }}/report.pdf" class="btn btn-sm">Download PDF</a>
+        {% if has_perm(user.role, Permission.EXPORT) %}
+        &nbsp; | &nbsp;
+        <a href="/frameworks/{{ detail.framework.id }}/evidence-package.zip" class="btn btn-sm"
+           title="ZIP: SoA, control library, per-run test ledger, audit trail, and evidence files">Evidence Package</a>
+        {% endif %}
         {% if ai_mapping_enabled and has_perm(user.role, Permission.EDIT) and detail.open_gap_count %}
         &nbsp; | &nbsp;
         <form method="post" action="/frameworks/{{ detail.framework.id }}/ai-suggest-mappings" style="display:inline;">

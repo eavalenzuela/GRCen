@@ -261,6 +261,45 @@ async def framework_soa_csv(
     )
 
 
+@router.get("/frameworks/{framework_id}/evidence-package.zip")
+async def framework_evidence_package(
+    framework_id: UUID,
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_db),
+    user: User = Depends(require_permission(Permission.EXPORT)),
+):
+    """Auditor evidence package (ZIP): SoA + control library + per-run test
+    ledger + audit trail + evidence files for this framework. Optional
+    ``?since=YYYY-MM-DD&until=YYYY-MM-DD`` scopes the test ledger + audit trail."""
+    from datetime import date as _date
+
+    from grcen.services import evidence_package
+
+    def _pdate(v: str | None):
+        try:
+            return _date.fromisoformat(v) if v else None
+        except ValueError:
+            return None
+
+    result = await evidence_package.build_package(
+        pool, organization_id=user.organization_id, framework_id=framework_id,
+        since=_pdate(request.query_params.get("since")),
+        until=_pdate(request.query_params.get("until")),
+    )
+    if result is None:
+        raise HTTPException(status_code=404, detail="Framework not found")
+    await access_log_service.record(
+        pool, user=user, action="export", entity_type="framework",
+        entity_id=framework_id, entity_name=result.filename,
+        path=str(request.url.path),
+        ip_address=request.client.host if request.client else None,
+    )
+    return Response(
+        content=result.content, media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{result.filename}"'},
+    )
+
+
 @router.get("/controls", response_class=HTMLResponse)
 async def controls_library(
     request: Request,

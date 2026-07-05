@@ -136,7 +136,7 @@ ITSM, inbound-TPRM, and SIEM connectors remain greenfield.
 | **PDF reports** | framework, gap, asset dossier, audit dossier | `pdf_service` | ✅ |
 | **CSV exports** | SoA, control-library summary, gap, access-log, questionnaire, asset export | inline `csv.writer` routes | ✅ |
 | **Executive board pack** | risk / coverage / incidents / findings exec summary | `board_service` | ✅ |
-| **Auditor evidence package** | ZIP of SoA + control library + **per-run test ledger** + evidence attachments + **audit-trail (change history)** for a framework/period | net-new bundle builder | ⬜ (per-run ledger, audit-trail export, and attachment ZIP are all missing) |
+| **Auditor evidence package** | ZIP of SoA + control library + per-run test ledger + evidence attachments + audit-trail for a framework/period | `services/evidence_package.py` → `GET /frameworks/{id}/evidence-package.zip` | ✅ (E2); scheduled delivery TBD |
 | **Vendor questionnaire campaigns** | push a questionnaire to a third party via a login-less portal token | `vendor_campaign_service` + `portal_router` | ✅ (auto-email link + reminders = gap) |
 | **My Work** | per-user aggregation of approvals / reviews / findings / watches | `routers/my_work.py` | ✅ |
 
@@ -215,8 +215,14 @@ ITSM, inbound-TPRM, and SIEM connectors remain greenfield.
   page update handlers). Admin format selector at `/admin/webhooks`. Tests: `tests/test_webhooks.py`.
   *Remaining:* domain events (`finding.*` / `risk.appetite_breached` / `review.due`) need
   lifecycle emit points — a follow-up.
-- **E2. Auditor evidence package** (ZIP: SoA + control library + per-run test ledger +
-  attachments + audit-trail) + **scheduled delivery** via an APScheduler job.
+- **E2. Auditor evidence package.** ✅ **Shipped** — `services/evidence_package.py`
+  (`build_package`): one ZIP per framework with `manifest.json` + `README.txt`, the SoA, the
+  framework-scoped control library, the **per-run control test ledger** (new — only a summary
+  existed), the **audit trail** for the framework's assets (new — no export existed), and the
+  actual **evidence files** (encrypted ones decrypted in) with an `evidence/_index.csv`. Optional
+  `?since=&until=` period scoping. `GET /frameworks/{id}/evidence-package.zip` (EXPORT-gated,
+  access-logged) + a button on the framework detail page. Tests: `tests/test_evidence_package.py`.
+  *Remaining:* scheduled delivery (email the package on a cadence via an APScheduler job).
 - **E3. External ticketing push** (Jira / ServiceNow) for findings/CAPA, plus inbound status
   sync (pairs with the ITSM ingress row).
 - **E4. Calendar enrichments** (audit dates, per-user "my assets" filter, VALARM reminders) +
