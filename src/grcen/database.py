@@ -994,6 +994,14 @@ DO $$ BEGIN
     ALTER TABLE webhook_deliveries ADD COLUMN attempt INTEGER NOT NULL DEFAULT 1;
 EXCEPTION WHEN duplicate_column THEN NULL; END $$;
 
+-- Webhook payload format: 'grcen' (signed JSON envelope, default), 'slack'
+-- (Slack incoming-webhook message), or 'teams' (Teams MessageCard). Slack/Teams
+-- deliveries carry the formatted body and are not HMAC-signed (the secret URL is
+-- the credential).
+DO $$ BEGIN
+    ALTER TABLE webhooks ADD COLUMN format VARCHAR(16) NOT NULL DEFAULT 'grcen';
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+
 -- Workflow self-approval override: when true, the submitter of a pending
 -- change may approve/reject it themselves (small-team escape hatch; off by
 -- default so the four-eyes rule stays the norm).

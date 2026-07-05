@@ -204,5 +204,16 @@ the `vuln_sync` module docstring. Tests `tests/test_vuln_sync.py`. Remaining: ag
 findings into rolled-up Risk assets (grouping policy — per-System / per-CVE / per-severity — is
 a design choice).
 
+### E1. Slack / Teams native webhook delivery — **SHIPPED**
+Per-webhook `format` (`grcen` | `slack` | `teams`) with a formatter branch in
+`webhook_service.send_to_webhook`: `slack` posts a mrkdwn incoming-webhook message, `teams` a
+MessageCard, both unsigned (the secret URL is the credential); `grcen` (default) keeps the signed
+JSON envelope unchanged. Any event can now reach Slack in Slack format, configured from the
+`/admin/webhooks` format selector. The event catalog is centralized in
+`webhook_service.WEBHOOK_EVENTS` (single source for the admin UI + chat formatter) and gains
+`asset.updated`, emitted from the REST + page asset-update handlers alongside the existing
+watcher notification. Tests `tests/test_webhooks.py`. Remaining: domain events (`finding.*`,
+`risk.appetite_breached`, `review.due`) need lifecycle emit points; a syslog/CEF SIEM egress.
+
 ## Known Stale / Cleanup
 - `CLAUDE.md` has been refreshed but the rest of `configure_*.md` and `security_features_and_requirements.md` should be reviewed in the same pass when we make significant changes to those areas.

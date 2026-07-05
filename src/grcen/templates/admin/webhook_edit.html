@@ -29,6 +29,14 @@
                value="{{ hook.event_filter | join(',') }}">
     </div>
     <div class="form-group">
+        <label for="format">Delivery Format</label>
+        <select id="format" name="format">
+            <option value="grcen" {% if hook.format == 'grcen' %}selected{% endif %}>GRCen JSON (signed envelope)</option>
+            <option value="slack" {% if hook.format == 'slack' %}selected{% endif %}>Slack</option>
+            <option value="teams" {% if hook.format == 'teams' %}selected{% endif %}>Microsoft Teams</option>
+        </select>
+    </div>
+    <div class="form-group">
         <label><input type="checkbox" name="enabled" {% if hook.enabled %}checked{% endif %}> Enabled</label>
     </div>
     <div class="form-actions">

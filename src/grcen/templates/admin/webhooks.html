@@ -17,13 +17,14 @@
     {% if webhooks %}
     <table class="table">
         <thead>
-            <tr><th>Name</th><th>URL</th><th>Events</th><th>Enabled</th><th></th></tr>
+            <tr><th>Name</th><th>URL</th><th>Format</th><th>Events</th><th>Enabled</th><th></th></tr>
         </thead>
         <tbody>
         {% for w in webhooks %}
             <tr>
                 <td>{{ w.name }}</td>
                 <td style="font-family:monospace; word-break:break-all;">{{ w.url }}</td>
+                <td>{{ w.format }}</td>
                 <td>{{ w.event_filter | join(', ') if w.event_filter else '(all)' }}</td>
                 <td>{{ 'yes' if w.enabled else 'no' }}</td>
                 <td>
@@ -66,7 +67,16 @@
     <div class="form-group">
         <label for="event_filter">Event Filter (comma-separated)</label>
         <input type="text" id="event_filter" name="event_filter" placeholder="alert.fired (leave blank for all)">
-        <small>Supported events today: <code>alert.fired</code>, <code>asset.created</code>, <code>asset.deleted</code>, <code>ping</code>.</small>
+        <small>Supported events: {% for e in events %}<code>{{ e }}</code>{% if not loop.last %}, {% endif %}{% endfor %} (blank = all).</small>
+    </div>
+    <div class="form-group">
+        <label for="format">Delivery Format</label>
+        <select id="format" name="format">
+            <option value="grcen">GRCen JSON (signed envelope — SIEM / machine)</option>
+            <option value="slack">Slack (incoming-webhook message)</option>
+            <option value="teams">Microsoft Teams (MessageCard)</option>
+        </select>
+        <small>Slack / Teams post a chat message to the URL and are not HMAC-signed.</small>
     </div>
     <div class="form-group">
         <label><input type="checkbox" name="enabled" checked> Enabled</label>

@@ -31,6 +31,25 @@ _SCOPE = "webhook_secrets"
 _TIMEOUT_SECONDS = 10.0
 _RESPONSE_BODY_LIMIT = 2000  # chars stored per delivery row
 
+# Canonical catalogue of outbound event types → human labels. Single source of
+# truth for the admin UI's "supported events" list and the chat formatter; emit
+# sites use the string keys directly.
+WEBHOOK_EVENTS: dict[str, str] = {
+    "alert.fired": "Alert fired",
+    "asset.created": "Asset created",
+    "asset.updated": "Asset updated",
+    "asset.deleted": "Asset deleted",
+    "ping": "Test ping",
+}
+
+# Per-webhook delivery formats. 'grcen' = signed JSON envelope (machine/SIEM);
+# 'slack'/'teams' = chat-ready message posted to an incoming-webhook URL.
+FORMATS = ("grcen", "slack", "teams")
+
+
+def normalize_format(value: str | None) -> str:
+    return value if value in FORMATS else "grcen"
+
 
 @dataclass
 class Webhook:
@@ -42,6 +61,7 @@ class Webhook:
     event_filter: list[str]
     created_at: datetime
     updated_at: datetime
+    format: str = "grcen"
 
     @classmethod
     def from_row(cls, row) -> Webhook:
@@ -54,6 +74,7 @@ class Webhook:
             event_filter=list(row["event_filter"] or []),
             created_at=row["created_at"],
             updated_at=row["updated_at"],
+            format=row.get("format") or "grcen",
         )
 
 
@@ -132,14 +153,15 @@ async def create_webhook(
     secret: str = "",
     enabled: bool = True,
     event_filter: list[str] | None = None,
+    format: str = "grcen",
 ) -> Webhook:
     encrypted = await _secrets_encrypted(pool)
     if organization_id is None:
         from grcen.services import organization_service
         organization_id = await organization_service.get_default_org_id(pool)
     row = await pool.fetchrow(
-        """INSERT INTO webhooks (id, name, url, secret, enabled, event_filter, organization_id)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)
+        """INSERT INTO webhooks (id, name, url, secret, enabled, event_filter, format, organization_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
            RETURNING *""",
         uuid.uuid4(),
         name,
@@ -147,6 +169,7 @@ async def create_webhook(
         _encrypt(secret, encrypted),
         enabled,
         event_filter or [],
+        normalize_format(format),
         organization_id,
     )
     h = Webhook.from_row(row)
@@ -163,6 +186,7 @@ async def update_webhook(
     secret: str | None = None,
     enabled: bool | None = None,
     event_filter: list[str] | None = None,
+    format: str | None = None,
 ) -> Webhook | None:
     sets: list[str] = []
     vals: list[Any] = []
@@ -174,6 +198,8 @@ async def update_webhook(
         ("secret", _encrypt(secret, encrypted) if secret is not None else None),
         ("enabled", enabled),
         ("event_filter", event_filter),
+        # None (not supplied) or an unknown value is skipped, leaving format as-is.
+        ("format", format if format in FORMATS else None),
     ]:
         if val is not None:
             sets.append(f"{col} = ${idx}")
@@ -230,6 +256,113 @@ def _is_transient(status_code: int | None) -> bool:
     return status_code is None or status_code >= 500
 
 
+# ── chat message formatting (Slack / Teams) ──────────────────────────────
+
+
+_EVENT_EMOJI = {
+    "alert.fired": ":rotating_light:",
+    "asset.created": ":new:",
+    "asset.updated": ":pencil2:",
+    "asset.deleted": ":wastebasket:",
+    "ping": ":satellite_antenna:",
+}
+
+
+def _summary_parts(event: str, data: dict[str, Any]) -> tuple[str, str, str, str | None]:
+    """Return (label, emoji, detail, link) for a human-readable chat message."""
+    label = WEBHOOK_EVENTS.get(event, event)
+    emoji = _EVENT_EMOJI.get(event, ":bell:")
+    link = data.get("link")
+    if event == "alert.fired":
+        detail = str(data.get("title") or "Alert")
+        if data.get("message"):
+            detail += f" — {data['message']}"
+        if data.get("asset_name"):
+            detail += f" (on {data['asset_name']})"
+    elif event.startswith("asset."):
+        detail = f"{data.get('name', '?')} ({data.get('type', '?')})"
+        if data.get("actor"):
+            detail += f" — by {data['actor']}"
+        if not link and data.get("id") and event != "asset.deleted":
+            from grcen.config import settings
+            link = f"{settings.APP_BASE_URL.rstrip('/')}/assets/{data['id']}"
+    elif event == "ping":
+        detail = str(data.get("message") or "(no message)")
+    else:
+        detail = ", ".join(
+            f"{k}={v}" for k, v in data.items()
+            if k != "link" and not isinstance(v, (dict, list))
+        )
+    return label, emoji, detail, link
+
+
+def _slack_payload(event: str, data: dict[str, Any]) -> dict[str, Any]:
+    """A Slack incoming-webhook message (mrkdwn)."""
+    label, emoji, detail, link = _summary_parts(event, data)
+    text = f"{emoji} *{label}*"
+    if detail:
+        text += f" — {detail}"
+    if link:
+        text += f"\n<{link}|View in GRCen>"
+    return {"text": text}
+
+
+def _teams_payload(event: str, data: dict[str, Any]) -> dict[str, Any]:
+    """A Microsoft Teams MessageCard."""
+    label, _emoji, detail, link = _summary_parts(event, data)
+    text = f"**{label}**"
+    if detail:
+        text += f" — {detail}"
+    card: dict[str, Any] = {
+        "@type": "MessageCard",
+        "@context": "http://schema.org/extensions",
+        "summary": label,
+        "themeColor": "0F62FE",
+        "title": f"GRCen: {label}",
+        "text": text,
+    }
+    if link:
+        card["potentialAction"] = [{
+            "@type": "OpenUri",
+            "name": "View in GRCen",
+            "targets": [{"os": "default", "uri": link}],
+        }]
+    return card
+
+
+def _build_request(
+    hook: Webhook, event: str, data: dict[str, Any],
+    delivery_id: str, timestamp: str,
+) -> tuple[bytes, dict[str, str]]:
+    """Serialise the request body + headers for this webhook's format.
+
+    'slack'/'teams' emit a chat-ready message and are unsigned — the secret
+    incoming-webhook URL is the credential and the receiver ignores our headers.
+    'grcen' (default) emits the signed JSON envelope for machine/SIEM consumers.
+    """
+    base = {"Content-Type": "application/json", "User-Agent": "GRCen-Webhook/1.0"}
+    if hook.format == "slack":
+        body = json.dumps(_slack_payload(event, data), separators=(",", ":"), default=str)
+        return body.encode("utf-8"), base
+    if hook.format == "teams":
+        body = json.dumps(_teams_payload(event, data), separators=(",", ":"), default=str)
+        return body.encode("utf-8"), base
+    envelope = {
+        "event": event, "delivery_id": delivery_id,
+        "timestamp": timestamp, "data": data,
+    }
+    body_bytes = json.dumps(envelope, separators=(",", ":"), default=str).encode("utf-8")
+    headers = {
+        **base,
+        "X-GRCen-Event": event,
+        "X-GRCen-Delivery": delivery_id,
+        "X-GRCen-Timestamp": timestamp,
+    }
+    if hook.secret:
+        headers["X-GRCen-Signature"] = sign_payload(hook.secret, body_bytes)
+    return body_bytes, headers
+
+
 async def send_to_webhook(
     pool: asyncpg.Pool,
     hook: Webhook,
@@ -246,22 +379,8 @@ async def send_to_webhook(
     from grcen.config import settings
 
     delivery_id = str(uuid.uuid4())
-    envelope = {
-        "event": event,
-        "delivery_id": delivery_id,
-        "timestamp": datetime.now(UTC).isoformat(),
-        "data": data,
-    }
-    body = json.dumps(envelope, separators=(",", ":"), default=str).encode("utf-8")
-    headers = {
-        "Content-Type": "application/json",
-        "User-Agent": "GRCen-Webhook/1.0",
-        "X-GRCen-Event": event,
-        "X-GRCen-Delivery": delivery_id,
-        "X-GRCen-Timestamp": envelope["timestamp"],
-    }
-    if hook.secret:
-        headers["X-GRCen-Signature"] = sign_payload(hook.secret, body)
+    timestamp = datetime.now(UTC).isoformat()
+    body, headers = _build_request(hook, event, data, delivery_id, timestamp)
 
     org_row = await pool.fetchrow(
         "SELECT organization_id FROM webhooks WHERE id = $1", hook.id

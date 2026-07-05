@@ -82,9 +82,10 @@ links, `external_id`=CI id so uvt findings resolve onto them, decommission-on-di
 and **vuln findings from uvt** (`services/vuln_sync.py` + `routers/sync.py`, CLI `grcen
 sync-vulns` or `POST /api/sync/vulns`, Finding assets linked `affected_by`→System, findings
 archived as remediated when they drop out). Egress hangs off `services/webhook_service.py`
-(4-event catalog), `alert_service`'s `_deliver_*` fan-out, `calendar_service`, and the
-`pdf_service` / `board_service` exports. Remaining enterprise sources (cloud/CSPM, MDM/EDR,
-ITSM, …) are greenfield — see `INTEGRATIONS.md` Part C.
+(centralized `WEBHOOK_EVENTS` catalog incl. `asset.updated`; per-webhook `format` =
+`grcen`/`slack`/`teams` posts native Slack/Teams messages, E1), `alert_service`'s `_deliver_*`
+fan-out, `calendar_service`, and the `pdf_service` / `board_service` exports. Remaining
+enterprise sources (cloud/CSPM, MDM/EDR, ITSM, …) are greenfield — see `INTEGRATIONS.md` Part C.
 
 ## Known Gaps (see `feature_roadmap.md` for the full list)
 

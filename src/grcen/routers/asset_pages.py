@@ -683,6 +683,11 @@ async def asset_update_submit(
                 organization_id=user.organization_id, action="update",
                 actor_id=user.id, actor_username=user.username,
             )
+            webhook_service.dispatch_background(
+                pool, "asset.updated",
+                webhook_service.asset_event_payload(updated, actor=user.username),
+                organization_id=user.organization_id,
+            )
     return RedirectResponse(f"/assets/{asset_id}", status_code=302)
 
 

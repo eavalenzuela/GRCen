@@ -129,8 +129,8 @@ ITSM, inbound-TPRM, and SIEM connectors remain greenfield.
 | **Email (SMTP)** | alert emails, hourly digests, per-org branding, `List-Unsubscribe` | `email_service` + `digest_service` | ✅ (watcher-email + scheduled-report email are gaps) |
 | **Calendar (subscribe)** | review / finding-due / risk-review / control-test / vendor / framework-cert dates as iCal VEVENTs | `calendar_service` + `review_service.REVIEW_DATE_FIELDS` | ✅ (audit dates = 1 line; per-user filter + VALARM = gaps) |
 | **Calendar (push)** | same, pushed into Google / Outlook | Google Calendar / MS Graph API | ⬜ net-new |
-| **Slack / MS Teams (native)** | alerts, finding raised/overdue, risk breach, review due, stale evidence | `webhook_service.send_to_webhook` **format branch** (`webhooks.format = slack \| teams`) or a `_deliver_slack()` in `fire_alert` | ⬜ (generic webhook can hit a URL but only sends GRCen JSON) |
-| **Webhooks / SIEM / SOAR** | asset + alert events | `webhook_service` (HMAC, retry) | ◐ 4 events only; **no `asset.updated`** / finding / risk / control events; no syslog/CEF |
+| **Slack / MS Teams (native)** | any event, as a chat message | per-webhook `format=slack\|teams` → formatter branch in `send_to_webhook` | ✅ (E1) |
+| **Webhooks / SIEM / SOAR** | asset + alert events | `webhook_service` (HMAC, retry) | ◐ 5 events (`asset.updated` added, E1); catalog centralized; still no finding/risk events or syslog/CEF |
 | **External ticketing push** | create Jira / ServiceNow ticket on finding raise or risk treatment; store ticket id | net-new alongside `findings_service` | ⬜ |
 | **Scheduled report delivery** | email board pack / auditor bundle on a cadence | APScheduler job (mirror `_flush_email_digests`) | ⬜ (all reports are pull-only today) |
 | **PDF reports** | framework, gap, asset dossier, audit dossier | `pdf_service` | ✅ |
@@ -206,9 +206,15 @@ ITSM, inbound-TPRM, and SIEM connectors remain greenfield.
 
 **Highest-value egress:**
 
-- **E1. Slack / Teams native** + an expanded event catalog (centralize events into a constant;
-  add `asset.updated`, `finding.raised` / `finding.overdue` / `finding.closed`,
-  `risk.appetite_breached`, `review.due`).
+- **E1. Slack / Teams native.** ✅ **Shipped** — a per-webhook `format` (`grcen` | `slack` |
+  `teams`) with a formatter branch in `webhook_service.send_to_webhook`: `slack` posts a mrkdwn
+  incoming-webhook message, `teams` a MessageCard, both unsigned (the secret URL is the
+  credential); `grcen` keeps the signed JSON envelope byte-for-byte. Any event routes to Slack
+  in Slack format. The event catalog is centralized in `webhook_service.WEBHOOK_EVENTS` (single
+  source for the admin UI + formatter) and gains **`asset.updated`** (emitted from the REST +
+  page update handlers). Admin format selector at `/admin/webhooks`. Tests: `tests/test_webhooks.py`.
+  *Remaining:* domain events (`finding.*` / `risk.appetite_breached` / `review.due`) need
+  lifecycle emit points — a follow-up.
 - **E2. Auditor evidence package** (ZIP: SoA + control library + per-run test ledger +
   attachments + audit-trail) + **scheduled delivery** via an APScheduler job.
 - **E3. External ticketing push** (Jira / ServiceNow) for findings/CAPA, plus inbound status

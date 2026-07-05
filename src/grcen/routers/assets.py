@@ -236,6 +236,11 @@ async def update_asset(
             organization_id=user.organization_id, action="update",
             actor_id=user.id, actor_username=user.username,
         )
+        webhook_service.dispatch_background(
+            pool, "asset.updated",
+            webhook_service.asset_event_payload(asset, actor=user.username),
+            organization_id=user.organization_id,
+        )
     return AssetResponse.model_validate(asset, from_attributes=True)
 
 

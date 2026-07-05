@@ -455,3 +455,132 @@ async def test_admin_create_webhook_flow(auth_client, pool):
     assert hooks[0].name == "Test Hook"
     assert hooks[0].event_filter == ["alert.fired"]
     assert hooks[0].secret == "abc"
+    assert hooks[0].format == "grcen"  # default
+
+
+# ── event catalog (E1) ───────────────────────────────────────────────────
+
+
+def test_webhook_events_catalog_contains_asset_updated():
+    assert "asset.updated" in webhook_service.WEBHOOK_EVENTS
+    assert {"alert.fired", "asset.created", "asset.deleted", "ping"} <= set(
+        webhook_service.WEBHOOK_EVENTS
+    )
+
+
+@pytest.mark.asyncio
+async def test_rest_asset_update_dispatches_event(auth_client):
+    """A REST asset update fires asset.updated."""
+    with patch(
+        "grcen.services.webhook_service.dispatch", new=AsyncMock(return_value=1)
+    ) as mock_dispatch:
+        resp = await auth_client.post("/api/assets/", json={"type": "system", "name": "Orig"})
+        asset_id = resp.json()["id"]
+        resp = await auth_client.put(f"/api/assets/{asset_id}", json={"name": "Renamed"})
+        assert resp.status_code == 200
+        import asyncio as _asyncio
+        await _asyncio.sleep(0)
+
+    events = [call.args[1] for call in mock_dispatch.await_args_list]
+    assert "asset.created" in events
+    assert "asset.updated" in events
+    upd = next(c for c in mock_dispatch.await_args_list if c.args[1] == "asset.updated")
+    assert upd.args[2]["name"] == "Renamed"
+
+
+# ── Slack / Teams native formats (E1) ────────────────────────────────────
+
+
+def test_slack_payload_formats_alert():
+    p = webhook_service._slack_payload(
+        "alert.fired", {"title": "Cert expiring", "asset_name": "Root CA", "link": "http://x/1"}
+    )
+    assert "text" in p
+    assert "Cert expiring" in p["text"]
+    assert "Root CA" in p["text"]
+    assert "<http://x/1|View in GRCen>" in p["text"]
+
+
+@pytest.mark.asyncio
+async def test_slack_format_delivers_unsigned_message(pool):
+    hook = await webhook_service.create_webhook(
+        pool, name="s", url="https://hooks.slack.com/x", secret="ignored", format="slack"
+    )
+    assert hook.format == "slack"
+    captured, transport = _capture_request()
+    with _patch_httpx_with_transport(transport):
+        ok, status, err = await webhook_service.send_to_webhook(
+            pool, hook, "alert.fired", {"title": "Review due", "asset_name": "AppX"}
+        )
+    assert ok is True
+    body = json.loads(captured["body"])
+    assert "text" in body
+    assert "Review due" in body["text"]
+    assert "event" not in body  # NOT the GRCen envelope
+    # Slack messages are unsigned and carry none of the X-GRCen-* headers.
+    assert "x-grcen-signature" not in captured["headers"]
+    assert "x-grcen-event" not in captured["headers"]
+    # delivery is still logged
+    assert await pool.fetchval("SELECT count(*) FROM webhook_deliveries") == 1
+
+
+@pytest.mark.asyncio
+async def test_teams_format_delivers_messagecard(pool):
+    hook = await webhook_service.create_webhook(
+        pool, name="t", url="https://outlook.office.com/webhook/x", format="teams"
+    )
+    captured, transport = _capture_request()
+    with _patch_httpx_with_transport(transport):
+        await webhook_service.send_to_webhook(
+            pool, hook, "asset.created",
+            {"name": "New Sys", "type": "system", "id": "abc", "actor": "admin"},
+        )
+    body = json.loads(captured["body"])
+    assert body["@type"] == "MessageCard"
+    assert "New Sys" in body["text"]
+
+
+@pytest.mark.asyncio
+async def test_grcen_format_still_signed_after_refactor(pool):
+    """The default format keeps the signed envelope unchanged."""
+    hook = await webhook_service.create_webhook(
+        pool, name="g", url="https://hooks.test/x", secret="topsecret"
+    )
+    assert hook.format == "grcen"
+    captured, transport = _capture_request()
+    with _patch_httpx_with_transport(transport):
+        await webhook_service.send_to_webhook(pool, hook, "ping", {"hello": "world"})
+    assert captured["headers"]["x-grcen-signature"] == webhook_service.sign_payload(
+        "topsecret", captured["body"]
+    )
+    assert json.loads(captured["body"])["event"] == "ping"
+
+
+@pytest.mark.asyncio
+async def test_update_webhook_format(pool):
+    hook = await webhook_service.create_webhook(pool, name="h", url="https://e.com/a")
+    assert hook.format == "grcen"
+    updated = await webhook_service.update_webhook(pool, hook.id, format="slack")
+    assert updated.format == "slack"
+    # An unknown format is ignored, leaving the current value untouched.
+    again = await webhook_service.update_webhook(pool, hook.id, format="bogus")
+    assert again.format == "slack"
+
+
+@pytest.mark.asyncio
+async def test_admin_create_webhook_with_slack_format(auth_client, pool):
+    from tests.conftest import _extract_csrf_from_session_cookie
+
+    resp = await auth_client.post(
+        "/admin/webhooks",
+        data={
+            "name": "Slack Hook",
+            "url": "https://hooks.slack.com/services/x",
+            "format": "slack",
+            "enabled": "on",
+            "csrf_token": _extract_csrf_from_session_cookie(auth_client),
+        },
+    )
+    assert resp.status_code in (302, 303)
+    hook = next(h for h in await webhook_service.list_webhooks(pool) if h.name == "Slack Hook")
+    assert hook.format == "slack"

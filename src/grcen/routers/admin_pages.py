@@ -753,6 +753,7 @@ async def admin_webhooks_page(
             "user": user,
             "webhooks": hooks,
             "deliveries": deliveries,
+            "events": webhook_service.WEBHOOK_EVENTS,
             "flash": _decode_flash(flash),
             "notif_count": notif_count,
         },
@@ -782,6 +783,7 @@ async def admin_webhooks_create(
         secret=str(form.get("secret", "")).strip(),
         enabled="enabled" in form,
         event_filter=_parse_event_filter(str(form.get("event_filter", ""))),
+        format=str(form.get("format", "grcen")),
     )
     return RedirectResponse("/admin/webhooks?flash=ok:Webhook created", status_code=302)
 
@@ -829,6 +831,7 @@ async def admin_webhook_edit_submit(
         secret=secret,
         enabled="enabled" in form,
         event_filter=_parse_event_filter(str(form.get("event_filter", ""))),
+        format=str(form.get("format", "grcen")),
     )
     if not hook:
         raise HTTPException(status_code=404, detail="Webhook not found")
