@@ -172,5 +172,15 @@ open. Enterprise-extension attributes (employeeNumber, department, manager, titl
 I0b Person fields. Tests `tests/test_scim.py`. Remaining: Groups → role sync, per-org SCIM
 config UI. See `INTEGRATIONS.md` Part C for the rest of the connector roadmap.
 
+### I2. HRIS roster sync — **SHIPPED**
+`services/hris_sync.py` (`sync_roster`) — the bulk counterpart to SCIM. Projects an HRIS roster
+(employees + optional org units) into People and Organizational Units with `manages` /
+`member_of` / `parent_of` edges, idempotent via I0. Movers re-point edges (stale ones pruned);
+**leavers are archived and their linked login disabled** (default; toggle with `--keep-leavers`),
+with optional owned-asset reassignment (`--reassign-to`). Delivered as CLI `grcen sync-hris
+<file>` and `POST /api/sync/hris` (`routers/sync.py`, `sync`-scoped token — which also lands
+I0's generic HTTP ingress surface). Roster contract in the `hris_sync` module docstring. Tests
+`tests/test_hris_sync.py`.
+
 ## Known Stale / Cleanup
 - `CLAUDE.md` has been refreshed but the rest of `configure_*.md` and `security_features_and_requirements.md` should be reviewed in the same pass when we make significant changes to those areas.

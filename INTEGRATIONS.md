@@ -89,7 +89,7 @@ Legend: **✅ exists** · **◐ partial** · **⬜ greenfield**
 | **Control/compliance SoR** — autocomply (also Vanta/Drata-shaped) | Framework, Requirement, Control, crosswalks | `autocomply` | `framework:` / `requirement:` / `control:<ref>` | — (contract-defined) | ✅ `catalog_sync` |
 | **Content packs** (cold-start baselines) | Framework, Requirement, Control | `grcen-pack:<id>` | same | — | ✅ `content_packs` |
 | **IdP / Directory** — Entra ID, Okta, Google Workspace | User + Person, group → role | `scim` (Person) / *(users table)* | `oidc_sub` / `saml_sub` / SCIM `externalId` | Groups → role sync | ◐ SSO JIT + **SCIM Users** |
-| **HRIS** — Workday, BambooHR, HiBob, Rippling, ADP | Person, Organizational Unit | `hris:<vendor>` | `employee_id` / `worker_id` | Person `employee_id`, `location`, `cost_center`; manager → `manages` edge; leaver → status | ⬜ |
+| **HRIS** — Workday, BambooHR, HiBob, Rippling, ADP | Person, Organizational Unit | `hris:<vendor>` | `employee_id` / `worker_id` | — (identity fields + edges + leaver handling shipped) | ✅ `hris_sync` (I2) |
 | **CMDB / IT asset inventory** — ServiceNow CMDB, Device42, Snipe-IT | System, Device, Product | `cmdb:<vendor>` | `sys_id` / CI id | System `hostname`, `ip_address`, `fqdn`, `external_id`; Device `ip_address`, `external_id` | ⬜ |
 | **Cloud inventory** — AWS Config, Azure Resource Graph, GCP Asset Inventory | System / Device (resources) | `cloud:<provider>` | ARN / resource id | System `cloud_resource_id`, `account` (`region` exists) | ⬜ (autocomply covers the control-evidence side only) |
 | **Vuln scanners / "Qualys-likes"** — Qualys, Tenable/Nessus, Rapid7, **uvt** | Finding (`affects` → System), aggregate → Risk | `uvt` or `qualys` / `tenable` | finding id or `CVE:host` | Finding `cve_id`, `cvss_score`, `cvss_vector`, `scanner`, `scan_id`, `affected_asset`, `first_seen`, `last_seen` | ⬜ (route via uvt — see note) |
@@ -111,11 +111,11 @@ per-scanner connectors remain an option for deployments not running uvt.
 
 ### What's confirmed absent today
 
-The external connectors that exist today are autocomply's catalog sync and **SCIM Users** (I1);
-the reusable `external_sync` primitive (I0) now underpins the SCIM connector and is the
-substrate for the rest. Beyond SCIM, Person assets are still created only by SSO first-login
-JIT, manual entry, or CSV import, and HRIS, CMDB, cloud-inventory, scanner, CSPM, MDM/EDR,
-ITSM, inbound-TPRM, and SIEM connectors remain greenfield.
+The external connectors that exist today are autocomply's catalog sync, **SCIM Users** (I1),
+and **HRIS roster sync** (I2) — the latter two built on the reusable `external_sync` primitive
+(I0). People are now provisioned and **deprovisioned** from both an IdP (SCIM) and an HRIS
+roster (leaver → Person archived + login disabled). CMDB, cloud-inventory, scanner, CSPM,
+MDM/EDR, ITSM, inbound-TPRM, and SIEM connectors remain greenfield.
 
 ---
 
@@ -159,9 +159,9 @@ ITSM, inbound-TPRM, and SIEM connectors remain greenfield.
   `upsert_external_asset` / `upsert_external_edge` (idempotent on `(organization_id, source,
   source_ref)`; unlike the narrower `catalog_sync` projection, the source owns `status` too, so
   a connector can archive on deprovision) + `prune_stale_assets` / `prune_stale_edges`. New
-  `sync` permission (`permissions.py`, held by Admin). Tests: `tests/test_external_sync.py`.
-  *Remaining:* a generic `POST /api/sync/<source>` HTTP surface — SCIM brought its own
-  endpoints; a generic one lands with the first bulk connector.
+  `sync` permission (`permissions.py`, held by Admin). Tests: `tests/test_external_sync.py`. The
+  authenticated HTTP ingress surface now exists at `POST /api/sync/<source>` (`routers/sync.py`;
+  `/hris` is the first, added with I2), alongside the CLI syncs.
 - **I0b. External-identity fields.** ✅ **Shipped** — added to `custom_fields.py`: Person
   `employee_id` / `location` / `cost_center`; System `hostname` / `ip_address` / `fqdn` /
   `external_id` / `cloud_resource_id`; Device `ip_address` / `external_id`; Finding `cve_id` /
@@ -178,8 +178,14 @@ ITSM, inbound-TPRM, and SIEM connectors remain greenfield.
   soft-deprovision — login disabled, Person archived — closing the deprovisioning gap that
   login-time OIDC/SAML JIT leaves open. Tests: `tests/test_scim.py`. *Remaining:* Groups → role
   sync, per-org SCIM config UI.
-- **I2. HRIS sync** — Person + Org-Unit authoritative refresh + joiner/mover/leaver (prune
-  deactivates leavers and reassigns owned assets).
+- **I2. HRIS sync.** ✅ **Shipped** — `services/hris_sync.py` (`sync_roster`): the bulk
+  counterpart to SCIM. Projects a roster → People (+ Org Units), `manages` / `member_of` /
+  `parent_of` edges, all idempotent via I0. Movers re-point edges (stale ones pruned); **leavers
+  are archived and their linked login disabled** (`deactivate_leavers`, default on), with
+  optional owned-asset reassignment. Delivered as CLI `grcen sync-hris <file>` **and**
+  `POST /api/sync/hris` (`routers/sync.py`, `sync`-scoped token — this also lands I0's remaining
+  generic HTTP ingress surface). Roster contract in the `hris_sync` module docstring. Tests:
+  `tests/test_hris_sync.py`.
 - **I3. CMDB / cloud-inventory sync** — System / Device with real hostnames, IPs, resource ids.
 - **I4. Vuln findings via uvt** — Finding assets `affects` System, aggregate → Risk.
 

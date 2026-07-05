@@ -34,6 +34,7 @@ from grcen.routers import (
     saml,
     saved_searches,
     scim,
+    sync,
     tags,
     tokens,
     vendor_campaigns,
@@ -194,6 +195,7 @@ def create_app() -> FastAPI:
     app.include_router(oidc.router)
     app.include_router(saml.router)
     app.include_router(scim.router)
+    app.include_router(sync.router)
     app.include_router(tokens.router)
     app.include_router(workflow.api_router)
 
@@ -274,7 +276,7 @@ def cli():
     """CLI entrypoint for management commands."""
     if len(sys.argv) < 2:
         print("Usage: grcen <command>")
-        print("Commands: createadmin, createsuperadmin, createorg, listorgs, runserver, generate-key, rotate-keys, backup, restore, sync-catalog, list-packs, install-pack")
+        print("Commands: createadmin, createsuperadmin, createorg, listorgs, runserver, generate-key, rotate-keys, backup, restore, sync-catalog, sync-hris, list-packs, install-pack")
         sys.exit(1)
 
     command = sys.argv[1]
@@ -306,6 +308,8 @@ def cli():
         asyncio.run(_rotate_keys())
     elif command == "sync-catalog":
         asyncio.run(_sync_catalog())
+    elif command == "sync-hris":
+        asyncio.run(_sync_hris())
     elif command == "list-packs":
         asyncio.run(_list_packs())
     elif command == "install-pack":
@@ -501,6 +505,91 @@ async def _sync_catalog():
         if not prune:
             for sref in result.stale_assets[:20]:
                 print(f"      {sref}")
+    await close_pool()
+
+
+async def _sync_hris():
+    """`grcen sync-hris <file> [--org=SLUG] [--dry-run] [--source=NAME] [--keep-leavers] [--reassign-to=UUID]`.
+
+    Project an HRIS roster (employees + optional org units) into the People
+    graph: upserts People/OUs and manager + membership edges, and archives
+    leavers (disabling their linked logins) unless --keep-leavers. See
+    grcen.services.hris_sync for the roster contract.
+    """
+    import json
+    from pathlib import Path
+    from uuid import UUID as _UUID
+
+    from grcen.services import hris_sync, organization_service
+
+    argv = sys.argv[2:]
+    positional = [a for a in argv if not a.startswith("--")]
+    if not positional:
+        print("Usage: grcen sync-hris <file> [--org=SLUG] [--dry-run] [--source=NAME] [--keep-leavers] [--reassign-to=UUID]")
+        sys.exit(1)
+    path = Path(positional[0])
+    if not path.exists():
+        print(f"File not found: {path}")
+        sys.exit(1)
+
+    dry_run = "--dry-run" in argv
+    keep_leavers = "--keep-leavers" in argv
+    org_slug = next((a.split("=", 1)[1] for a in argv if a.startswith("--org=")), None)
+    source = next((a.split("=", 1)[1] for a in argv if a.startswith("--source=")), None)
+    reassign_raw = next((a.split("=", 1)[1] for a in argv if a.startswith("--reassign-to=")), None)
+    reassign_to = None
+    if reassign_raw:
+        try:
+            reassign_to = _UUID(reassign_raw)
+        except ValueError:
+            print(f"Invalid --reassign-to UUID: {reassign_raw}")
+            sys.exit(1)
+
+    try:
+        roster = json.loads(path.read_text())
+    except json.JSONDecodeError as e:
+        print(f"Invalid JSON in {path}: {e}")
+        sys.exit(1)
+
+    pool = await init_pool()
+    await init_schema()
+
+    org_id = None
+    if org_slug:
+        org = await organization_service.get_by_slug(pool, org_slug)
+        if org is None:
+            print(f"Organization '{org_slug}' not found.")
+            await close_pool()
+            sys.exit(1)
+        org_id = org.id
+
+    result = await hris_sync.sync_roster(
+        pool, roster, organization_id=org_id, source=source,
+        dry_run=dry_run, deactivate_leavers=not keep_leavers,
+        reassign_owned_to=reassign_to,
+    )
+
+    if result.errors:
+        print(f"Roster invalid — {len(result.errors)} error(s), nothing written:")
+        for err in result.errors[:50]:
+            print(f"  - {err}")
+        await close_pool()
+        sys.exit(1)
+
+    tag = " (dry run — rolled back)" if dry_run else ""
+    print(f"HRIS sync from '{result.source}'{tag}:")
+    print(f"  people:    {result.persons_created} created, {result.persons_updated} updated, {result.persons_archived} archived")
+    print(f"  org units: {result.org_units_created} created, {result.org_units_updated} updated, {result.org_units_archived} archived")
+    print(f"  edges:     {result.manager_edges} manages, {result.membership_edges} member_of, {result.hierarchy_edges} parent_of, {result.edges_pruned} pruned")
+    leaver_note = (
+        f"archived, {result.users_deactivated} login(s) disabled"
+        if not keep_leavers else "reported; kept (--keep-leavers)"
+    )
+    print(f"  leavers:   {len(result.leavers)} ({leaver_note})")
+    if result.assets_reassigned:
+        print(f"  reassigned {result.assets_reassigned} owned asset(s) to {reassign_to}")
+    for w in result.warnings[:20]:
+        print(f"  ! {w}")
     await close_pool()
 
 

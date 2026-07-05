@@ -71,13 +71,15 @@ GRCen (pronounced "gurken") is a free and open-source GRC (Governance, Risk, Com
 egress (Slack/Teams, calendar, ticketing, SIEM, auditor evidence bundles). The reusable
 ingress seam is the `source` / `source_ref` provenance + `(organization_id, source,
 source_ref)` upsert, now factored into `services/external_sync.py` (`upsert_external_asset` /
-`upsert_external_edge` + `prune_stale_*`; writers today are `catalog_sync`/content-packs and
-the SCIM connector). The first authoritative-source connector — **SCIM 2.0 user provisioning**
-(`routers/scim.py` + `services/scim_service.py`, `sync`-scoped token, Person under
-`source='scim'`, soft-deprovision on `active:false`/DELETE) — ships on it. Egress hangs off
-`services/webhook_service.py` (4-event catalog), `alert_service`'s `_deliver_*` fan-out,
-`calendar_service`, and the `pdf_service` / `board_service` exports. Remaining enterprise
-sources (HRIS, CMDB, scanners, …) are greenfield — see `INTEGRATIONS.md` Part C.
+`upsert_external_edge` + `prune_stale_*`; writers today are `catalog_sync`/content-packs plus
+the two connectors below). Both are `sync`-scoped and deprovision leavers: **SCIM 2.0 user
+provisioning** (`routers/scim.py` +
+`services/scim_service.py`, per-user push, Person under `source='scim'`, soft-deprovision on
+`active:false`/DELETE) and **HRIS roster sync** (`services/hris_sync.py` + `routers/sync.py`,
+bulk roster, CLI `grcen sync-hris` or `POST /api/sync/hris`, leaver → Person archived + login
+disabled). Egress hangs off `services/webhook_service.py` (4-event catalog), `alert_service`'s
+`_deliver_*` fan-out, `calendar_service`, and the `pdf_service` / `board_service` exports.
+Remaining enterprise sources (CMDB, scanners, …) are greenfield — see `INTEGRATIONS.md` Part C.
 
 ## Known Gaps (see `feature_roadmap.md` for the full list)
 
