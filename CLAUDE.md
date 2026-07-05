@@ -84,7 +84,9 @@ sync-vulns` or `POST /api/sync/vulns`, Finding assets linked `affected_by`→Sys
 archived as remediated when they drop out). Egress hangs off `services/webhook_service.py`
 (centralized `WEBHOOK_EVENTS` catalog incl. `asset.updated`; per-webhook `format` =
 `grcen`/`slack`/`teams` posts native Slack/Teams messages, E1), `alert_service`'s `_deliver_*`
-fan-out, `calendar_service`, the `pdf_service` / `board_service` exports, `evidence_package`
+fan-out, `calendar_service` (per-user iCal feed of review/finding/audit/… due dates, with VALARM
+reminders `?alarm=N` and a `?scope=mine` owner filter, E4), the `pdf_service` / `board_service`
+exports, `evidence_package`
 (per-framework auditor ZIP — SoA + control library + per-run test ledger + audit trail +
 evidence files, E2), and `ticketing_service` (push a finding to Jira/ServiceNow, sync ticket
 status back onto `finding_status`, E3 — config in `itsm_settings`). Remaining enterprise sources

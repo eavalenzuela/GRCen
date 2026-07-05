@@ -23,7 +23,7 @@ REVIEW_DATE_FIELDS: dict[str, str] = {
     "control": "next_test_due",
     "framework": "certification_expiry",
     "finding": "due_date",
-    # audit uses end_date but audits are events, not recurring reviews
+    "audit": "end_date",  # E4: surface the audit's end date as a calendar event
 }
 
 
@@ -49,8 +49,12 @@ async def get_reviews(
     asset_type: str | None = None,
     status_filter: str | None = None,
     organization_id=None,
+    owner_id=None,
 ) -> list[dict]:
-    """Return all active assets that have a review/due date field set."""
+    """Return all active assets that have a review/due date field set.
+
+    ``owner_id`` restricts to assets owned by that Person/OU (the "my assets"
+    calendar filter — E4)."""
     where = "a.status = 'active'"
     vals: list = []
     idx = 1
@@ -61,6 +65,10 @@ async def get_reviews(
     if organization_id is not None:
         where += f" AND a.organization_id = ${idx}"
         vals.append(organization_id)
+        idx += 1
+    if owner_id is not None:
+        where += f" AND a.owner_id = ${idx}"
+        vals.append(owner_id)
         idx += 1
 
     rows = await pool.fetch(

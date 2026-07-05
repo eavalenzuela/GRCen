@@ -238,5 +238,15 @@ table, `itsm_secrets` encryption scope), admin page `/admin/itsm-settings`. Find
 `external_ticket*` custom fields. Tests `tests/test_ticketing.py`. Remaining: auto-push on finding
 raise (per-severity rule); a configurable status map.
 
+### E4. Calendar enrichments — **SHIPPED**
+Enriches the per-user iCal review feed (`calendar_service` + `review_service` +
+`routers/calendar.py`): **audit** end-dates now appear as events (added to `REVIEW_DATE_FIELDS`);
+per-type event phrasing (audits read "Audit: …", findings "Finding remediation due: …", etc.,
+policies unchanged); a **VALARM** reminder on each event via `?alarm=N` days (default 7, `0`
+disables); and a `?scope=mine` filter that limits the feed to assets the subscriber owns (via
+their linked Person). Options are documented on the `/settings` calendar card. Tests
+`tests/test_calendar_feed.py`. Deferred: true push-to-calendar via the Google Calendar / MS
+Graph API — net-new OAuth surface, tracked as a follow-up.
+
 ## Known Stale / Cleanup
 - `CLAUDE.md` has been refreshed but the rest of `configure_*.md` and `security_features_and_requirements.md` should be reviewed in the same pass when we make significant changes to those areas.

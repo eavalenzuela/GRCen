@@ -128,8 +128,8 @@ SIEM connectors remain greenfield.
 |---|---|---|---|
 | **In-app notifications** | alerts, watched-asset changes, session evictions | `alert_service` + `watcher_service` | ✅ |
 | **Email (SMTP)** | alert emails, hourly digests, per-org branding, `List-Unsubscribe` | `email_service` + `digest_service` | ✅ (watcher-email + scheduled-report email are gaps) |
-| **Calendar (subscribe)** | review / finding-due / risk-review / control-test / vendor / framework-cert dates as iCal VEVENTs | `calendar_service` + `review_service.REVIEW_DATE_FIELDS` | ✅ (audit dates = 1 line; per-user filter + VALARM = gaps) |
-| **Calendar (push)** | same, pushed into Google / Outlook | Google Calendar / MS Graph API | ⬜ net-new |
+| **Calendar (subscribe)** | review / finding / risk / control-test / vendor / framework-cert / **audit** dates as iCal VEVENTs, with **VALARM** reminders and a per-user **`?scope=mine`** filter | `calendar_service` + `review_service.REVIEW_DATE_FIELDS` | ✅ (E4) |
+| **Calendar (push)** | same, pushed into Google / Outlook | Google Calendar / MS Graph API | ⬜ net-new (E4-deferred — OAuth surface) |
 | **Slack / MS Teams (native)** | any event, as a chat message | per-webhook `format=slack\|teams` → formatter branch in `send_to_webhook` | ✅ (E1) |
 | **Webhooks / SIEM / SOAR** | asset + alert events | `webhook_service` (HMAC, retry) | ◐ 5 events (`asset.updated` added, E1); catalog centralized; still no finding/risk events or syslog/CEF |
 | **External ticketing push** | create Jira / ServiceNow / generic ticket from a finding; store ticket ref | `ticketing_service.push_finding` → `POST /api/findings/{id}/ticket` | ✅ (E3) |
@@ -233,8 +233,12 @@ SIEM connectors remain greenfield.
   admin page at `/admin/itsm-settings`. Finding fields `external_ticket*` added. Tests:
   `tests/test_ticketing.py`. *Remaining:* auto-push on finding raise (per-severity rule);
   richer status-map config.
-- **E4. Calendar enrichments** (audit dates, per-user "my assets" filter, VALARM reminders) +
-  optional push-to-calendar.
+- **E4. Calendar enrichments.** ✅ **Shipped** — the iCal feed now carries **audit** end-dates,
+  per-type event phrasing, and a **VALARM** reminder on each event (`?alarm=N` days, default 7,
+  `0` to disable); `?scope=mine` filters to the subscriber's own assets (via their linked
+  Person). `calendar_service` + `review_service` + `routers/calendar.py`; options documented on
+  `/settings`. Tests: `tests/test_calendar_feed.py`. *Remaining (deferred):* push-to-calendar via
+  the Google/MS Graph API — net-new OAuth surface.
 
 **Second wave:** MDM/EDR → Device; CSPM misconfig → Finding; inbound TPRM vendor-risk; data
 catalog → Data Category; SIEM syslog/CEF forwarder; auto-email + reminders for vendor

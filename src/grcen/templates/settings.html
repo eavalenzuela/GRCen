@@ -125,6 +125,11 @@
        treat it like a password, and regenerate it if it leaks.</p>
     {% if calendar_url %}
     <p><code style="word-break:break-all;">{{ calendar_url }}</code></p>
+    <p style="color:#6b7280; font-size:0.9em;">
+        Options (append to the URL): <code>?scope=mine</code> — only assets you own;
+        <code>?alarm=14</code> — reminder 14 days before (default 7; <code>?alarm=0</code> to
+        turn reminders off). Combine with <code>&amp;</code>.
+    </p>
     <form method="post" action="/settings/calendar/enable" style="display:inline;">
         {% include "partials/csrf.html" %}
         <button type="submit" class="btn">Regenerate URL</button>
