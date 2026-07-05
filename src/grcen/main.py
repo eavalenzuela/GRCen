@@ -276,7 +276,7 @@ def cli():
     """CLI entrypoint for management commands."""
     if len(sys.argv) < 2:
         print("Usage: grcen <command>")
-        print("Commands: createadmin, createsuperadmin, createorg, listorgs, runserver, generate-key, rotate-keys, backup, restore, sync-catalog, sync-hris, list-packs, install-pack")
+        print("Commands: createadmin, createsuperadmin, createorg, listorgs, runserver, generate-key, rotate-keys, backup, restore, sync-catalog, sync-hris, sync-vulns, list-packs, install-pack")
         sys.exit(1)
 
     command = sys.argv[1]
@@ -310,6 +310,8 @@ def cli():
         asyncio.run(_sync_catalog())
     elif command == "sync-hris":
         asyncio.run(_sync_hris())
+    elif command == "sync-vulns":
+        asyncio.run(_sync_vulns())
     elif command == "list-packs":
         asyncio.run(_list_packs())
     elif command == "install-pack":
@@ -588,6 +590,75 @@ async def _sync_hris():
     print(f"  leavers:   {len(result.leavers)} ({leaver_note})")
     if result.assets_reassigned:
         print(f"  reassigned {result.assets_reassigned} owned asset(s) to {reassign_to}")
+    for w in result.warnings[:20]:
+        print(f"  ! {w}")
+    await close_pool()
+
+
+async def _sync_vulns():
+    """`grcen sync-vulns <file> [--org=SLUG] [--dry-run] [--source=NAME] [--keep-resolved]`.
+
+    Project a vulnerability-findings export (from uvt, or a per-scanner exporter)
+    into the asset graph: upserts Finding assets, links each to the System it
+    affects, and archives findings that dropped out of the export as remediated
+    (unless --keep-resolved). See grcen.services.vuln_sync for the contract.
+    """
+    import json
+    from pathlib import Path
+
+    from grcen.services import organization_service, vuln_sync
+
+    argv = sys.argv[2:]
+    positional = [a for a in argv if not a.startswith("--")]
+    if not positional:
+        print("Usage: grcen sync-vulns <file> [--org=SLUG] [--dry-run] [--source=NAME] [--keep-resolved]")
+        sys.exit(1)
+    path = Path(positional[0])
+    if not path.exists():
+        print(f"File not found: {path}")
+        sys.exit(1)
+
+    dry_run = "--dry-run" in argv
+    keep_resolved = "--keep-resolved" in argv
+    org_slug = next((a.split("=", 1)[1] for a in argv if a.startswith("--org=")), None)
+    source = next((a.split("=", 1)[1] for a in argv if a.startswith("--source=")), None)
+
+    try:
+        export = json.loads(path.read_text())
+    except json.JSONDecodeError as e:
+        print(f"Invalid JSON in {path}: {e}")
+        sys.exit(1)
+
+    pool = await init_pool()
+    await init_schema()
+
+    org_id = None
+    if org_slug:
+        org = await organization_service.get_by_slug(pool, org_slug)
+        if org is None:
+            print(f"Organization '{org_slug}' not found.")
+            await close_pool()
+            sys.exit(1)
+        org_id = org.id
+
+    result = await vuln_sync.sync_findings(
+        pool, export, organization_id=org_id, source=source,
+        dry_run=dry_run, resolve_missing=not keep_resolved,
+    )
+
+    if result.errors:
+        print(f"Export invalid — {len(result.errors)} error(s), nothing written:")
+        for err in result.errors[:50]:
+            print(f"  - {err}")
+        await close_pool()
+        sys.exit(1)
+
+    tag = " (dry run — rolled back)" if dry_run else ""
+    print(f"Vuln sync from '{result.source}'{tag}:")
+    print(f"  findings:  {result.findings_created} created, {result.findings_updated} updated, {result.findings_resolved} resolved")
+    print(f"  edges:     {result.affects_edges} affects, {result.edges_pruned} pruned")
+    if result.unresolved_assets:
+        print(f"  unresolved affected assets: {len(result.unresolved_assets)} finding(s) — System not found")
     for w in result.warnings[:20]:
         print(f"  ! {w}")
     await close_pool()

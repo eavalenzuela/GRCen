@@ -92,7 +92,7 @@ Legend: **✅ exists** · **◐ partial** · **⬜ greenfield**
 | **HRIS** — Workday, BambooHR, HiBob, Rippling, ADP | Person, Organizational Unit | `hris:<vendor>` | `employee_id` / `worker_id` | — (identity fields + edges + leaver handling shipped) | ✅ `hris_sync` (I2) |
 | **CMDB / IT asset inventory** — ServiceNow CMDB, Device42, Snipe-IT | System, Device, Product | `cmdb:<vendor>` | `sys_id` / CI id | System `hostname`, `ip_address`, `fqdn`, `external_id`; Device `ip_address`, `external_id` | ⬜ |
 | **Cloud inventory** — AWS Config, Azure Resource Graph, GCP Asset Inventory | System / Device (resources) | `cloud:<provider>` | ARN / resource id | System `cloud_resource_id`, `account` (`region` exists) | ⬜ (autocomply covers the control-evidence side only) |
-| **Vuln scanners / "Qualys-likes"** — Qualys, Tenable/Nessus, Rapid7, **uvt** | Finding (`affects` → System), aggregate → Risk | `uvt` or `qualys` / `tenable` | finding id or `CVE:host` | Finding `cve_id`, `cvss_score`, `cvss_vector`, `scanner`, `scan_id`, `affected_asset`, `first_seen`, `last_seen` | ⬜ (route via uvt — see note) |
+| **Vuln scanners / "Qualys-likes"** — Qualys, Tenable/Nessus, Rapid7, **uvt** | Finding (`affected_by` ← System) | `uvt` or `qualys` / `tenable` | `finding:<finding_id>` | — (fields shipped in I0b) | ◐ `vuln_sync` (I4); Risk aggregation deferred |
 | **CSPM** — Wiz, Prisma, Security Hub, Steampipe | Finding (misconfig) → System; Control evidence | `cspm:<vendor>` | check id + resource | Finding fields above | ⬜ (autocomply's simulated AWS collector feeds control evidence) |
 | **MDM / EDR** — Intune, Jamf, Kandji, CrowdStrike, SentinelOne | Device (+ device-compliance Finding) | `mdm:<vendor>` / `edr:<vendor>` | device id | Device `ip_address`, `external_id`, `compliance_state` | ⬜ |
 | **ITSM / ticketing** — Jira, ServiceNow ITSM, Linear | Finding / CAPA / Risk **status sync (inbound)** | `itsm:<vendor>` | ticket key | Finding `external_ticket` | ⬜ (no inbound receiver exists) |
@@ -112,10 +112,11 @@ per-scanner connectors remain an option for deployments not running uvt.
 ### What's confirmed absent today
 
 The external connectors that exist today are autocomply's catalog sync, **SCIM Users** (I1),
-and **HRIS roster sync** (I2) — the latter two built on the reusable `external_sync` primitive
-(I0). People are now provisioned and **deprovisioned** from both an IdP (SCIM) and an HRIS
-roster (leaver → Person archived + login disabled). CMDB, cloud-inventory, scanner, CSPM,
-MDM/EDR, ITSM, inbound-TPRM, and SIEM connectors remain greenfield.
+**HRIS roster sync** (I2), and **vuln findings from uvt** (I4) — the last three built on the
+reusable `external_sync` primitive (I0). People are provisioned and **deprovisioned** from both
+an IdP (SCIM) and an HRIS roster (leaver → Person archived + login disabled), and scanner
+findings land as Findings linked to the Systems they affect (resolved on remediation). CMDB,
+cloud-inventory, CSPM, MDM/EDR, ITSM, inbound-TPRM, and SIEM connectors remain greenfield.
 
 ---
 
@@ -187,7 +188,14 @@ MDM/EDR, ITSM, inbound-TPRM, and SIEM connectors remain greenfield.
   generic HTTP ingress surface). Roster contract in the `hris_sync` module docstring. Tests:
   `tests/test_hris_sync.py`.
 - **I3. CMDB / cloud-inventory sync** — System / Device with real hostnames, IPs, resource ids.
-- **I4. Vuln findings via uvt** — Finding assets `affects` System, aggregate → Risk.
+- **I4. Vuln findings via uvt.** ◐ **Shipped (Findings)** — `services/vuln_sync.py`
+  (`sync_findings`): consumes uvt's triaged findings export → Finding assets (via I0), each
+  linked `System --affected_by--> Finding` by resolving the affected host (external_id →
+  hostname → fqdn → ip_address → name; GRCen never invents Systems, an unresolved target is a
+  warning). Findings that drop out of the export are archived as `remediated`
+  (`resolve_missing`, default on). CLI `grcen sync-vulns <file>` and `POST /api/sync/vulns`.
+  Contract in the `vuln_sync` module docstring. Tests: `tests/test_vuln_sync.py`. *Remaining:*
+  aggregating findings into rolled-up Risk assets (the grouping policy is a design choice).
 
 **Highest-value egress:**
 

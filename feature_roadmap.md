@@ -182,5 +182,16 @@ with optional owned-asset reassignment (`--reassign-to`). Delivered as CLI `grce
 I0's generic HTTP ingress surface). Roster contract in the `hris_sync` module docstring. Tests
 `tests/test_hris_sync.py`.
 
+### I4. Vuln findings via uvt — **SHIPPED (Findings)**
+`services/vuln_sync.py` (`sync_findings`): consumes the sibling **uvt** tracker's triaged
+findings export → Finding assets (via I0), each linked `System --affected_by--> Finding` by
+resolving the affected host (external_id → hostname → fqdn → ip_address → name; GRCen never
+invents Systems — an unresolved target is a warning, the Finding is still recorded). Findings
+that drop out of the export are archived as `remediated` (`resolve_missing`, default on; toggle
+`--keep-resolved`). CLI `grcen sync-vulns <file>` and `POST /api/sync/vulns`. Export contract in
+the `vuln_sync` module docstring. Tests `tests/test_vuln_sync.py`. Remaining: aggregating
+findings into rolled-up Risk assets (grouping policy — per-System / per-CVE / per-severity — is
+a design choice).
+
 ## Known Stale / Cleanup
 - `CLAUDE.md` has been refreshed but the rest of `configure_*.md` and `security_features_and_requirements.md` should be reviewed in the same pass when we make significant changes to those areas.

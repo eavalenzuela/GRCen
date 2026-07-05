@@ -17,8 +17,9 @@ from fastapi.responses import JSONResponse
 from grcen.models.user import User
 from grcen.permissions import Permission
 from grcen.routers.deps import get_db, require_permission
-from grcen.services import hris_sync
+from grcen.services import hris_sync, vuln_sync
 from grcen.services.hris_sync import HrisSyncResult
+from grcen.services.vuln_sync import VulnSyncResult
 
 router = APIRouter(prefix="/api/sync", tags=["sync"])
 
@@ -51,6 +52,30 @@ async def sync_hris(
         organization_id=user.organization_id,
         dry_run=_flag(request, "dry_run", False),
         deactivate_leavers=_flag(request, "deactivate_leavers", True),
+    )
+    status = 200 if not result.errors else 400
+    return JSONResponse(dataclasses.asdict(result), status_code=status)
+
+
+@router.post("/vulns", summary="Sync a vuln-findings export (uvt/scanner) into the graph")
+async def sync_vulns(
+    request: Request,
+    pool=Depends(get_db),
+    user: User = Depends(_sync_required),
+) -> JSONResponse:
+    """Body = the findings export (see ``services.vuln_sync`` for the contract).
+    Query: ``dry_run`` (preview), ``resolve_missing`` (default true — findings
+    that dropped out are archived as remediated)."""
+    try:
+        export = await request.json()
+    except Exception:
+        return JSONResponse({"errors": ["invalid JSON body"]}, status_code=400)
+
+    result: VulnSyncResult = await vuln_sync.sync_findings(
+        pool, export,
+        organization_id=user.organization_id,
+        dry_run=_flag(request, "dry_run", False),
+        resolve_missing=_flag(request, "resolve_missing", True),
     )
     status = 200 if not result.errors else 400
     return JSONResponse(dataclasses.asdict(result), status_code=status)
