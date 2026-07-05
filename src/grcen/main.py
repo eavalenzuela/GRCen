@@ -83,6 +83,13 @@ async def _nightly_compliance_snapshot():
     await capture_all_org_compliance_snapshots(pool)
 
 
+async def _nightly_risk_aggregation():
+    from grcen.services.risk_aggregation import aggregate_all_orgs
+
+    pool = await get_pool()
+    await aggregate_all_orgs(pool)
+
+
 async def _flush_email_digests():
     from grcen.services.digest_service import flush_digests
 
@@ -124,6 +131,12 @@ async def lifespan(app: FastAPI):
         _nightly_compliance_snapshot,
         CronTrigger(hour=0, minute=10),
         id="compliance_snapshot_daily",
+    )
+    # Daily at 00:20 UTC — roll open vuln findings up into Risk assets (I4).
+    scheduler.add_job(
+        _nightly_risk_aggregation,
+        CronTrigger(hour=0, minute=20),
+        id="risk_aggregation_daily",
     )
     # Hourly at :15 — flush queued digest emails. Off-cycle from the alert
     # ticker so a fresh batch can accumulate before each flush.
@@ -276,7 +289,7 @@ def cli():
     """CLI entrypoint for management commands."""
     if len(sys.argv) < 2:
         print("Usage: grcen <command>")
-        print("Commands: createadmin, createsuperadmin, createorg, listorgs, runserver, generate-key, rotate-keys, backup, restore, sync-catalog, sync-hris, sync-vulns, sync-cmdb, list-packs, install-pack")
+        print("Commands: createadmin, createsuperadmin, createorg, listorgs, runserver, generate-key, rotate-keys, backup, restore, sync-catalog, sync-hris, sync-vulns, sync-cmdb, aggregate-risks, list-packs, install-pack")
         sys.exit(1)
 
     command = sys.argv[1]
@@ -314,6 +327,8 @@ def cli():
         asyncio.run(_sync_vulns())
     elif command == "sync-cmdb":
         asyncio.run(_sync_cmdb())
+    elif command == "aggregate-risks":
+        asyncio.run(_aggregate_risks())
     elif command == "list-packs":
         asyncio.run(_list_packs())
     elif command == "install-pack":
@@ -732,6 +747,50 @@ async def _sync_cmdb():
     print(f"  owners:    {result.owners_linked} linked")
     for w in result.warnings[:20]:
         print(f"  ! {w}")
+    await close_pool()
+
+
+async def _aggregate_risks():
+    """`grcen aggregate-risks [--org=SLUG] [--group-by=system|severity] [--dry-run] [--no-prune]`.
+
+    Roll open vulnerability findings up into Risk assets (grouped by affected
+    System or by severity). See grcen.services.risk_aggregation.
+    """
+    from grcen.services import organization_service, risk_aggregation
+
+    argv = sys.argv[2:]
+    dry_run = "--dry-run" in argv
+    prune = "--no-prune" not in argv
+    org_slug = next((a.split("=", 1)[1] for a in argv if a.startswith("--org=")), None)
+    group_by = next((a.split("=", 1)[1] for a in argv if a.startswith("--group-by=")), "system")
+
+    pool = await init_pool()
+    await init_schema()
+
+    if org_slug:
+        org = await organization_service.get_by_slug(pool, org_slug)
+        if org is None:
+            print(f"Organization '{org_slug}' not found.")
+            await close_pool()
+            sys.exit(1)
+        org_id = org.id
+    else:
+        org_id = await organization_service.get_default_org_id(pool)
+
+    result = await risk_aggregation.aggregate_vuln_risks(
+        pool, organization_id=org_id, group_by=group_by, dry_run=dry_run, prune=prune)
+
+    if result.errors:
+        for e in result.errors:
+            print(f"  - {e}")
+        await close_pool()
+        sys.exit(1)
+
+    tag = " (dry run — rolled back)" if dry_run else ""
+    print(f"Risk aggregation (group_by={result.group_by}){tag}:")
+    print(f"  risks:    {result.risks_created} created, {result.risks_updated} updated, {result.risks_archived} archived")
+    print(f"  edges:    {result.threatens_edges} threatens, {result.relates_edges} relates_to, {result.edges_pruned} pruned")
+    print(f"  findings: {result.findings_considered} considered ({result.unassigned} with no system)")
     await close_pool()
 
 

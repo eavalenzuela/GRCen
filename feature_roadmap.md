@@ -198,16 +198,24 @@ inventory are archived (`archive_missing`, default on; a devices-only sync never
 Systems). CLI `grcen sync-cmdb <file>` and `POST /api/sync/cmdb`. Contract in the `cmdb_sync`
 module docstring. Tests `tests/test_cmdb_sync.py`.
 
-### I4. Vuln findings via uvt — **SHIPPED (Findings)**
+### I4. Vuln findings via uvt (+ risk aggregation) — **SHIPPED**
 `services/vuln_sync.py` (`sync_findings`): consumes the sibling **uvt** tracker's triaged
 findings export → Finding assets (via I0), each linked `System --affected_by--> Finding` by
 resolving the affected host (external_id → hostname → fqdn → ip_address → name; GRCen never
 invents Systems — an unresolved target is a warning, the Finding is still recorded). Findings
 that drop out of the export are archived as `remediated` (`resolve_missing`, default on; toggle
 `--keep-resolved`). CLI `grcen sync-vulns <file>` and `POST /api/sync/vulns`. Export contract in
-the `vuln_sync` module docstring. Tests `tests/test_vuln_sync.py`. Remaining: aggregating
-findings into rolled-up Risk assets (grouping policy — per-System / per-CVE / per-severity — is
-a design choice).
+the `vuln_sync` module docstring. Tests `tests/test_vuln_sync.py`.
+
+**Risk aggregation** (`services/risk_aggregation.py`, `aggregate_vuln_risks`): rolls open
+Findings up into Risk assets — grouped by affected **System** (default) or by **severity** —
+mapping worst-severity to the register's likelihood × impact (critical 4×5, high 3×4, …) so
+they surface on the risk register + 5×5 heatmap, linking `Risk --threatens--> System` and
+`Risk --relates_to--> Finding` for traceability. Idempotent via I0 under `source='vuln-agg'`:
+edges to closed findings prune, and a Risk archives once its group has no open findings
+(reactivating if new ones appear). CLI `grcen aggregate-risks [--group-by=system|severity]`
+plus a nightly APScheduler job (00:20 UTC). Tests `tests/test_risk_aggregation.py`. The grouping
+policy is configurable — `system` and `severity` ship; `cve` is a straightforward extension.
 
 ### E1. Slack / Teams native webhook delivery — **SHIPPED**
 Per-webhook `format` (`grcen` | `slack` | `teams`) with a formatter branch in

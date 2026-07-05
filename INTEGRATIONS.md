@@ -92,7 +92,7 @@ Legend: **✅ exists** · **◐ partial** · **⬜ greenfield**
 | **HRIS** — Workday, BambooHR, HiBob, Rippling, ADP | Person, Organizational Unit | `hris:<vendor>` | `employee_id` / `worker_id` | — (identity fields + edges + leaver handling shipped) | ✅ `hris_sync` (I2) |
 | **CMDB / IT asset inventory** — ServiceNow CMDB, Device42, Snipe-IT | System, Device (+ `depends_on`, owner) | `cmdb:<vendor>` | `system:`/`device:<ci_id>` | — (fields shipped in I0b) | ✅ `cmdb_sync` (I3) |
 | **Cloud inventory** — AWS Config, Azure Resource Graph, GCP Asset Inventory | System / Device (resources) | `cloud:<provider>` | ARN / resource id | — (uses the same `cmdb_sync` contract) | ✅ via `cmdb_sync` (I3); dedicated pullers TBD |
-| **Vuln scanners / "Qualys-likes"** — Qualys, Tenable/Nessus, Rapid7, **uvt** | Finding (`affected_by` ← System) | `uvt` or `qualys` / `tenable` | `finding:<finding_id>` | — (fields shipped in I0b) | ◐ `vuln_sync` (I4); Risk aggregation deferred |
+| **Vuln scanners / "Qualys-likes"** — Qualys, Tenable/Nessus, Rapid7, **uvt** | Finding (`affected_by` ← System), aggregated → **Risk** | `uvt` or `qualys` / `tenable` | `finding:<finding_id>` | — (fields shipped in I0b) | ✅ `vuln_sync` + `risk_aggregation` (I4) |
 | **CSPM** — Wiz, Prisma, Security Hub, Steampipe | Finding (misconfig) → System; Control evidence | `cspm:<vendor>` | check id + resource | Finding fields above | ⬜ (autocomply's simulated AWS collector feeds control evidence) |
 | **MDM / EDR** — Intune, Jamf, Kandji, CrowdStrike, SentinelOne | Device (+ device-compliance Finding) | `mdm:<vendor>` / `edr:<vendor>` | device id | Device `ip_address`, `external_id`, `compliance_state` | ⬜ |
 | **ITSM / ticketing** — Jira, ServiceNow, Linear | Finding **status sync (inbound)** | — | ticket key | — (`external_ticket*` shipped) | ✅ `ticketing_service` (E3) via `POST /api/sync/tickets` |
@@ -197,14 +197,17 @@ SIEM connectors remain greenfield.
   dropped-out CIs are archived (`archive_missing`, default on; a devices-only sync never touches
   Systems). CLI `grcen sync-cmdb <file>` and `POST /api/sync/cmdb`. Contract in the `cmdb_sync`
   module docstring. Tests: `tests/test_cmdb_sync.py` (incl. the cross-connector uvt↔CMDB join).
-- **I4. Vuln findings via uvt.** ◐ **Shipped (Findings)** — `services/vuln_sync.py`
-  (`sync_findings`): consumes uvt's triaged findings export → Finding assets (via I0), each
-  linked `System --affected_by--> Finding` by resolving the affected host (external_id →
-  hostname → fqdn → ip_address → name; GRCen never invents Systems, an unresolved target is a
-  warning). Findings that drop out of the export are archived as `remediated`
-  (`resolve_missing`, default on). CLI `grcen sync-vulns <file>` and `POST /api/sync/vulns`.
-  Contract in the `vuln_sync` module docstring. Tests: `tests/test_vuln_sync.py`. *Remaining:*
-  aggregating findings into rolled-up Risk assets (the grouping policy is a design choice).
+- **I4. Vuln findings via uvt.** ✅ **Shipped** — `services/vuln_sync.py` (`sync_findings`):
+  consumes uvt's triaged findings export → Finding assets (via I0), each linked
+  `System --affected_by--> Finding` by resolving the affected host (external_id → hostname →
+  fqdn → ip_address → name; GRCen never invents Systems). Findings that drop out are archived as
+  `remediated`. CLI `grcen sync-vulns` / `POST /api/sync/vulns`. **Risk aggregation:**
+  `services/risk_aggregation.py` rolls open Findings up into Risk assets — by affected **System**
+  (default) or by **severity** — mapping worst-severity to likelihood × impact so they land on
+  the register + 5×5 heatmap, linking `Risk --threatens--> System` + `Risk --relates_to-->
+  Finding`, and self-healing (edges prune as findings close, the Risk archives when its group
+  empties). CLI `grcen aggregate-risks` + a nightly scheduler job. Tests:
+  `tests/test_vuln_sync.py`, `tests/test_risk_aggregation.py`.
 
 **Highest-value egress:**
 
