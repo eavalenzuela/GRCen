@@ -113,6 +113,31 @@ flows back to the finding.
 - New nightly scheduler jobs: compliance/risk snapshots already existed; added
   **risk aggregation** (00:20 UTC).
 
+### Added — Tenant isolation enforced by Postgres
+
+- **Row-level security** (`src/grcen/tenancy.py`) on all 30 tenant tables. The
+  ~212 hand-written `organization_id` filters now have a database backstop: a
+  query that forgets one returns nothing instead of another tenant's rows — the
+  `services/org_views.py` class of bug becomes a visible failure rather than a
+  silent leak. Tenant context rides asyncpg's per-acquire `setup` hook, so none
+  of the ~459 database call sites changed.
+- Enforced queries run as an auto-provisioned **`grcen_app`** role
+  (NOSUPERUSER/NOBYPASSRLS). This is load-bearing rather than defensive: the
+  connecting role is normally a superuser, and superusers ignore RLS entirely
+  even with `FORCE ROW LEVEL SECURITY`. Policies applied without it are inert
+  while looking correct in `pg_policy` — `tenancy.assert_enforcing` now fails
+  startup rather than allowing that state.
+- Cross-tenant paths (migrations, scheduler jobs, CLI, and the pre-auth
+  capability-token lookups for invites, OAuth, the vendor portal and the
+  calendar feed) run in `tenancy.system_context()`, which declines to drop
+  privileges — a privilege boundary, not a flag the policy trusts. The vendor
+  portal narrows to the campaign's org straight after the token lookup.
+- The identity plane (`users`, `user_organizations`, `api_tokens`) is
+  deliberately outside RLS: it's read before a tenant is known, and multi-org
+  membership means `organization_id` isn't its access key.
+- `RLS_ENABLED` (default on) applies or drops the policies in `init_schema`, so
+  the change is reversible. Backups are unaffected — `pg_dump --no-acl` already.
+
 ### Notes
 
 - The test suite grew from 820 to **931** over this work; every connector ships

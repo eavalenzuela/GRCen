@@ -3,6 +3,7 @@ from uuid import UUID
 import asyncpg
 from fastapi import Depends, HTTPException, Request
 
+from grcen import tenancy
 from grcen.config import settings
 from grcen.database import get_pool
 from grcen.models.user import User
@@ -89,6 +90,7 @@ async def get_current_user(
 
     # Tokens are bound to their issuing org — never switch them.
     if via_token:
+        tenancy.set_tenant(user.organization_id)
         return user
 
     active_id = request.session.get("active_org_id")
@@ -113,6 +115,9 @@ async def get_current_user(
             else:
                 # Stale active org — clear it.
                 request.session.pop("active_org_id", None)
+    # Set after the active-org overlay so RLS scopes to the org the user is
+    # actually acting in, not their home org.
+    tenancy.set_tenant(user.organization_id)
     return user
 
 
@@ -130,7 +135,10 @@ async def get_current_user_or_none(
 
     if not user_id:
         return None
-    return await get_user_by_id(pool, UUID(user_id))
+    user = await get_user_by_id(pool, UUID(user_id))
+    if user is not None:
+        tenancy.set_tenant(user.organization_id)
+    return user
 
 
 async def get_current_organization_id(

@@ -18,6 +18,7 @@ import asyncpg
 from fastapi import APIRouter, Depends, Form
 from fastapi.responses import JSONResponse
 
+from grcen import tenancy
 from grcen.routers.deps import get_db
 from grcen.services import oauth_service
 
@@ -42,7 +43,9 @@ async def token_endpoint(
         return _error("unsupported_grant_type")
     if not client_id or not client_secret:
         return _error("invalid_request")
-    issued = await oauth_service.issue_token(pool, client_id, client_secret)
+    # Pre-auth by definition: the client_id is what identifies the tenant.
+    with tenancy.system_context():
+        issued = await oauth_service.issue_token(pool, client_id, client_secret)
     if issued is None:
         return _error("invalid_client", status=401)
     raw_token, expires_in = issued

@@ -15,6 +15,7 @@ os.environ["SSL_KEYFILE"] = ""
 os.environ["ENCRYPTION_KEY"] = ""
 os.environ["ENCRYPTION_KEY_RETIRED"] = ""
 
+from grcen import tenancy  # noqa: E402
 from grcen.database import close_pool, init_pool, init_schema  # noqa: E402
 from grcen.main import app  # noqa: E402
 
@@ -73,6 +74,16 @@ async def login_with_csrf(client: AsyncClient, username: str, password: str):
     await client.get("/health")
     new_csrf = _extract_csrf_from_session_cookie(client)
     client.headers["X-CSRF-Token"] = new_csrf
+
+
+# The suite runs ambiently in system context so fixtures and assertions can read
+# and truncate tables directly, the way they did before RLS. Set at import time
+# rather than in a fixture: tasks copy the context at creation, so this reaches
+# every test task, while a `with` inside an async fixture would not escape it.
+# Requests through the app override it per-request — deps.get_current_user calls
+# tenancy.set_tenant, which clears the bypass — so every existing HTTP test
+# exercises the policies for real rather than around them.
+tenancy.enable_process_bypass()
 
 
 @pytest_asyncio.fixture(scope="session")

@@ -18,6 +18,7 @@ from grcen.models.asset import AssetType
 from grcen.models.user import User
 from grcen.permissions import Permission
 from grcen.routers._pages_shared import _csrf_check, templates
+from grcen import tenancy
 from grcen.routers.deps import get_db, require_permission
 from grcen.services import (
     alert_service as alert_svc,
@@ -195,10 +196,15 @@ async def _require_campaign(pool, campaign_id: UUID, user: User):
 # --------------------------------------------------------------------------- #
 @portal_router.get("/vendor-portal/{token}", response_class=HTMLResponse)
 async def portal_view(request: Request, token: str, pool: asyncpg.Pool = Depends(get_db)):
-    campaign = await vc.get_by_token(pool, token)
+    # The token is the capability, so the lookup itself can't be tenant-scoped —
+    # it's how we discover the tenant. Everything after narrows to that org, so
+    # the rest of the request runs under RLS like any authenticated one.
+    with tenancy.system_context():
+        campaign = await vc.get_by_token(pool, token)
     if campaign is None or campaign["status"] not in vc.PORTAL_VISIBLE:
         raise HTTPException(status_code=404, detail="Not found")
-    questions = await vc.list_questions(pool, campaign["id"])
+    with tenancy.tenant_context(campaign["organization_id"]):
+        questions = await vc.list_questions(pool, campaign["id"])
     editable = campaign["status"] in vc.PORTAL_EDITABLE
     return templates.TemplateResponse(
         request, "vendor_portal.html",
@@ -210,16 +216,18 @@ async def portal_view(request: Request, token: str, pool: asyncpg.Pool = Depends
 
 @portal_router.post("/vendor-portal/{token}")
 async def portal_submit(request: Request, token: str, pool: asyncpg.Pool = Depends(get_db)):
-    campaign = await vc.get_by_token(pool, token)
+    with tenancy.system_context():
+        campaign = await vc.get_by_token(pool, token)
     if campaign is None or campaign["status"] not in vc.PORTAL_EDITABLE:
         raise HTTPException(status_code=404, detail="Not found")
-    questions = await vc.list_questions(pool, campaign["id"])
     form = await request.form()
-    answers = {q["id"]: str(form.get(f"answer_{q['id']}", "")) for q in questions}
-    await vc.save_answers(pool, campaign["id"], answers)
-    if str(form.get("action", "")) == "submit":
-        await vc.submit(pool, campaign["id"])
-        msg = "ok:Thank you — your responses have been submitted."
-    else:
-        msg = "ok:Saved. You can return to this link to finish later."
+    with tenancy.tenant_context(campaign["organization_id"]):
+        questions = await vc.list_questions(pool, campaign["id"])
+        answers = {q["id"]: str(form.get(f"answer_{q['id']}", "")) for q in questions}
+        await vc.save_answers(pool, campaign["id"], answers)
+        if str(form.get("action", "")) == "submit":
+            await vc.submit(pool, campaign["id"])
+            msg = "ok:Thank you — your responses have been submitted."
+        else:
+            msg = "ok:Saved. You can return to this link to finish later."
     return RedirectResponse(f"/vendor-portal/{token}?flash=" + quote(msg), status_code=302)

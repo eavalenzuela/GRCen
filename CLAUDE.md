@@ -108,9 +108,33 @@ evidence files, E2), and `ticketing_service` (push a finding to Jira/ServiceNow,
 status back onto `finding_status`, E3 — config in `itsm_settings`). Remaining enterprise sources
 (cloud/CSPM, MDM/EDR, TPRM, SIEM, …) are greenfield — see `INTEGRATIONS.md` Part C.
 
+## Tenant Isolation
+
+Two layers. Services take `organization_id` and filter explicitly (the fast path,
+and the only layer that can express field-level redaction). **Postgres RLS sits
+underneath** as the backstop: `src/grcen/tenancy.py` puts a `grcen_tenant_isolation`
+policy on all 30 tenant tables, so a query that forgets its filter returns nothing
+instead of another tenant's rows.
+
+Context reaches the database through asyncpg's per-acquire `setup` hook
+(`tenancy.prepare_connection`), not through per-call plumbing — that's why none of
+the ~459 DB call sites needed changing. Enforced queries run via `SET ROLE grcen_app`
+(NOSUPERUSER/NOBYPASSRLS, auto-provisioned by `init_schema`); **this is essential —
+the connecting role is typically a superuser, and superusers ignore RLS entirely even
+with `FORCE ROW LEVEL SECURITY`.** `tenancy.assert_enforcing` fails startup rather
+than booting with inert policies.
+
+Cross-tenant work — migrations, scheduler jobs, the CLI, and pre-auth capability-token
+lookups (invite, OAuth, vendor portal, calendar feed) — runs in `tenancy.system_context()`,
+which simply doesn't drop privileges. Grep for it: every occurrence is a deliberate
+exemption. The identity plane (`users`, `user_organizations`, `api_tokens`) is outside
+RLS by design — it's read *before* a tenant is known, and multi-org membership means
+`organization_id` isn't its access key. Toggle with `RLS_ENABLED` (default on;
+`init_schema` applies or drops policies, so it's reversible).
+
 ## Known Gaps (see `feature_roadmap.md` for the full list)
 
-- WebAuthn / FIDO2 for MFA, Redis-backed rate limiter, per-org SSO/SMTP/webhook/encryption overrides, tenancy-aware Postgres RLS policy
+- WebAuthn / FIDO2 for MFA, Redis-backed rate limiter, per-org SSO/SMTP/webhook/encryption overrides
 - Tail items inside shipped roadmap sections — see `feature_roadmap.md` "Remaining:" lines for each
 
 ## Design Philosophy

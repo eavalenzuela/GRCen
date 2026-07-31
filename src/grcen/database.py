@@ -1,5 +1,6 @@
 import asyncpg
 
+from grcen import tenancy
 from grcen.config import settings
 
 pool: asyncpg.Pool | None = None
@@ -1103,7 +1104,16 @@ def _dsn() -> str:
 
 async def init_pool() -> asyncpg.Pool:
     global pool
-    pool = await asyncpg.create_pool(_dsn(), min_size=2, max_size=10)
+    # `setup` runs on every acquire — including the implicit acquire inside
+    # pool.fetch()/execute() — so tenant context reaches the connection without
+    # touching any call site. See grcen/tenancy.py.
+    # System context while the pool warms: a fresh pool has no tenant, and on a
+    # first-ever boot the app role doesn't exist yet, so `SET ROLE` would fail
+    # before init_schema has had a chance to create it.
+    with tenancy.system_context():
+        pool = await asyncpg.create_pool(
+            _dsn(), min_size=2, max_size=10, setup=tenancy.prepare_connection
+        )
     return pool
 
 
@@ -1127,11 +1137,24 @@ async def init_schema() -> None:
     workers start simultaneously (e.g. Gunicorn with multiple uvicorn workers).
     """
     p = await get_pool()
-    async with p.acquire() as conn:
-        # Advisory lock ID 1 — only one connection runs migrations at a time
-        await conn.execute("SELECT pg_advisory_lock(1)")
-        try:
-            await conn.execute(SCHEMA_SQL)
-            await conn.execute(MIGRATION_SQL)
-        finally:
-            await conn.execute("SELECT pg_advisory_unlock(1)")
+    # Migrations are inherently cross-tenant, and the RLS step below has to run
+    # from a context the policies it is creating don't apply to.
+    with tenancy.system_context():
+        async with p.acquire() as conn:
+            # Advisory lock ID 1 — only one connection runs migrations at a time
+            await conn.execute("SELECT pg_advisory_lock(1)")
+            try:
+                await conn.execute(SCHEMA_SQL)
+                await conn.execute(MIGRATION_SQL)
+                # Applied last: the policy set is derived from the catalog, so
+                # tables added by the migrations above are covered on this run
+                # rather than the next one.
+                if settings.RLS_ENABLED:
+                    await tenancy.ensure_app_role(conn)
+                    await tenancy.apply_policies(conn)
+                    # Refuse to boot into inert-policy territory.
+                    await tenancy.assert_enforcing(conn)
+                else:
+                    await tenancy.drop_policies(conn)
+            finally:
+                await conn.execute("SELECT pg_advisory_unlock(1)")

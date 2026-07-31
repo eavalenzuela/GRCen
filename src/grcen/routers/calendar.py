@@ -11,6 +11,7 @@ import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 
+from grcen import tenancy
 from grcen.config import settings
 from grcen.routers.deps import get_db
 from grcen.services import calendar_service
@@ -34,9 +35,13 @@ async def calendar_feed(
             alarm_days = max(0, int(raw_alarm))
         except ValueError:
             alarm_days = 7
-    ics = await calendar_service.feed_for_token(
-        pool, token, base_url=settings.APP_BASE_URL, mine=mine, alarm_days=alarm_days
-    )
+    # The calendar token is the capability. Resolving it and building the
+    # feed are one service call, so the bypass covers both; the service
+    # scopes to the token owner's active org internally.
+    with tenancy.system_context():
+        ics = await calendar_service.feed_for_token(
+            pool, token, base_url=settings.APP_BASE_URL, mine=mine, alarm_days=alarm_days
+        )
     if ics is None:
         # Same 404 for unknown vs revoked tokens — no probing signal.
         raise HTTPException(status_code=404, detail="Not found")

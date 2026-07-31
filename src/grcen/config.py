@@ -45,6 +45,11 @@ class Settings(BaseSettings):
     # Login rate limiting (per-IP spraying protection)
     LOGIN_RATE_LIMIT_SECONDS: float = 2.0
 
+    # Postgres row-level security as a tenant-isolation backstop beneath the
+    # per-query organization_id filters (see grcen/tenancy.py). Applied and
+    # removed by init_schema, so toggling this is reversible.
+    RLS_ENABLED: bool = True
+
     # General API rate limit. Sliding window per (key, bucket) pair.
     # Key is the API token id, then session id, then client IP, in that order.
     # Two buckets: 'read' (GET/HEAD/OPTIONS) and 'write' (everything else).

@@ -96,6 +96,14 @@ Use 404, not 403, to avoid confirming existence of other resources.
 
 **All queries must use parameterized placeholders** (`$1`, `$2`, …). Never interpolate user input into SQL strings.
 
+**Tenant scoping still belongs in every query.** Postgres RLS (`src/grcen/tenancy.py`) backstops
+a forgotten `organization_id` filter, but it is the second layer, not a licence to drop the
+first: RLS can't express field-level redaction or per-asset overrides, and it doesn't apply on
+the paths that legitimately run privileged. If you write `tenancy.system_context()`, you have
+switched the backstop off for that block — scope the query yourself, and keep the block as small
+as the lookup that needs it (`routers/vendor_campaigns.py` shows the pattern: bypass the token
+lookup, then narrow to the org it returned).
+
 For dynamic `WHERE` / `SET` clauses, use the index-counting pattern:
 
 ```python

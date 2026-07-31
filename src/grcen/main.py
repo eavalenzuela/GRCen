@@ -10,6 +10,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
+from grcen import tenancy
 from grcen.config import settings
 from grcen.database import close_pool, get_pool, init_pool, init_schema
 from grcen.routers import (
@@ -46,62 +47,68 @@ scheduler = AsyncIOScheduler()
 
 async def _tick_alerts():
     """Check for alerts whose next_fire_at has passed and fire them."""
-    from grcen.services.alert_service import fire_alert
+    with tenancy.system_context():
+        from grcen.services.alert_service import fire_alert
 
-    pool = await get_pool()
-    now = datetime.now(UTC)
-    rows = await pool.fetch(
-        "SELECT id, schedule_type, cron_expression FROM alerts"
-        " WHERE enabled = true AND next_fire_at <= $1",
-        now,
-    )
-    for row in rows:
-        await fire_alert(pool, row["id"])
-        if row["schedule_type"] == "recurring" and row["cron_expression"]:
-            trigger = CronTrigger.from_crontab(row["cron_expression"])
-            next_time = trigger.get_next_fire_time(None, now)
-            await pool.execute(
-                "UPDATE alerts SET next_fire_at = $1, updated_at = now() WHERE id = $2",
-                next_time,
-                row["id"],
-            )
+        pool = await get_pool()
+        now = datetime.now(UTC)
+        rows = await pool.fetch(
+            "SELECT id, schedule_type, cron_expression FROM alerts"
+            " WHERE enabled = true AND next_fire_at <= $1",
+            now,
+        )
+        for row in rows:
+            await fire_alert(pool, row["id"])
+            if row["schedule_type"] == "recurring" and row["cron_expression"]:
+                trigger = CronTrigger.from_crontab(row["cron_expression"])
+                next_time = trigger.get_next_fire_time(None, now)
+                await pool.execute(
+                    "UPDATE alerts SET next_fire_at = $1, updated_at = now() WHERE id = $2",
+                    next_time,
+                    row["id"],
+                )
 
 
 async def _nightly_risk_snapshot():
-    from grcen.services.risk_service import capture_all_org_snapshots
+    with tenancy.system_context():
+        from grcen.services.risk_service import capture_all_org_snapshots
 
-    pool = await get_pool()
-    await capture_all_org_snapshots(pool)
+        pool = await get_pool()
+        await capture_all_org_snapshots(pool)
 
 
 async def _nightly_compliance_snapshot():
-    from grcen.services.compliance_snapshot_service import (
-        capture_all_org_compliance_snapshots,
-    )
+    with tenancy.system_context():
+        from grcen.services.compliance_snapshot_service import (
+            capture_all_org_compliance_snapshots,
+        )
 
-    pool = await get_pool()
-    await capture_all_org_compliance_snapshots(pool)
+        pool = await get_pool()
+        await capture_all_org_compliance_snapshots(pool)
 
 
 async def _nightly_risk_aggregation():
-    from grcen.services.risk_aggregation import aggregate_all_orgs
+    with tenancy.system_context():
+        from grcen.services.risk_aggregation import aggregate_all_orgs
 
-    pool = await get_pool()
-    await aggregate_all_orgs(pool)
+        pool = await get_pool()
+        await aggregate_all_orgs(pool)
 
 
 async def _flush_email_digests():
-    from grcen.services.digest_service import flush_digests
+    with tenancy.system_context():
+        from grcen.services.digest_service import flush_digests
 
-    pool = await get_pool()
-    await flush_digests(pool)
+        pool = await get_pool()
+        await flush_digests(pool)
 
 
 async def _purge_access_log():
-    from grcen.services.access_log_service import purge_expired
+    with tenancy.system_context():
+        from grcen.services.access_log_service import purge_expired
 
-    pool = await get_pool()
-    await purge_expired(pool)
+        pool = await get_pool()
+        await purge_expired(pool)
 
 
 _DEFAULT_SECRET_KEY = "change-me-to-a-random-secret-key"
@@ -286,7 +293,18 @@ app = create_app()
 
 
 def cli():
-    """CLI entrypoint for management commands."""
+    """CLI entrypoint for management commands.
+
+    The whole CLI runs cross-tenant: operators create orgs, sync every tenant,
+    dump the database. There is no request and no session to derive a tenant
+    from, so RLS is bypassed for the process — the operator's shell access is
+    already the trust boundary here.
+    """
+    with tenancy.system_context():
+        _dispatch_cli()
+
+
+def _dispatch_cli():
     if len(sys.argv) < 2:
         print("Usage: grcen <command>")
         print("Commands: createadmin, createsuperadmin, createorg, listorgs, runserver, generate-key, rotate-keys, backup, restore, sync-catalog, sync-hris, sync-vulns, sync-cmdb, sync-cspm, aggregate-risks, list-packs, install-pack")
