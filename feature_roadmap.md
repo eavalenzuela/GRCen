@@ -312,8 +312,20 @@ CSV can't clear `tags`/`criticality`/`owner` — that needs the JSON door. Sendi
 one request keeps the sync in one transaction, which is what lets an edge resolve against an
 asset created in the same call.
 
-Tests `tests/test_generic_sync.py`. Remaining: linking a synced asset to a *human-authored* one
-by name (only `owner` does name resolution today).
+**Name-based linking:** each end of a relationship is addressed one of two ways, exactly one —
+by external `ref` (`from`/`to`) or by `from_name` + `from_type` / `to_name` + `to_type`. The
+latter reaches assets the source doesn't own: the hand-authored Org Unit that owns a synced
+system, an HRIS-synced Person, a content-pack Control. Org-scoped and source-agnostic (the rule
+`owner` already follows — restricting to `source IS NULL` would baffle anyone linking to an
+HRIS Person). Setting both forms for one end is an *error*, not a precedence rule, and a ref
+that fails to resolve never silently falls back to a name. A duplicate name+type resolves to the
+oldest match **and warns**; an unmatched one warns and skips the edge — nothing is ever invented
+to satisfy a link. Derived edge refs are unchanged for ref-only edges, so the feature doesn't
+churn edges synced before it landed. The vocabulary deliberately differs from
+`/api/imports/relationships`' `source_name`/`target_name`: `source` already means the provenance
+tag on this endpoint, and overloading it exactly where both meanings are live would be a trap.
+
+Tests `tests/test_generic_sync.py` (44). I5 is complete.
 
 ## Known Stale / Cleanup
 - `CLAUDE.md` has been refreshed but the rest of `configure_*.md` and `security_features_and_requirements.md` should be reviewed in the same pass when we make significant changes to those areas.

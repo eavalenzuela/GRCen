@@ -216,6 +216,194 @@ async def test_dropped_edge_is_pruned_when_relationships_present(pool):
     assert res.edges_pruned == 1
 
 
+# ── name-based linking to assets this source doesn't own ─────────────────────
+
+
+async def _edges(pool, org, source=SOURCE):
+    return await pool.fetch(
+        """SELECT r.relationship_type, r.source_ref,
+                  s.name AS src_name, t.name AS tgt_name
+           FROM relationships r
+           JOIN assets s ON s.id = r.source_asset_id
+           JOIN assets t ON t.id = r.target_asset_id
+           WHERE r.organization_id = $1 AND r.source = $2
+           ORDER BY r.source_ref""",
+        org, source,
+    )
+
+
+@pytest.mark.asyncio
+async def test_links_to_a_human_authored_asset_by_name(pool):
+    org = await _org(pool)
+    await asset_svc.create_asset(
+        pool, organization_id=org, type=AssetType.ORGANIZATIONAL_UNIT,
+        name="Security Team")
+
+    res = await generic_sync.sync(pool, _payload(
+        assets=[_asset_rec("srv-1", "Prod Web")],
+        relationships=[{
+            "from": "srv-1", "to_name": "Security Team",
+            "to_type": "organizational_unit", "type": "owned_by",
+        }],
+    ), organization_id=org)
+
+    assert res.edges_created == 1 and not res.warnings
+    edge = (await _edges(pool, org))[0]
+    assert (edge["src_name"], edge["tgt_name"]) == ("Prod Web", "Security Team")
+    assert edge["source_ref"] == "srv-1:owned_by:name:organizational_unit:Security Team"
+
+
+@pytest.mark.asyncio
+async def test_name_linking_reaches_other_synced_sources(pool):
+    """Not restricted to source IS NULL — an HRIS-synced Person is linkable."""
+    org = await _org(pool)
+    await generic_sync.sync(pool, _payload(
+        assets=[_asset_rec("p-1", "Ada Lovelace", atype="person")],
+        source="etl:people"), organization_id=org)
+
+    res = await generic_sync.sync(pool, _payload(
+        assets=[_asset_rec("srv-1", "Prod Web")],
+        relationships=[{"from": "srv-1", "to_name": "Ada Lovelace",
+                        "to_type": "person", "type": "maintained_by"}],
+    ), organization_id=org)
+    assert res.edges_created == 1 and not res.warnings
+
+
+@pytest.mark.asyncio
+async def test_name_linking_works_on_both_ends(pool):
+    org = await _org(pool)
+    for name in ("Access Policy", "Security Team"):
+        atype = AssetType.POLICY if name == "Access Policy" else AssetType.ORGANIZATIONAL_UNIT
+        await asset_svc.create_asset(pool, organization_id=org, type=atype, name=name)
+
+    res = await generic_sync.sync(pool, _payload(relationships=[{
+        "from_name": "Access Policy", "from_type": "policy",
+        "to_name": "Security Team", "to_type": "organizational_unit",
+        "type": "owned_by",
+    }]), organization_id=org)
+    assert res.edges_created == 1
+    assert (await _edges(pool, org))[0]["src_name"] == "Access Policy"
+
+
+@pytest.mark.asyncio
+async def test_unmatched_name_warns_and_creates_nothing(pool):
+    org = await _org(pool)
+    before = await pool.fetchval("SELECT count(*) FROM assets WHERE organization_id = $1", org)
+
+    res = await generic_sync.sync(pool, _payload(
+        assets=[_asset_rec("srv-1", "Prod Web")],
+        relationships=[{"from": "srv-1", "to_name": "Ghost Team",
+                        "to_type": "organizational_unit", "type": "owned_by"}],
+    ), organization_id=org)
+
+    assert res.edges_created == 0
+    assert any("Ghost Team" in w and "organizational_unit" in w for w in res.warnings)
+    # One new asset (srv-1) and nothing invented for the dangling name.
+    after = await pool.fetchval("SELECT count(*) FROM assets WHERE organization_id = $1", org)
+    assert after == before + 1
+
+
+@pytest.mark.asyncio
+async def test_ambiguous_name_takes_oldest_and_warns(pool):
+    org = await _org(pool)
+    first = await asset_svc.create_asset(
+        pool, organization_id=org, type=AssetType.ORGANIZATIONAL_UNIT, name="Ops")
+    await asset_svc.create_asset(
+        pool, organization_id=org, type=AssetType.ORGANIZATIONAL_UNIT, name="Ops")
+
+    res = await generic_sync.sync(pool, _payload(
+        assets=[_asset_rec("srv-1", "Prod Web")],
+        relationships=[{"from": "srv-1", "to_name": "Ops",
+                        "to_type": "organizational_unit", "type": "owned_by"}],
+    ), organization_id=org)
+
+    assert res.edges_created == 1
+    assert any("matches 2 assets" in w for w in res.warnings)
+    target = await pool.fetchval(
+        "SELECT target_asset_id FROM relationships WHERE organization_id = $1 AND source = $2",
+        org, SOURCE)
+    assert target == first.id
+
+
+@pytest.mark.asyncio
+async def test_name_lookup_is_org_scoped(pool):
+    org = await _org(pool)
+    other = await organization_service.create_organization(
+        pool, name="Other", slug=f"other-{uuid.uuid4().hex[:8]}")
+    await asset_svc.create_asset(
+        pool, organization_id=other.id, type=AssetType.ORGANIZATIONAL_UNIT,
+        name="Security Team")
+
+    res = await generic_sync.sync(pool, _payload(
+        assets=[_asset_rec("srv-1", "Prod Web")],
+        relationships=[{"from": "srv-1", "to_name": "Security Team",
+                        "to_type": "organizational_unit", "type": "owned_by"}],
+    ), organization_id=org)
+    assert res.edges_created == 0
+    assert any("Security Team" in w for w in res.warnings)
+
+
+@pytest.mark.asyncio
+async def test_addressing_modes_are_exclusive_and_validated(pool):
+    org = await _org(pool)
+
+    async def errs(rels):
+        return (await generic_sync.sync(
+            pool, _payload(relationships=rels), organization_id=org)).errors
+
+    assert any("use one" in e for e in await errs([
+        {"from": "a", "to": "b", "to_name": "X", "to_type": "policy", "type": "t"}]))
+    assert any("'to_type'" in e for e in await errs([
+        {"from": "a", "to_name": "X", "type": "t"}]))
+    assert any("invalid 'to_type'" in e for e in await errs([
+        {"from": "a", "to_name": "X", "to_type": "nonsense", "type": "t"}]))
+    assert any("missing 'to' or 'to_name'" in e for e in await errs([
+        {"from": "a", "type": "t"}]))
+
+
+@pytest.mark.asyncio
+async def test_ref_only_edge_refs_are_unchanged_by_the_feature(pool):
+    """A derived ref must stay stable, or existing edges churn on re-sync."""
+    org = await _org(pool)
+    await generic_sync.sync(pool, _payload(
+        assets=[_asset_rec("srv-1", "Web"), _asset_rec("db-1", "DB")],
+        relationships=[{"from": "srv-1", "to": "db-1", "type": "depends_on"}],
+    ), organization_id=org)
+    assert (await _edges(pool, org))[0]["source_ref"] == "srv-1:depends_on:db-1"
+
+
+@pytest.mark.asyncio
+async def test_name_linked_edge_is_stable_across_resync(pool):
+    org = await _org(pool)
+    await asset_svc.create_asset(
+        pool, organization_id=org, type=AssetType.ORGANIZATIONAL_UNIT, name="Security Team")
+    body = _payload(
+        assets=[_asset_rec("srv-1", "Prod Web")],
+        relationships=[{"from": "srv-1", "to_name": "Security Team",
+                        "to_type": "organizational_unit", "type": "owned_by"}],
+    )
+    await generic_sync.sync(pool, body, organization_id=org)
+    res = await generic_sync.sync(pool, body, organization_id=org)
+
+    assert res.edges_created == 0 and res.edges_updated == 1 and res.edges_pruned == 0
+    assert len(await _edges(pool, org)) == 1
+
+
+def test_csv_name_linking_columns():
+    payload, errors, _ = generic_sync.payload_from_csv(
+        source=SOURCE,
+        relationships_csv=(
+            "from,to_name,to_type,relationship_type\n"
+            "srv-1,Security Team,organizational_unit,owned_by\n"
+        ),
+    )
+    assert not errors
+    assert payload["relationships"] == [{
+        "from": "srv-1", "to_name": "Security Team",
+        "to_type": "organizational_unit", "type": "owned_by",
+    }]
+
+
 # ── lifecycle (on_missing) ───────────────────────────────────────────────────
 
 

@@ -38,8 +38,9 @@ projection cannot. Reach for this when nothing fits.
       ],
       "relationships": [
         {
-          "from": "srv-001",             // REQUIRED. An asset `ref`.
-          "to": "db-001",                // REQUIRED. An asset `ref`.
+          "from": "srv-001",             // an asset `ref`…
+          "to_name": "Security Team",    // …or a name + type, for an asset
+          "to_type": "organizational_unit",  //  this source doesn't own
           "type": "depends_on",          // REQUIRED. Free-text edge type.
           "description": "reads session state",
           "ref": "srv-001:depends_on:db-001"   // optional; derived when absent
@@ -55,11 +56,31 @@ over a flat key of the same name. ``metadata.external_id`` defaults to the
 record's ``ref`` (mirroring ``cmdb_sync``), so a uvt or CSPM finding that cites
 that id resolves onto the asset without extra plumbing.
 
-Relationship endpoints resolve against assets in this payload first, then
-against assets carrying the same ``source`` from earlier runs — so a
-relationships-only payload can wire up an inventory synced previously. A ``from``
-or ``to`` that resolves to nothing is a warning, not an error; the edge is
-skipped and the rest of the payload still lands.
+Each end of a relationship is addressed one of two ways, and exactly one:
+
+- **By external ref** — ``from`` / ``to``. Resolved against assets in this
+  payload first, then assets carrying the same ``source`` from earlier runs, so
+  a relationships-only payload can wire up an inventory synced previously.
+- **By name + type** — ``from_name`` + ``from_type`` (likewise ``to_*``). Reaches
+  assets this source doesn't own: the hand-authored Org Unit that owns a synced
+  system, an HRIS-synced Person, a Control from a content pack. Org-scoped and
+  source-agnostic — the same rule ``owner`` already follows. A duplicate
+  name+type resolves to the oldest match *and warns*, so the pick isn't silent.
+
+Setting both forms for one end is an error rather than a precedence rule; there
+is no silent fallback from a ref that didn't resolve to a name that might.
+Nothing is ever created to satisfy a link — an end that resolves to nothing is a
+warning, the edge is skipped, and the rest of the payload still lands.
+
+Note this vocabulary differs from ``/api/imports/relationships``, which spells
+the same idea ``source_name``/``target_name``. That word is already spoken for
+here — ``source`` is the provenance tag — and quietly overloading it on the one
+endpoint where both meanings are live would be a trap.
+
+Edges to human-authored assets are still owned by the caller's ``source``, so
+they prune when they drop out of a payload like any other synced edge. A human
+who hand-edits one will see it reverted on the next sync; that is the existing
+rule for every connector, not something new here.
 
 ## CSV front door
 
@@ -272,9 +293,30 @@ def validate_payload(payload: object) -> list[str]:
         if not isinstance(edge, dict):
             errors.append(f"relationships[{i}] must be an object")
             continue
-        for key in ("from", "to", "type"):
-            if not edge.get(key):
-                errors.append(f"relationships[{i}] missing '{key}'")
+        if not edge.get("type"):
+            errors.append(f"relationships[{i}] missing 'type'")
+        for side in ("from", "to"):
+            by_ref = bool(edge.get(side))
+            by_name = bool(edge.get(f"{side}_name"))
+            if by_ref and by_name:
+                errors.append(
+                    f"relationships[{i}] sets both '{side}' and '{side}_name' — use one"
+                )
+            elif by_name:
+                side_type = edge.get(f"{side}_type")
+                if not side_type:
+                    errors.append(
+                        f"relationships[{i}] has '{side}_name' but no '{side}_type'"
+                    )
+                else:
+                    try:
+                        AssetType(side_type)
+                    except ValueError:
+                        errors.append(
+                            f"relationships[{i}] has invalid '{side}_type' '{side_type}'"
+                        )
+            elif not by_ref:
+                errors.append(f"relationships[{i}] missing '{side}' or '{side}_name'")
         eref = edge.get("ref") or _edge_ref(edge)
         if eref in seen_edge_refs:
             errors.append(f"duplicate relationship ref '{eref}'")
@@ -284,8 +326,29 @@ def validate_payload(payload: object) -> list[str]:
     return errors
 
 
+def _endpoint_token(edge: dict, side: str) -> str:
+    """Stable token for one end of an edge, used to derive the edge's own ref.
+
+    Ref-addressed ends yield the bare ref, so refs derived before name-based
+    linking existed are unchanged — an existing synced edge keeps its key
+    instead of being pruned and re-created on the next run.
+    """
+    ref = edge.get(side)
+    if ref:
+        return str(ref)
+    return f"name:{edge.get(f'{side}_type')}:{edge.get(f'{side}_name')}"
+
+
+def _endpoint_label(edge: dict, side: str) -> str:
+    if edge.get(side):
+        return f"ref '{edge[side]}'"
+    return f"{edge.get(f'{side}_type')} named '{edge.get(f'{side}_name')}'"
+
+
 def _edge_ref(edge: dict) -> str:
-    return f"{edge.get('from')}:{edge.get('type')}:{edge.get('to')}"
+    return (
+        f"{_endpoint_token(edge, 'from')}:{edge.get('type')}:{_endpoint_token(edge, 'to')}"
+    )
 
 
 def _read_csv(content: str, label: str, errors: list[str]) -> list[dict]:
@@ -343,8 +406,10 @@ def payload_from_csv(
     ``type``, ``name``, ``description``, ``status``, ``owner``, ``tags``
     (comma-separated in one cell), ``criticality``, plus any per-type
     custom-field column. ``default_type`` supplies ``type`` for a homogeneous
-    export that has no such column. Relationship columns are ``from``, ``to``,
-    ``type`` (or ``relationship_type``), ``description``, ``ref``.
+    export that has no such column. Relationship columns are ``from``/``to`` (or
+    ``from_name`` + ``from_type`` / ``to_name`` + ``to_type`` to reach an asset
+    this source doesn't own), ``type`` (or ``relationship_type``),
+    ``description``, ``ref``.
 
     A column that isn't a known field for its row's type is reported as a
     warning rather than silently dropped — a typo'd header vanishing without
@@ -524,6 +589,51 @@ async def _resolve_ref(
     return cache[ref]
 
 
+async def _resolve_by_name(
+    conn, organization_id: UUID, name: str, asset_type: str,
+    cache: dict[str, UUID | None], result: GenericSyncResult,
+) -> UUID | None:
+    """Asset id for a ``(name, type)`` pair, org-scoped and source-agnostic.
+
+    Deliberately not restricted to human-authored rows: ``owner`` resolution
+    already matches by name regardless of provenance, and a caller linking to an
+    HRIS-synced Person would be baffled by a lookup that could only see
+    hand-typed ones. Ambiguity resolves to the oldest match (the house rule in
+    ``import_service`` and ``cmdb_sync``) but warns, so a duplicate name isn't
+    silently picked for you. Never creates: an unmatched name skips the edge.
+    """
+    key = (name, asset_type)
+    if key in cache:
+        return cache[key]
+    rows = await conn.fetch(
+        """SELECT id FROM assets
+           WHERE organization_id = $1 AND type = $2 AND name = $3
+           ORDER BY created_at""",
+        organization_id, asset_type, name,
+    )
+    if len(rows) > 1:
+        result.warnings.append(
+            f"'{name}' ({asset_type}) matches {len(rows)} assets; linked the oldest"
+        )
+    cache[key] = rows[0]["id"] if rows else None
+    return cache[key]
+
+
+async def _resolve_endpoint(
+    conn, organization_id: UUID, source: str, edge: dict, side: str,
+    ref_cache: dict[str, UUID | None], name_cache: dict[tuple[str, str], UUID | None],
+    result: GenericSyncResult,
+) -> UUID | None:
+    """One end of an edge, addressed by external ``ref`` or by ``name`` + ``type``."""
+    ref = edge.get(side)
+    if ref:
+        return await _resolve_ref(conn, organization_id, source, ref, ref_cache)
+    return await _resolve_by_name(
+        conn, organization_id, edge[f"{side}_name"], edge[f"{side}_type"],
+        name_cache, result,
+    )
+
+
 async def sync(
     pool: asyncpg.Pool,
     payload: dict,
@@ -572,14 +682,17 @@ async def sync(
                 await _apply_local_fields(conn, org, r.id, record, result)
 
             seen_edge_refs: list[str] = []
+            name_to_id: dict[tuple[str, str], UUID | None] = {}
             for edge in rels:
-                src_id = await _resolve_ref(conn, org, source, edge["from"], ref_to_id)
-                tgt_id = await _resolve_ref(conn, org, source, edge["to"], ref_to_id)
+                src_id = await _resolve_endpoint(
+                    conn, org, source, edge, "from", ref_to_id, name_to_id, result)
+                tgt_id = await _resolve_endpoint(
+                    conn, org, source, edge, "to", ref_to_id, name_to_id, result)
                 if src_id is None or tgt_id is None:
-                    missing = edge["from"] if src_id is None else edge["to"]
+                    side = "from" if src_id is None else "to"
                     result.warnings.append(
-                        f"relationship '{_edge_ref(edge)}' references unknown ref "
-                        f"'{missing}'; edge skipped"
+                        f"relationship '{_edge_ref(edge)}' references unknown "
+                        f"{_endpoint_label(edge, side)}; edge skipped"
                     )
                     continue
                 if src_id == tgt_id:

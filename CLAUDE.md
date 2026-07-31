@@ -92,7 +92,9 @@ CSV-parsing script gets idempotent re-sync without a client-side id-mapping tabl
 the module docstring; `on_missing` (`ignore`/`archive`/`delete`) governs dropped records, and
 source tags colliding with a built-in connector's namespace are rejected. `POST
 /api/sync/upsert/csv` is the same path behind a multipart envelope (`assets` and/or
-`relationships` CSV files, `payload_from_csv` adapts them onto the identical payload). Note the
+`relationships` CSV files, `payload_from_csv` adapts them onto the identical payload).
+Relationship ends address either an external `ref` or a `name`+`type` pair, which is how a synced
+asset links to one the source doesn't own (hand-authored, HRIS, content pack). Note the
 contrast with `/api/imports`, which is append-only and duplicates on re-run — that path is for
 one-time loads; anything that re-syncs goes through `/api/sync/*`.
 Egress hangs off `services/webhook_service.py`

@@ -80,7 +80,11 @@ flows back to the finding.
   onto the contract (`tags` as one comma-separated cell, a `default_type` field
   for exports with no `type` column). Headers are normalized and de-BOM'd,
   blank lines skipped, and an unrecognized header is reported as a warning
-  rather than silently dropped.
+  rather than silently dropped. Relationship ends address either an external
+  `ref` or a `name` + `type` pair, so a synced asset can link to one the source
+  doesn't own — a hand-authored Org Unit, an HRIS-synced Person, a content-pack
+  Control. Ambiguous names resolve to the oldest match and warn; unmatched ones
+  warn and skip the edge rather than inventing an asset.
 
 **Egress — the asset graph → downstream tools**
 
