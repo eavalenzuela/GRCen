@@ -63,6 +63,18 @@ flows back to the finding.
   feeds the risk register through the aggregation above with no extra wiring.
 - **ITSM ticket-status sync** (`POST /api/sync/tickets`) — an external status
   feed maps ticket status back onto `finding_status`.
+- **Generic upsert-by-source** (`services/generic_sync.py`,
+  `POST /api/sync/upsert`) — the untyped connector, for sources with no
+  purpose-built one: the caller declares its own `source` tag and a stable `ref`
+  per record, and GRCen reconciles on `(organization_id, source, source_ref)`
+  like every typed connector does. Re-post the same inventory and it updates in
+  place — no client-side external-id → GRCen-id mapping table, and none of
+  `/api/imports`' duplicate-on-re-run behaviour. Carries assets (incl.
+  owner-by-name, tags, criticality, and flat CSV-style custom-field columns) and
+  relationships by external ref. Lifecycle for dropped records is `on_missing`
+  (`ignore` default / `archive` / `delete`), scoped per asset type; `?dry_run`
+  previews. Source tags colliding with a built-in connector's namespace are
+  rejected so a generic caller can't archive an IdP-synced directory.
 
 **Egress — the asset graph → downstream tools**
 

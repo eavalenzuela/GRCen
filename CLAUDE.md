@@ -85,7 +85,13 @@ sync-vulns` or `POST /api/sync/vulns`, Finding assets linked `affected_by`→Sys
 archived as remediated when they drop out; `services/cspm_sync.py` does the same for CSPM cloud
 misconfigurations, resolving the affected System by cloud resource id; `services/risk_aggregation.py`
 rolls open findings into Risk assets on the register/heatmap — CLI `grcen aggregate-risks` + a
-nightly job).
+nightly job). For sources with no purpose-built connector there is an **untyped** one:
+`services/generic_sync.py` + `POST /api/sync/upsert` (I5) — the caller supplies its own `source`
+tag and a stable `ref` per record and GRCen reconciles on the same key, so a hand-rolled ETL or
+CSV-parsing script gets idempotent re-sync without a client-side id-mapping table. Contract in
+the module docstring; `on_missing` (`ignore`/`archive`/`delete`) governs dropped records, and
+source tags colliding with a built-in connector's namespace are rejected. Note the contrast with
+`/api/imports`, which is append-only and duplicates on re-run — that path is for one-time loads.
 Egress hangs off `services/webhook_service.py`
 (centralized `WEBHOOK_EVENTS` catalog incl. `asset.updated`; per-webhook `format` =
 `grcen`/`slack`/`teams` posts native Slack/Teams messages, E1), `alert_service`'s `_deliver_*`

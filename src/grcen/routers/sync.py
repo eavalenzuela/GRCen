@@ -17,9 +17,17 @@ from fastapi.responses import JSONResponse
 from grcen.models.user import User
 from grcen.permissions import Permission
 from grcen.routers.deps import get_db, require_permission
-from grcen.services import cmdb_sync, cspm_sync, hris_sync, ticketing_service, vuln_sync
+from grcen.services import (
+    cmdb_sync,
+    cspm_sync,
+    generic_sync,
+    hris_sync,
+    ticketing_service,
+    vuln_sync,
+)
 from grcen.services.cmdb_sync import CmdbSyncResult
 from grcen.services.cspm_sync import CspmSyncResult
+from grcen.services.generic_sync import GenericSyncResult
 from grcen.services.hris_sync import HrisSyncResult
 from grcen.services.vuln_sync import VulnSyncResult
 
@@ -33,6 +41,35 @@ def _flag(request: Request, name: str, default: bool) -> bool:
     if raw is None:
         return default
     return raw.strip().lower() in ("1", "true", "yes", "on")
+
+
+@router.post("/upsert", summary="Idempotent upsert of arbitrary assets/relationships by external ref")
+async def sync_upsert(
+    request: Request,
+    pool=Depends(get_db),
+    user: User = Depends(_sync_required),
+) -> JSONResponse:
+    """Generic, source-agnostic ingress for callers with no matching connector.
+
+    Body carries its own ``source`` tag plus ``assets`` / ``relationships``
+    keyed by caller-defined ``ref``s; re-posting upserts in place on
+    ``(organization_id, source, source_ref)``. See ``services.generic_sync`` for
+    the contract. Query: ``dry_run`` (preview, writes nothing). Lifecycle for
+    records the payload drops is the body's ``on_missing`` field, not a query
+    flag — it defaults to ``ignore`` so partial uploads are safe.
+    """
+    try:
+        payload = await request.json()
+    except Exception:
+        return JSONResponse({"errors": ["invalid JSON body"]}, status_code=400)
+
+    result: GenericSyncResult = await generic_sync.sync(
+        pool, payload,
+        organization_id=user.organization_id,
+        dry_run=_flag(request, "dry_run", False),
+    )
+    status = 200 if not result.errors else 400
+    return JSONResponse(dataclasses.asdict(result), status_code=status)
 
 
 @router.post("/hris", summary="Sync an HRIS roster into the People graph")

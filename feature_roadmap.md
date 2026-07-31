@@ -273,5 +273,33 @@ with no extra wiring. CLI `grcen sync-cspm <file>` and `POST /api/sync/cspm`. Co
 `cspm_sync` module docstring. Tests `tests/test_cspm_sync.py` (incl. the CSPM→risk-aggregation
 interlock). Remaining: mapping a CSPM check to its GRCen Control (evidence linkage).
 
+### I5. Generic upsert-by-source — **SHIPPED**
+`services/generic_sync.py` (`sync`) + `POST /api/sync/upsert` (`sync`-scoped): the untyped
+sibling of I1–I4, for callers with no matching connector — a spreadsheet export, an in-house
+CMDB with its own shape, a one-off ETL. The caller declares its own `source` tag and a stable
+`ref` per record; GRCen reconciles on `(organization_id, source, source_ref)` through the same
+I0 primitives, so re-posting the same inventory updates in place instead of duplicating. Closes
+the gap where the only programmatic ingress was `/api/imports` (blind `INSERT`, duplicates on
+re-run) or the REST API (keys on GRCen's UUIDs, so the client has to maintain its own
+external-id → GRCen-id mapping table).
+
+Payload carries `assets[]` (`ref`/`type`/`name` + description, status, owner-by-name, tags,
+criticality, and either an explicit `metadata` bag or flat per-type custom-field keys coerced
+exactly as a CSV import column would be — so a CSV row read into a dict posts through unchanged)
+and `relationships[]` (`from`/`to` external refs + `type`), resolving refs against the batch
+first then earlier runs of the same source. `metadata.external_id` defaults to the record's
+`ref`, so uvt/CSPM findings resolve onto generically-synced Systems for free. Lifecycle is the
+body's `on_missing`: `ignore` (default — a partial/paginated upload must not archive what it
+omits), `archive`, or `delete`. Staleness is scoped per asset *type* the payload carried
+(cmdb_sync's per-CI-class rule), and edges prune only when the payload carried a
+`relationships` key at all. `?dry_run=true` previews in a rolled-back transaction.
+
+Guard: caller-supplied `source` tags that collide with a built-in connector's namespace
+(`scim`, `hris`, `cmdb`, `cspm`, `uvt`, `autocomply`, `vuln-agg`, `grcen-pack:*`) are rejected —
+otherwise `{"source": "scim", "assets": [], "on_missing": "delete"}` would drop an IdP-synced
+directory. Tests `tests/test_generic_sync.py`. Remaining: a CSV/multipart front door for the
+same path (today the caller parses and posts JSON); linking a synced asset to a *human-authored*
+one by name (only `owner` does name resolution today).
+
 ## Known Stale / Cleanup
 - `CLAUDE.md` has been refreshed but the rest of `configure_*.md` and `security_features_and_requirements.md` should be reviewed in the same pass when we make significant changes to those areas.

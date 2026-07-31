@@ -41,15 +41,16 @@ Every integration below hangs off a pattern GRCen already has. Naming them once:
   `assets` and `relationships` each carry `source VARCHAR(64)` + `source_ref VARCHAR(255)`
   with a partial unique index on `(organization_id, source, source_ref) WHERE source IS NOT
   NULL` (`src/grcen/database.py`). `source IS NULL` = human-authored; non-null = externally
-  owned. Today the **only** writer is `services/catalog_sync.py` (`sync_catalog`, with
-  `_ASSET_UPSERT` / `_EDGE_UPSERT` and a source-scoped stale prune), driven by
-  `grcen sync-catalog` and reused by content packs under a `grcen-pack:<id>` source tag. **A
-  new source reuses this substrate**: a per-source `source` tag, a stable `source_ref` = the
-  source system's own primary key, upsert-in-place, prune-what's-gone.
+  owned. The primitive lives in `services/external_sync.py` (I0); writers today are
+  `catalog_sync` / content packs (`grcen-pack:<id>`), the typed connectors (`scim`, `hris`,
+  `cmdb`, `cspm`, `uvt`, `vuln-agg`), and the untyped `generic_sync` (I5). **A new source
+  reuses this substrate**: a per-source `source` tag, a stable `source_ref` = the source
+  system's own primary key, upsert-in-place, prune-what's-gone.
 
-  > **Caveat.** The REST and bulk-import paths are **append-only and never set `source`**
-  > (`services/asset.py:create_asset`, `services/import_service.py`), so a connector cannot
-  > ride the public API as-is — it needs a generic external-upsert primitive (roadmap **I0**).
+  > **Caveat.** The REST and bulk-import paths remain **append-only and never set `source`**
+  > (`services/asset.py:create_asset`, `services/import_service.py`) — re-running an import
+  > duplicates. Anything that needs to *re-sync* rather than *load once* goes through a
+  > connector or `POST /api/sync/upsert` (I5), not `/api/imports`.
 
 - **Per-type fields = JSON, zero-migration.** Every asset is one row in `assets`; type-specific
   fields live in the `metadata` JSONB blob, defined by `FieldDef`s in

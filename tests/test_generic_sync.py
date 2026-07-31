@@ -1,0 +1,415 @@
+"""Tests for the generic external-source upsert endpoint (roadmap I5)."""
+import json
+import uuid
+
+import pytest
+from httpx import ASGITransport, AsyncClient
+
+from grcen.main import app
+from grcen.models.asset import AssetType
+from grcen.permissions import UserRole
+from grcen.services import asset as asset_svc
+from grcen.services import generic_sync, organization_service
+from grcen.services.auth import create_user
+from grcen.services.token_service import create_token
+
+SOURCE = "etl:test"
+
+
+async def _org(pool):
+    return await organization_service.get_default_org_id(pool)
+
+
+def _asset_rec(ref, name, atype="system", **over):
+    rec = {"ref": ref, "type": atype, "name": name}
+    rec.update(over)
+    return rec
+
+
+def _payload(*, assets=None, relationships=None, source=SOURCE, **over):
+    body = {"source": source}
+    if assets is not None:
+        body["assets"] = assets
+    if relationships is not None:
+        body["relationships"] = relationships
+    body.update(over)
+    return body
+
+
+async def _row(pool, org, ref, source=SOURCE):
+    return await pool.fetchrow(
+        """SELECT id, type, name, description, status, metadata, owner_id, tags, criticality
+           FROM assets
+           WHERE organization_id = $1 AND source = $2 AND source_ref = $3""",
+        org, source, ref,
+    )
+
+
+# ── idempotency: the whole point ─────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_resync_updates_in_place_rather_than_duplicating(pool):
+    org = await _org(pool)
+    body = _payload(assets=[_asset_rec("srv-1", "Prod Web")])
+
+    first = await generic_sync.sync(pool, body, organization_id=org)
+    assert first.assets_created == 1 and first.assets_updated == 0
+
+    body["assets"][0]["name"] = "Prod Web Tier"
+    second = await generic_sync.sync(pool, body, organization_id=org)
+    assert second.assets_created == 0 and second.assets_updated == 1
+
+    count = await pool.fetchval(
+        "SELECT count(*) FROM assets WHERE organization_id = $1 AND source = $2",
+        org, SOURCE,
+    )
+    assert count == 1
+    row = await _row(pool, org, "srv-1")
+    assert row["name"] == "Prod Web Tier"
+
+
+@pytest.mark.asyncio
+async def test_dry_run_writes_nothing(pool):
+    org = await _org(pool)
+    res = await generic_sync.sync(
+        pool, _payload(assets=[_asset_rec("srv-1", "Prod Web")]),
+        organization_id=org, dry_run=True,
+    )
+    assert res.assets_created == 1 and res.dry_run is True
+    assert await pool.fetchval(
+        "SELECT count(*) FROM assets WHERE source = $1", SOURCE) == 0
+
+
+# ── field projection ─────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_flat_custom_fields_and_metadata_bag_both_land(pool):
+    """A CSV row read into a dict posts through unchanged; an explicit bag wins."""
+    org = await _org(pool)
+    await generic_sync.sync(pool, _payload(assets=[
+        _asset_rec("srv-1", "Prod Web",
+                   environment="production", hosting="cloud",
+                   metadata={"provider": "aws", "hosting": "hybrid"}),
+    ]), organization_id=org)
+
+    meta = json.loads((await _row(pool, org, "srv-1"))["metadata"])
+    assert meta["environment"] == "production"   # flat key coerced through
+    assert meta["provider"] == "aws"             # explicit bag
+    assert meta["hosting"] == "hybrid"           # bag beats flat key
+    assert meta["external_id"] == "srv-1"        # default, so uvt/CSPM resolve
+
+
+@pytest.mark.asyncio
+async def test_owner_tags_criticality_and_status(pool):
+    org = await _org(pool)
+    await asset_svc.create_asset(
+        pool, organization_id=org, type=AssetType.PERSON, name="Ada Lovelace")
+
+    await generic_sync.sync(pool, _payload(assets=[
+        _asset_rec("srv-1", "Prod Web", owner="Ada Lovelace",
+                   tags=["prod", "pci"], criticality="high", status="draft"),
+    ]), organization_id=org)
+
+    row = await _row(pool, org, "srv-1")
+    assert row["owner_id"] is not None
+    assert sorted(row["tags"]) == ["pci", "prod"]
+    assert row["criticality"] == "high"
+    assert row["status"] == "draft"
+
+
+@pytest.mark.asyncio
+async def test_unresolved_owner_warns_without_failing(pool):
+    org = await _org(pool)
+    res = await generic_sync.sync(pool, _payload(assets=[
+        _asset_rec("srv-1", "Prod Web", owner="Nobody At All"),
+    ]), organization_id=org)
+    assert res.assets_created == 1
+    assert not res.errors
+    assert any("Nobody At All" in w for w in res.warnings)
+    assert (await _row(pool, org, "srv-1"))["owner_id"] is None
+
+
+# ── relationships ────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_relationships_by_ref_within_batch(pool):
+    org = await _org(pool)
+    res = await generic_sync.sync(pool, _payload(
+        assets=[_asset_rec("srv-1", "Web"), _asset_rec("db-1", "DB")],
+        relationships=[{"from": "srv-1", "to": "db-1", "type": "depends_on"}],
+    ), organization_id=org)
+    assert res.edges_created == 1
+
+    edge = await pool.fetchrow(
+        """SELECT r.relationship_type, s.source_ref AS src, t.source_ref AS tgt
+           FROM relationships r
+           JOIN assets s ON s.id = r.source_asset_id
+           JOIN assets t ON t.id = r.target_asset_id
+           WHERE r.organization_id = $1 AND r.source = $2""",
+        org, SOURCE,
+    )
+    assert (edge["src"], edge["relationship_type"], edge["tgt"]) == (
+        "srv-1", "depends_on", "db-1")
+
+
+@pytest.mark.asyncio
+async def test_relationships_resolve_against_earlier_runs(pool):
+    """A relationships-only payload wires up an inventory synced previously."""
+    org = await _org(pool)
+    await generic_sync.sync(pool, _payload(
+        assets=[_asset_rec("srv-1", "Web"), _asset_rec("db-1", "DB")],
+    ), organization_id=org)
+
+    res = await generic_sync.sync(pool, _payload(
+        relationships=[{"from": "srv-1", "to": "db-1", "type": "depends_on"}],
+    ), organization_id=org)
+    assert res.edges_created == 1 and not res.warnings
+
+
+@pytest.mark.asyncio
+async def test_dangling_and_self_refs_warn_but_dont_block(pool):
+    org = await _org(pool)
+    res = await generic_sync.sync(pool, _payload(
+        assets=[_asset_rec("srv-1", "Web"), _asset_rec("db-1", "DB")],
+        relationships=[
+            {"from": "srv-1", "to": "ghost", "type": "depends_on"},
+            {"from": "srv-1", "to": "srv-1", "type": "depends_on"},
+            {"from": "srv-1", "to": "db-1", "type": "depends_on"},
+        ],
+    ), organization_id=org)
+    assert res.edges_created == 1
+    assert not res.errors
+    assert len(res.warnings) == 2
+
+
+@pytest.mark.asyncio
+async def test_assets_only_payload_does_not_prune_edges(pool):
+    org = await _org(pool)
+    await generic_sync.sync(pool, _payload(
+        assets=[_asset_rec("srv-1", "Web"), _asset_rec("db-1", "DB")],
+        relationships=[{"from": "srv-1", "to": "db-1", "type": "depends_on"}],
+    ), organization_id=org)
+
+    res = await generic_sync.sync(pool, _payload(
+        assets=[_asset_rec("srv-1", "Web"), _asset_rec("db-1", "DB")],
+    ), organization_id=org)
+    assert res.edges_pruned == 0
+    assert await pool.fetchval(
+        "SELECT count(*) FROM relationships WHERE source = $1", SOURCE) == 1
+
+
+@pytest.mark.asyncio
+async def test_dropped_edge_is_pruned_when_relationships_present(pool):
+    org = await _org(pool)
+    await generic_sync.sync(pool, _payload(
+        assets=[_asset_rec("srv-1", "Web"), _asset_rec("db-1", "DB")],
+        relationships=[{"from": "srv-1", "to": "db-1", "type": "depends_on"}],
+    ), organization_id=org)
+
+    res = await generic_sync.sync(pool, _payload(
+        assets=[_asset_rec("srv-1", "Web"), _asset_rec("db-1", "DB")],
+        relationships=[],
+    ), organization_id=org)
+    assert res.edges_pruned == 1
+
+
+# ── lifecycle (on_missing) ───────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_on_missing_defaults_to_ignore(pool):
+    org = await _org(pool)
+    await generic_sync.sync(pool, _payload(
+        assets=[_asset_rec("srv-1", "Web"), _asset_rec("srv-2", "App")],
+    ), organization_id=org)
+
+    res = await generic_sync.sync(pool, _payload(
+        assets=[_asset_rec("srv-1", "Web")]), organization_id=org)
+    assert res.stale == ["srv-2"]
+    assert res.assets_archived == 0 and res.assets_deleted == 0
+    assert (await _row(pool, org, "srv-2"))["status"] == "active"
+
+
+@pytest.mark.asyncio
+async def test_on_missing_archive_and_delete(pool):
+    org = await _org(pool)
+    both = [_asset_rec("srv-1", "Web"), _asset_rec("srv-2", "App")]
+    await generic_sync.sync(pool, _payload(assets=both), organization_id=org)
+
+    res = await generic_sync.sync(pool, _payload(
+        assets=[_asset_rec("srv-1", "Web")], on_missing="archive"), organization_id=org)
+    assert res.assets_archived == 1
+    assert (await _row(pool, org, "srv-2"))["status"] == "archived"
+
+    await generic_sync.sync(pool, _payload(assets=both), organization_id=org)
+    res = await generic_sync.sync(pool, _payload(
+        assets=[_asset_rec("srv-1", "Web")], on_missing="delete"), organization_id=org)
+    assert res.assets_deleted == 1
+    assert await _row(pool, org, "srv-2") is None
+
+
+@pytest.mark.asyncio
+async def test_staleness_is_scoped_per_asset_type(pool):
+    """systems.csv and devices.csv under one source tag don't cannibalize."""
+    org = await _org(pool)
+    await generic_sync.sync(pool, _payload(
+        assets=[_asset_rec("dev-1", "Laptop", atype="device")],
+        on_missing="archive"), organization_id=org)
+    res = await generic_sync.sync(pool, _payload(
+        assets=[_asset_rec("srv-1", "Web")], on_missing="archive"), organization_id=org)
+
+    assert res.assets_archived == 0
+    assert (await _row(pool, org, "dev-1"))["status"] == "active"
+
+
+@pytest.mark.asyncio
+async def test_other_sources_and_human_rows_are_untouched(pool):
+    org = await _org(pool)
+    human = await asset_svc.create_asset(
+        pool, organization_id=org, type=AssetType.SYSTEM, name="Hand-typed")
+    await generic_sync.sync(pool, _payload(
+        assets=[_asset_rec("o-1", "Other")], source="etl:other"), organization_id=org)
+
+    await generic_sync.sync(pool, _payload(
+        assets=[_asset_rec("srv-1", "Web")], on_missing="delete"), organization_id=org)
+
+    assert await pool.fetchval("SELECT count(*) FROM assets WHERE id = $1", human.id) == 1
+    assert await pool.fetchval(
+        "SELECT count(*) FROM assets WHERE source = 'etl:other'") == 1
+
+
+# ── validation & guards ──────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_reserved_source_tags_rejected(pool):
+    org = await _org(pool)
+    for src in ("scim", "cmdb", "CMDB", "hris:workday", "grcen-pack:soc2"):
+        res = await generic_sync.sync(
+            pool, _payload(assets=[_asset_rec("x", "X")], source=src),
+            organization_id=org)
+        assert res.errors, f"{src} should be rejected"
+        assert "reserved" in res.errors[0]
+
+
+@pytest.mark.asyncio
+async def test_validation_errors(pool):
+    org = await _org(pool)
+
+    async def errs(body):
+        return (await generic_sync.sync(pool, body, organization_id=org)).errors
+
+    assert "missing 'source'" in await errs({"assets": []})
+    assert any("'ref'" in e for e in await errs(
+        _payload(assets=[{"type": "system", "name": "X"}])))
+    assert any("invalid type" in e for e in await errs(
+        _payload(assets=[_asset_rec("a", "X", atype="nonsense")])))
+    assert any("invalid status" in e for e in await errs(
+        _payload(assets=[_asset_rec("a", "X", status="nonsense")])))
+    assert any("duplicate asset ref" in e for e in await errs(
+        _payload(assets=[_asset_rec("a", "X"), _asset_rec("a", "Y")])))
+    assert any("on_missing" in e for e in await errs(
+        _payload(assets=[_asset_rec("a", "X")], on_missing="nuke")))
+    assert any("must contain" in e for e in await errs({"source": SOURCE}))
+
+
+@pytest.mark.asyncio
+async def test_validation_failure_writes_nothing(pool):
+    org = await _org(pool)
+    res = await generic_sync.sync(pool, _payload(assets=[
+        _asset_rec("srv-1", "Web"),
+        _asset_rec("srv-2", "App", atype="nonsense"),
+    ]), organization_id=org)
+    assert res.errors
+    assert await pool.fetchval("SELECT count(*) FROM assets WHERE source = $1", SOURCE) == 0
+
+
+# ── tenancy ──────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_same_ref_in_two_orgs_stays_separate(pool):
+    org = await _org(pool)
+    other = await organization_service.create_organization(
+        pool, name="Other", slug=f"other-{uuid.uuid4().hex[:8]}")
+
+    await generic_sync.sync(pool, _payload(assets=[_asset_rec("srv-1", "Ours")]),
+                            organization_id=org)
+    await generic_sync.sync(pool, _payload(assets=[_asset_rec("srv-1", "Theirs")]),
+                            organization_id=other.id)
+
+    assert (await _row(pool, org, "srv-1"))["name"] == "Ours"
+    assert (await _row(pool, other.id, "srv-1"))["name"] == "Theirs"
+
+
+# ── HTTP endpoint ────────────────────────────────────────────────────────────
+
+
+def _client() -> AsyncClient:
+    return AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
+
+
+async def _sync_token(pool) -> str:
+    admin = await create_user(
+        pool, f"genadmin_{uuid.uuid4().hex[:8]}", "pw", role=UserRole.ADMIN)
+    _, raw = await create_token(pool, admin.id, "gen", ["sync"], is_service_account=True)
+    return raw
+
+
+@pytest.mark.asyncio
+async def test_http_requires_sync_permission(pool):
+    body = _payload(assets=[_asset_rec("srv-1", "Web")])
+    async with _client() as c:
+        assert (await c.post("/api/sync/upsert", json=body)).status_code == 401
+        admin = await create_user(
+            pool, f"a_{uuid.uuid4().hex[:8]}", "pw", role=UserRole.ADMIN)
+        _, raw = await create_token(pool, admin.id, "t", ["view"], is_service_account=True)
+        r = await c.post("/api/sync/upsert", json=body,
+                         headers={"Authorization": f"Bearer {raw}"})
+        assert r.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_http_upsert_dry_run_then_commit(pool):
+    org = await _org(pool)
+    raw = await _sync_token(pool)
+    body = _payload(
+        assets=[_asset_rec("srv-1", "Web"), _asset_rec("db-1", "DB")],
+        relationships=[{"from": "srv-1", "to": "db-1", "type": "depends_on"}],
+    )
+    async with _client() as c:
+        h = {"Authorization": f"Bearer {raw}"}
+        dr = await c.post("/api/sync/upsert", params={"dry_run": "true"}, json=body, headers=h)
+        assert dr.status_code == 200
+        assert dr.json()["assets_created"] == 2
+        assert await pool.fetchval(
+            "SELECT count(*) FROM assets WHERE source = $1", SOURCE) == 0
+
+        r = await c.post("/api/sync/upsert", json=body, headers=h)
+        assert r.status_code == 200
+        assert r.json()["assets_created"] == 2 and r.json()["edges_created"] == 1
+
+        again = await c.post("/api/sync/upsert", json=body, headers=h)
+        assert again.json()["assets_created"] == 0
+        assert again.json()["assets_updated"] == 2
+        assert await pool.fetchval(
+            "SELECT count(*) FROM assets WHERE organization_id = $1 AND source = $2",
+            org, SOURCE) == 2
+
+
+@pytest.mark.asyncio
+async def test_http_invalid_payload_400(pool):
+    raw = await _sync_token(pool)
+    async with _client() as c:
+        h = {"Authorization": f"Bearer {raw}"}
+        r = await c.post("/api/sync/upsert", json={"source": SOURCE, "assets": "nope"},
+                         headers=h)
+        assert r.status_code == 400 and r.json()["errors"]
+
+        r = await c.post("/api/sync/upsert",
+                         json=_payload(assets=[_asset_rec("a", "X")], source="scim"),
+                         headers=h)
+        assert r.status_code == 400 and "reserved" in r.json()["errors"][0]
