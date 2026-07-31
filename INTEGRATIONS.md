@@ -50,7 +50,9 @@ Every integration below hangs off a pattern GRCen already has. Naming them once:
   > **Caveat.** The REST and bulk-import paths remain **append-only and never set `source`**
   > (`services/asset.py:create_asset`, `services/import_service.py`) — re-running an import
   > duplicates. Anything that needs to *re-sync* rather than *load once* goes through a
-  > connector or `POST /api/sync/upsert` (I5), not `/api/imports`.
+  > connector or I5's `POST /api/sync/upsert` (JSON) / `POST /api/sync/upsert/csv`
+  > (multipart CSV), not `/api/imports`. Note the two CSV doors differ in kind, not just
+  > shape: `/api/imports` inserts, `/api/sync/upsert/csv` reconciles.
 
 - **Per-type fields = JSON, zero-migration.** Every asset is one row in `assets`; type-specific
   fields live in the `metadata` JSONB blob, defined by `FieldDef`s in

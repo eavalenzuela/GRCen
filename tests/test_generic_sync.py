@@ -345,6 +345,108 @@ async def test_same_ref_in_two_orgs_stays_separate(pool):
     assert (await _row(pool, other.id, "srv-1"))["name"] == "Theirs"
 
 
+# ── CSV adapter ──────────────────────────────────────────────────────────────
+
+
+def _from_csv(**kw):
+    kw.setdefault("source", SOURCE)
+    return generic_sync.payload_from_csv(**kw)
+
+
+def test_csv_maps_columns_onto_the_json_contract():
+    payload, errors, warnings = _from_csv(assets_csv=(
+        "ref,type,name,description,status,owner,tags,criticality,hostname\n"
+        "srv-1,system,Prod Web,The web tier,draft,Ada Lovelace,\"prod,pci\",high,web01\n"
+    ))
+    assert not errors and not warnings
+    assert payload["assets"] == [{
+        "ref": "srv-1", "type": "system", "name": "Prod Web",
+        "description": "The web tier", "status": "draft", "owner": "Ada Lovelace",
+        "tags": ["prod", "pci"], "criticality": "high", "hostname": "web01",
+    }]
+
+
+def test_csv_header_normalization_bom_and_blank_rows():
+    payload, errors, _ = _from_csv(assets_csv=(
+        "﻿ Ref , Type , Name \n"
+        "srv-1,system,Prod Web\n"
+        "\n"
+        ",,\n"
+        "srv-2,system,App\n"
+    ))
+    assert not errors
+    assert [r["ref"] for r in payload["assets"]] == ["srv-1", "srv-2"]
+    assert payload["assets"][0]["type"] == "system"
+
+
+def test_csv_blank_cells_are_omitted_not_blanked():
+    payload, _, _ = _from_csv(assets_csv=(
+        "ref,type,name,tags,criticality\n"
+        "srv-1,system,Prod Web,,\n"
+    ))
+    record = payload["assets"][0]
+    assert "tags" not in record and "criticality" not in record
+
+
+def test_csv_ref_aliases_and_default_type():
+    payload, errors, _ = _from_csv(
+        assets_csv="ci_id,name\nsys_abc,Prod Web\n", default_type="system")
+    assert not errors
+    assert payload["assets"] == [
+        {"ref": "sys_abc", "name": "Prod Web", "type": "system"}]
+
+    # An explicit `ref` wins and leaves external_id alone as a custom field.
+    payload, _, _ = _from_csv(
+        assets_csv="ref,external_id,type,name\nr1,ext-9,system,Web\n")
+    assert payload["assets"][0]["ref"] == "r1"
+    assert payload["assets"][0]["external_id"] == "ext-9"
+
+
+def test_csv_unknown_columns_warn_rather_than_vanish():
+    _, errors, warnings = _from_csv(
+        assets_csv="ref,type,name,hostnmae\nsrv-1,system,Web,web01\n")
+    assert not errors
+    assert any("hostnmae" in w and "system" in w for w in warnings)
+
+
+def test_csv_relationship_columns_and_alias():
+    payload, errors, _ = _from_csv(
+        relationships_csv="from,to,relationship_type,description\nsrv-1,db-1,depends_on,reads\n")
+    assert not errors
+    assert payload["relationships"] == [
+        {"from": "srv-1", "to": "db-1", "type": "depends_on", "description": "reads"}]
+
+
+def test_csv_only_supplied_sections_appear_in_payload():
+    """Drives the assets-only-doesn't-prune-edges rule through the CSV door."""
+    payload, _, _ = _from_csv(assets_csv="ref,type,name\nsrv-1,system,Web\n")
+    assert "assets" in payload and "relationships" not in payload
+
+    payload, _, _ = _from_csv(relationships_csv="from,to,type\na,b,depends_on\n")
+    assert "relationships" in payload and "assets" not in payload
+
+
+def test_csv_parse_errors():
+    _, errors, _ = _from_csv(assets_csv="")
+    assert any("no header row" in e for e in errors)
+
+    _, errors, _ = _from_csv(
+        assets_csv="ref,name\nsrv-1,Web\n", default_type="nonsense")
+    assert any("invalid default type" in e for e in errors)
+
+
+@pytest.mark.asyncio
+async def test_csv_payload_flows_through_sync(pool):
+    org = await _org(pool)
+    payload, errors, _ = _from_csv(
+        assets_csv="ref,type,name,environment\nsrv-1,system,Web,production\n")
+    assert not errors
+    res = await generic_sync.sync(pool, payload, organization_id=org)
+    assert res.assets_created == 1
+    meta = json.loads((await _row(pool, org, "srv-1"))["metadata"])
+    assert meta["environment"] == "production"
+
+
 # ── HTTP endpoint ────────────────────────────────────────────────────────────
 
 
@@ -398,6 +500,74 @@ async def test_http_upsert_dry_run_then_commit(pool):
         assert await pool.fetchval(
             "SELECT count(*) FROM assets WHERE organization_id = $1 AND source = $2",
             org, SOURCE) == 2
+
+
+@pytest.mark.asyncio
+async def test_http_csv_upsert_both_files_in_one_transaction(pool):
+    org = await _org(pool)
+    raw = await _sync_token(pool)
+    files = {
+        "assets": ("assets.csv", "ref,type,name\nsrv-1,system,Web\ndb-1,system,DB\n", "text/csv"),
+        "relationships": ("rels.csv", "from,to,type\nsrv-1,db-1,depends_on\n", "text/csv"),
+    }
+    async with _client() as c:
+        h = {"Authorization": f"Bearer {raw}"}
+        dr = await c.post("/api/sync/upsert/csv", params={"dry_run": "true"},
+                          data={"source": SOURCE}, files=files, headers=h)
+        assert dr.status_code == 200 and dr.json()["assets_created"] == 2
+        assert await pool.fetchval(
+            "SELECT count(*) FROM assets WHERE source = $1", SOURCE) == 0
+
+        r = await c.post("/api/sync/upsert/csv", data={"source": SOURCE},
+                         files=files, headers=h)
+        body = r.json()
+        assert r.status_code == 200
+        # The edge resolves against an asset created in the same request.
+        assert body["assets_created"] == 2 and body["edges_created"] == 1
+
+        again = await c.post("/api/sync/upsert/csv", data={"source": SOURCE},
+                             files=files, headers=h)
+        assert again.json()["assets_updated"] == 2
+        assert await pool.fetchval(
+            "SELECT count(*) FROM assets WHERE organization_id = $1 AND source = $2",
+            org, SOURCE) == 2
+
+
+@pytest.mark.asyncio
+async def test_http_csv_default_type_and_column_warning(pool):
+    raw = await _sync_token(pool)
+    async with _client() as c:
+        r = await c.post(
+            "/api/sync/upsert/csv",
+            data={"source": SOURCE, "default_type": "system"},
+            files={"assets": ("a.csv", "ci_id,name,notacolumn\nsys_a,Web,x\n", "text/csv")},
+            headers={"Authorization": f"Bearer {raw}"})
+        assert r.status_code == 200
+        assert r.json()["assets_created"] == 1
+        assert any("notacolumn" in w for w in r.json()["warnings"])
+
+
+@pytest.mark.asyncio
+async def test_http_csv_requires_a_file_and_rejects_reserved_source(pool):
+    raw = await _sync_token(pool)
+    async with _client() as c:
+        h = {"Authorization": f"Bearer {raw}"}
+        r = await c.post("/api/sync/upsert/csv", data={"source": SOURCE}, headers=h)
+        assert r.status_code == 400 and "assets" in r.json()["errors"][0]
+
+        r = await c.post(
+            "/api/sync/upsert/csv", data={"source": "cmdb"},
+            files={"assets": ("a.csv", "ref,type,name\na,system,X\n", "text/csv")},
+            headers=h)
+        assert r.status_code == 400 and "reserved" in r.json()["errors"][0]
+
+
+@pytest.mark.asyncio
+async def test_http_csv_requires_sync_permission(pool):
+    files = {"assets": ("a.csv", "ref,type,name\na,system,X\n", "text/csv")}
+    async with _client() as c:
+        r = await c.post("/api/sync/upsert/csv", data={"source": SOURCE}, files=files)
+        assert r.status_code == 401
 
 
 @pytest.mark.asyncio

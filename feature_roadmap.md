@@ -297,9 +297,23 @@ omits), `archive`, or `delete`. Staleness is scoped per asset *type* the payload
 Guard: caller-supplied `source` tags that collide with a built-in connector's namespace
 (`scim`, `hris`, `cmdb`, `cspm`, `uvt`, `autocomply`, `vuln-agg`, `grcen-pack:*`) are rejected —
 otherwise `{"source": "scim", "assets": [], "on_missing": "delete"}` would drop an IdP-synced
-directory. Tests `tests/test_generic_sync.py`. Remaining: a CSV/multipart front door for the
-same path (today the caller parses and posts JSON); linking a synced asset to a *human-authored*
-one by name (only `owner` does name resolution today).
+directory.
+
+**CSV front door:** `POST /api/sync/upsert/csv` (multipart — an `assets` file, a
+`relationships` file, or both) runs the same path through `payload_from_csv`, a thin adapter
+onto the payload above, so the contract, validation and lifecycle rules keep exactly one
+implementation. Columns are the record keys (`ref` — or `external_id`/`ci_id` — `type`, `name`,
+…, plus per-type custom-field columns); `tags` is one comma-separated cell, matching the tag
+input on the asset form; a `default_type` form field covers homogeneous exports with no `type`
+column. Headers are stripped/lowercased and a BOM dropped (Excel), blank and `,,,` filler lines
+skipped, and a header that isn't a known field for its row's type comes back as a **warning**
+rather than vanishing silently. Blank cells omit their key rather than blanking the value, so a
+CSV can't clear `tags`/`criticality`/`owner` — that needs the JSON door. Sending both files in
+one request keeps the sync in one transaction, which is what lets an edge resolve against an
+asset created in the same call.
+
+Tests `tests/test_generic_sync.py`. Remaining: linking a synced asset to a *human-authored* one
+by name (only `owner` does name resolution today).
 
 ## Known Stale / Cleanup
 - `CLAUDE.md` has been refreshed but the rest of `configure_*.md` and `security_features_and_requirements.md` should be reviewed in the same pass when we make significant changes to those areas.

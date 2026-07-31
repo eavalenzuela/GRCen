@@ -75,6 +75,12 @@ flows back to the finding.
   (`ignore` default / `archive` / `delete`), scoped per asset type; `?dry_run`
   previews. Source tags colliding with a built-in connector's namespace are
   rejected so a generic caller can't archive an IdP-synced directory.
+  `POST /api/sync/upsert/csv` puts the same path behind a multipart envelope —
+  attach an `assets` and/or `relationships` CSV and the columns map straight
+  onto the contract (`tags` as one comma-separated cell, a `default_type` field
+  for exports with no `type` column). Headers are normalized and de-BOM'd,
+  blank lines skipped, and an unrecognized header is reported as a warning
+  rather than silently dropped.
 
 **Egress — the asset graph → downstream tools**
 

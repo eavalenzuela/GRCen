@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import dataclasses
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import JSONResponse
 
 from grcen.models.user import User
@@ -68,6 +68,65 @@ async def sync_upsert(
         organization_id=user.organization_id,
         dry_run=_flag(request, "dry_run", False),
     )
+    status = 200 if not result.errors else 400
+    return JSONResponse(dataclasses.asdict(result), status_code=status)
+
+
+async def _decode(upload: UploadFile | None) -> str | None:
+    """Read an uploaded CSV as text. ``utf-8-sig`` strips Excel's BOM, which
+    would otherwise turn the first header into ``﻿ref`` and break the file.
+    """
+    if upload is None:
+        return None
+    return (await upload.read()).decode("utf-8-sig")
+
+
+@router.post("/upsert/csv", summary="Idempotent upsert from CSV files (multipart)")
+async def sync_upsert_csv(
+    request: Request,
+    source: str = Form(..., description="Your source tag; must not collide with a built-in connector"),
+    on_missing: str = Form("ignore", description="ignore | archive | delete"),
+    default_type: str | None = Form(None, description="Asset type for rows with no 'type' column"),
+    assets: UploadFile | None = File(None),
+    relationships: UploadFile | None = File(None),
+    pool=Depends(get_db),
+    user: User = Depends(_sync_required),
+) -> JSONResponse:
+    """The CSV envelope over ``/api/sync/upsert`` — same contract, same lifecycle.
+
+    Send an ``assets`` CSV, a ``relationships`` CSV, or both; sending both in one
+    request keeps the sync in a single transaction, so relationships resolve
+    against assets created in the same call. Query: ``dry_run``. See
+    ``services.generic_sync`` for columns and semantics.
+    """
+    if assets is None and relationships is None:
+        return JSONResponse(
+            {"errors": ["attach an 'assets' and/or 'relationships' CSV file"]},
+            status_code=400,
+        )
+    try:
+        assets_csv = await _decode(assets)
+        relationships_csv = await _decode(relationships)
+    except UnicodeDecodeError:
+        return JSONResponse({"errors": ["files must be UTF-8 encoded"]}, status_code=400)
+
+    payload, parse_errors, parse_warnings = generic_sync.payload_from_csv(
+        source=source,
+        assets_csv=assets_csv,
+        relationships_csv=relationships_csv,
+        default_type=default_type,
+        on_missing=on_missing,
+    )
+    if parse_errors:
+        return JSONResponse({"errors": parse_errors}, status_code=400)
+
+    result: GenericSyncResult = await generic_sync.sync(
+        pool, payload,
+        organization_id=user.organization_id,
+        dry_run=_flag(request, "dry_run", False),
+    )
+    # Unrecognized-column notices belong with whatever the sync itself reported.
+    result.warnings = [*parse_warnings, *result.warnings]
     status = 200 if not result.errors else 400
     return JSONResponse(dataclasses.asdict(result), status_code=status)
 

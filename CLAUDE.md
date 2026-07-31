@@ -90,8 +90,11 @@ nightly job). For sources with no purpose-built connector there is an **untyped*
 tag and a stable `ref` per record and GRCen reconciles on the same key, so a hand-rolled ETL or
 CSV-parsing script gets idempotent re-sync without a client-side id-mapping table. Contract in
 the module docstring; `on_missing` (`ignore`/`archive`/`delete`) governs dropped records, and
-source tags colliding with a built-in connector's namespace are rejected. Note the contrast with
-`/api/imports`, which is append-only and duplicates on re-run — that path is for one-time loads.
+source tags colliding with a built-in connector's namespace are rejected. `POST
+/api/sync/upsert/csv` is the same path behind a multipart envelope (`assets` and/or
+`relationships` CSV files, `payload_from_csv` adapts them onto the identical payload). Note the
+contrast with `/api/imports`, which is append-only and duplicates on re-run — that path is for
+one-time loads; anything that re-syncs goes through `/api/sync/*`.
 Egress hangs off `services/webhook_service.py`
 (centralized `WEBHOOK_EVENTS` catalog incl. `asset.updated`; per-webhook `format` =
 `grcen`/`slack`/`teams` posts native Slack/Teams messages, E1), `alert_service`'s `_deliver_*`

@@ -61,6 +61,22 @@ relationships-only payload can wire up an inventory synced previously. A ``from`
 or ``to`` that resolves to nothing is a warning, not an error; the edge is
 skipped and the rest of the payload still lands.
 
+## CSV front door
+
+``payload_from_csv`` adapts CSV text into exactly the payload above, so
+``POST /api/sync/upsert/csv`` (multipart: an ``assets`` file, a ``relationships``
+file, or both) is the same code path with a different envelope — one contract,
+one set of lifecycle rules. Columns are the record keys; ``tags`` is one
+comma-separated cell; a ``default_type`` form field supplies ``type`` for a
+homogeneous export that lacks the column. A header that isn't a known field for
+its row's type comes back as a warning rather than vanishing.
+
+Blank cells drop out rather than writing empties, so a CSV cannot clear an
+existing ``tags``/``criticality``/``owner`` — post JSON with an explicit value
+for that. Sending both files in one request keeps the whole sync in a single
+transaction, which is what lets relationships resolve against assets created in
+the same call.
+
 ## Lifecycle
 
 ``on_missing`` governs records that GRCen holds under this ``source`` but that
@@ -88,6 +104,8 @@ front; pick your own.
 
 from __future__ import annotations
 
+import csv
+import io
 from dataclasses import dataclass, field
 from uuid import UUID
 
@@ -131,6 +149,21 @@ _RESERVED_ASSET_KEYS = frozenset({
     "ref", "type", "name", "description", "status", "owner",
     "tags", "criticality", "metadata",
 })
+
+
+# CSV header aliases → the contract's key. A CMDB/scanner export tends to name
+# its stable key one of these; the edge type is commonly spelled the long way.
+_ASSET_REF_ALIASES = ("ref", "external_id", "ci_id")
+# Only the edge type gets an alias. `source_ref` is deliberately NOT aliased to
+# the edge's own `ref` — a reader would just as reasonably take it to mean "the
+# source asset's ref", and silently mis-keying an edge is worse than a header
+# that doesn't resolve.
+_EDGE_ALIASES = {"relationship_type": "type"}
+
+# Tags arrive as one cell; comma matches the tag input on the asset form
+# (routers/asset_pages.py). A tag containing a comma isn't expressible — same
+# limitation the web form has.
+_TAG_DELIMITER = ","
 
 
 @dataclass
@@ -253,6 +286,121 @@ def validate_payload(payload: object) -> list[str]:
 
 def _edge_ref(edge: dict) -> str:
     return f"{edge.get('from')}:{edge.get('type')}:{edge.get('to')}"
+
+
+def _read_csv(content: str, label: str, errors: list[str]) -> list[dict]:
+    """Parse CSV into row dicts: headers normalized, empty cells dropped.
+
+    Headers are stripped and lowercased — every custom-field name is lowercase
+    snake_case, so this only ever rescues a ``Name``/``Type`` header. A leading
+    BOM is dropped here as well as at decode time: Excel emits one, it would
+    turn the first header into ``﻿ref``, and the parse shouldn't depend on
+    the caller having picked ``utf-8-sig``. An empty cell drops its key entirely
+    rather than writing a blank: a blank spreadsheet cell means "not supplied",
+    and clearing a value the file didn't mean to speak to is the wrong default.
+    Post JSON with an explicit ``[]`` to clear.
+    """
+    content = content.lstrip("﻿")
+    try:
+        reader = csv.DictReader(io.StringIO(content))
+        if not reader.fieldnames:
+            errors.append(f"{label} CSV has no header row")
+            return []
+        rows: list[dict] = []
+        for raw in reader:
+            row: dict = {}
+            for key, val in raw.items():
+                if key is None:      # columns beyond the header
+                    continue
+                name = key.strip().lower()
+                value = val.strip() if isinstance(val, str) else val
+                if not name or value in (None, ""):
+                    continue
+                row[name] = value
+            if row:                  # skips blank and ",,," filler lines
+                rows.append(row)
+        return rows
+    except csv.Error as exc:
+        errors.append(f"{label} CSV could not be parsed: {exc}")
+        return []
+
+
+def payload_from_csv(
+    *,
+    source: str,
+    assets_csv: str | None = None,
+    relationships_csv: str | None = None,
+    default_type: str | None = None,
+    on_missing: str = "ignore",
+) -> tuple[dict, list[str], list[str]]:
+    """Adapt CSV text into a ``sync`` payload. Returns ``(payload, errors, warnings)``.
+
+    A thin adapter, deliberately: the CSV front door and the JSON one converge
+    on the same payload, so the contract, validation, and lifecycle rules have
+    exactly one implementation.
+
+    Asset columns are the record keys — ``ref`` (or ``external_id`` / ``ci_id``),
+    ``type``, ``name``, ``description``, ``status``, ``owner``, ``tags``
+    (comma-separated in one cell), ``criticality``, plus any per-type
+    custom-field column. ``default_type`` supplies ``type`` for a homogeneous
+    export that has no such column. Relationship columns are ``from``, ``to``,
+    ``type`` (or ``relationship_type``), ``description``, ``ref``.
+
+    A column that isn't a known field for its row's type is reported as a
+    warning rather than silently dropped — a typo'd header vanishing without
+    trace is the classic CSV-import frustration.
+    """
+    errors: list[str] = []
+    warnings: list[str] = []
+    payload: dict = {"source": source, "on_missing": on_missing}
+
+    if default_type:
+        try:
+            AssetType(default_type)
+        except ValueError:
+            errors.append(f"invalid default type '{default_type}'")
+            default_type = None
+
+    if assets_csv is not None:
+        records: list[dict] = []
+        unknown: set[tuple[str, str]] = set()
+        for row in _read_csv(assets_csv, "assets", errors):
+            record = dict(row)
+            # First alias present wins; the others stay put, so a file carrying
+            # both `ref` and `external_id` keeps external_id as a custom field.
+            for alias in _ASSET_REF_ALIASES:
+                if alias in record:
+                    record["ref"] = record.pop(alias)
+                    break
+            if not record.get("type") and default_type:
+                record["type"] = default_type
+            if "tags" in record:
+                record["tags"] = [
+                    t.strip() for t in record["tags"].split(_TAG_DELIMITER) if t.strip()
+                ]
+            try:
+                known = {f.name for f in CUSTOM_FIELDS.get(AssetType(record["type"]), [])}
+            except (ValueError, KeyError):
+                known = set()          # invalid/absent type — validation reports it
+            else:
+                for key in record:
+                    if key not in _RESERVED_ASSET_KEYS and key not in known:
+                        unknown.add((record["type"], key))
+            records.append(record)
+        payload["assets"] = records
+        for asset_type, column in sorted(unknown):
+            warnings.append(
+                f"column '{column}' isn't a known field for type '{asset_type}'; ignored"
+            )
+
+    if relationships_csv is not None:
+        edges: list[dict] = []
+        for row in _read_csv(relationships_csv, "relationships", errors):
+            edge = {_EDGE_ALIASES.get(k, k): v for k, v in row.items()}
+            edges.append(edge)
+        payload["relationships"] = edges
+
+    return payload, errors, warnings
 
 
 def _metadata(record: dict) -> dict:
