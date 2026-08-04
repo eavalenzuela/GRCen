@@ -30,6 +30,7 @@ from grcen.services import (
     watcher_service,
     workflow_service,
 )
+from grcen.services.findings_service import TERMINAL_STATUSES
 
 router = APIRouter(tags=["pages"], dependencies=[Depends(_csrf_check)])
 
@@ -78,7 +79,12 @@ async def my_work(
             if isinstance(meta, str):
                 meta = json.loads(meta or "{}")
             meta = meta or {}
-            if str(meta.get("finding_status", "")).lower() in ("closed", "verified"):
+            # findings_service owns this vocabulary. The local set here said
+            # ("closed", "verified"), which was wrong in both directions:
+            # risk-accepted findings are finished but kept appearing as open
+            # work, and verified-but-not-yet-closed ones — which still need
+            # closing — silently vanished from the assignee's queue.
+            if str(meta.get("finding_status", "")).lower() in TERMINAL_STATUSES:
                 continue
             my_findings.append({
                 "id": r["id"],

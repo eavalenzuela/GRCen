@@ -1,5 +1,7 @@
 """Tests for risk scoring and heatmap."""
 
+from datetime import date, timedelta
+
 import pytest
 
 from grcen.services.risk_service import (
@@ -211,3 +213,58 @@ async def test_risk_register_mixed_scored_and_unscored_does_not_crash(pool):
     # The text-column sort path must also tolerate the mix.
     by_name = await get_risk_register(pool, sort="name", order="asc")
     assert [r["name"] for r in by_name] == ["Scored Risk", "Unscored Risk"]
+
+
+# --- only "Next Review Due" can be overdue --------------------------------
+
+
+@pytest.mark.asyncio
+async def test_last_reviewed_alone_does_not_mark_risk_overdue(pool):
+    """"Last Reviewed" is in the past by definition.
+
+    Falling back to it meant a risk reviewed yesterday read as overdue forever
+    — the better maintained the risk, the more certainly it was flagged.
+    """
+    from grcen.models.asset import AssetType
+    from grcen.services import asset as asset_svc, organization_service, risk_service
+
+    org = await organization_service.get_default_org_id(pool)
+    reviewed_yesterday = (date.today() - timedelta(days=1)).isoformat()
+
+    diligent = await asset_svc.create_asset(
+        pool, organization_id=org, type=AssetType.RISK, name="Diligently reviewed",
+        status="active",
+        metadata_={"likelihood": "3", "impact": "3",
+                   "last_reviewed": reviewed_yesterday},
+    )
+    genuinely_due = await asset_svc.create_asset(
+        pool, organization_id=org, type=AssetType.RISK, name="Actually overdue",
+        status="active",
+        metadata_={"likelihood": "3", "impact": "3",
+                   "last_reviewed": reviewed_yesterday,
+                   "review_date": (date.today() - timedelta(days=5)).isoformat()},
+    )
+
+    register = await risk_service.get_risk_register(pool, organization_id=org)
+    by_id = {r["id"]: r for r in register}
+
+    assert by_id[diligent.id]["is_overdue"] is False
+    assert by_id[genuinely_due.id]["is_overdue"] is True
+
+
+@pytest.mark.asyncio
+async def test_future_review_date_is_not_overdue(pool):
+    from grcen.models.asset import AssetType
+    from grcen.services import asset as asset_svc, organization_service, risk_service
+
+    org = await organization_service.get_default_org_id(pool)
+    r = await asset_svc.create_asset(
+        pool, organization_id=org, type=AssetType.RISK, name="Future review",
+        status="active",
+        metadata_={"likelihood": "2", "impact": "2",
+                   "review_date": (date.today() + timedelta(days=30)).isoformat()},
+    )
+
+    register = await risk_service.get_risk_register(pool, organization_id=org)
+    by_id = {x["id"]: x for x in register}
+    assert by_id[r.id]["is_overdue"] is False

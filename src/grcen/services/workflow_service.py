@@ -476,6 +476,20 @@ async def approve(
 
     async with pool.acquire() as conn:
         async with conn.transaction():
+            # Serialize approvers on this change before counting or applying.
+            # The claim at the end is a compare-and-swap, but it ran *after* the
+            # apply: two approvers crossing the threshold at once would both
+            # apply the payload — creating the asset twice, or applying an
+            # update twice — and only then would one of them lose the swap.
+            locked = await conn.fetchrow(
+                "SELECT status FROM pending_changes WHERE id = $1 FOR UPDATE",
+                change.id,
+            )
+            if locked is None:
+                raise ValueError("Pending change no longer exists.")
+            if locked["status"] != "pending":
+                raise ValueError("Only pending changes can be approved.")
+
             await conn.execute(
                 """INSERT INTO pending_change_approvals
                        (pending_change_id, approver_id, approver_username, note)

@@ -174,18 +174,22 @@ async def _deliver_email(
     if not smtp.is_enabled:
         return
 
-    recipients = await email_service.resolve_alert_recipients(pool, alert.asset_id)
-    if not recipients:
-        return
-
-    # Resolve the alert's owning org so the email gets that tenant's branding.
+    # Resolve the alert's owning org first: it scopes the recipient lookup, and
+    # then gives the email that tenant's branding.
     from grcen.services import organization_service
     org_row = await pool.fetchrow(
         "SELECT organization_id FROM alerts WHERE id = $1", alert.id
     )
-    org = None
-    if org_row:
-        org = await organization_service.get_by_id(pool, org_row["organization_id"])
+    if not org_row:
+        return
+
+    recipients = await email_service.resolve_alert_recipients(
+        pool, alert.asset_id, organization_id=org_row["organization_id"]
+    )
+    if not recipients:
+        return
+
+    org = await organization_service.get_by_id(pool, org_row["organization_id"])
     brand_name = (
         org.email_from_name if org and org.email_from_name else "GRCen"
     )

@@ -241,3 +241,77 @@ async def test_unsubstantiated_library_still_usable_for_fill(pool, admin_user, o
     await qs.set_response(pool, resp["id"], organization_id=org_id, answer_asset_id=answer.id)
     updated = (await qs.list_responses(pool, qid, organization_id=org_id))[0]
     assert updated["filled_answer"] == "A."
+
+
+# --- re-mapping must bring the new answer's text with it -------------------
+
+
+async def _two_answers(pool, org_id, admin_user):
+    a1 = await asset_svc.create_asset(
+        pool, organization_id=org_id, type=AssetType.ANSWER,
+        name="Encryption at rest", description="Yes, AES-256-GCM.",
+        updated_by=admin_user.id,
+    )
+    a2 = await asset_svc.create_asset(
+        pool, organization_id=org_id, type=AssetType.ANSWER,
+        name="Encryption in transit", description="Yes, TLS 1.3 everywhere.",
+        updated_by=admin_user.id,
+    )
+    return a1, a2
+
+
+@pytest.mark.asyncio
+async def test_remap_replaces_unedited_answer_text(pool, admin_user, org_id):
+    """The edit form always re-posts the current text.
+
+    Auto-fill was skipped whenever any text was supplied, so re-mapping kept
+    the previous answer's wording while showing the new source — the
+    questionnaire then went out attesting to the wrong thing.
+    """
+    a1, a2 = await _two_answers(pool, org_id, admin_user)
+    qid = await qs.create_questionnaire(
+        pool, organization_id=org_id, name="Q", created_by=admin_user.id
+    )
+    await qs.import_questions(pool, qid, ["Encryption?"], organization_id=org_id)
+    resp = (await qs.list_responses(pool, qid, organization_id=org_id))[0]
+
+    await qs.set_response(pool, resp["id"], organization_id=org_id, answer_asset_id=a1.id)
+    current = (await qs.list_responses(pool, qid, organization_id=org_id))[0]
+    assert current["filled_answer"] == "Yes, AES-256-GCM."
+
+    # Re-map, echoing the existing text back the way the form does.
+    await qs.set_response(
+        pool, resp["id"], organization_id=org_id,
+        answer_asset_id=a2.id, filled_answer=current["filled_answer"],
+    )
+
+    updated = (await qs.list_responses(pool, qid, organization_id=org_id))[0]
+    assert updated["answer_asset_id"] == a2.id
+    assert updated["filled_answer"] == "Yes, TLS 1.3 everywhere."
+
+
+@pytest.mark.asyncio
+async def test_remap_preserves_customised_answer_text(pool, admin_user, org_id):
+    """Text the user actually edited must survive a re-map."""
+    a1, a2 = await _two_answers(pool, org_id, admin_user)
+    qid = await qs.create_questionnaire(
+        pool, organization_id=org_id, name="Q", created_by=admin_user.id
+    )
+    await qs.import_questions(pool, qid, ["Encryption?"], organization_id=org_id)
+    resp = (await qs.list_responses(pool, qid, organization_id=org_id))[0]
+
+    await qs.set_response(pool, resp["id"], organization_id=org_id, answer_asset_id=a1.id)
+    await qs.set_response(
+        pool, resp["id"], organization_id=org_id,
+        answer_asset_id=a1.id, filled_answer="Yes, AES-256-GCM, rotated quarterly.",
+    )
+
+    await qs.set_response(
+        pool, resp["id"], organization_id=org_id,
+        answer_asset_id=a2.id,
+        filled_answer="Yes, AES-256-GCM, rotated quarterly.",
+    )
+
+    updated = (await qs.list_responses(pool, qid, organization_id=org_id))[0]
+    assert updated["answer_asset_id"] == a2.id
+    assert updated["filled_answer"] == "Yes, AES-256-GCM, rotated quarterly."

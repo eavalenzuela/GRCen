@@ -260,3 +260,51 @@ async def test_self_reject_allowed_when_override_set(pool, two_admins_and_editor
     resp = await fx["ca1"].post(f"/api/approvals/{change_id}/reject", json={})
     assert resp.status_code == 200
     assert resp.json()["status"] == "rejected"
+
+
+# ── concurrent approvals must apply the payload exactly once ─────────────
+
+
+@pytest.mark.asyncio
+async def test_concurrent_approvals_apply_the_change_once(pool, two_admins_and_editor):
+    """Two approvers crossing the threshold at the same moment.
+
+    The claim on pending_changes is a compare-and-swap, but it ran *after* the
+    apply — so both approvers could create the asset and only then would one of
+    them lose the swap. The row is now locked before anything is applied.
+    """
+    import asyncio
+
+    fx = two_admins_and_editor
+    await workflow_service.upsert_config(
+        pool, AssetType.POLICY, require_approval_create=True,
+        require_approval_update=False, require_approval_delete=False,
+        required_approvals=1,
+    )
+    submit = await fx["ced"].post(
+        "/api/assets/", json={"type": "policy", "name": "RaceMe"}
+    )
+    change_id = submit.json()["pending_change_id"]
+
+    change = await workflow_service.get(pool, uuid.UUID(change_id))
+
+    async def _approve(approver):
+        try:
+            return await workflow_service.approve(pool, change, approver, note=None)
+        except (ValueError, PermissionError) as e:
+            return e
+
+    results = await asyncio.gather(
+        _approve(fx["a1"]), _approve(fx["a2"]),
+    )
+
+    applied = [r for r in results if not isinstance(r, Exception)]
+    assert len(applied) == 1, "the same pending change was applied twice"
+
+    rows = await pool.fetch(
+        "SELECT id FROM assets WHERE type = 'policy' AND name = 'RaceMe'"
+    )
+    assert len(rows) == 1, f"payload applied {len(rows)} times"
+
+    final = await workflow_service.get(pool, uuid.UUID(change_id))
+    assert final.status == "approved"

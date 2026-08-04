@@ -122,7 +122,9 @@ async def test_resolve_recipients_prefers_asset_owner(pool):
         updated_by=owner.id,
     )
 
-    recipients = await email_service.resolve_alert_recipients(pool, system.id)
+    recipients = await email_service.resolve_alert_recipients(
+        pool, system.id, organization_id=owner.organization_id
+    )
     assert recipients == [(owner.id, "owner@test", "immediate")]
 
 
@@ -140,7 +142,9 @@ async def test_resolve_recipients_falls_back_to_admins(pool):
         pool, type=AssetType.SYSTEM, name="Orphan", status="active", updated_by=admin.id
     )
 
-    recipients = await email_service.resolve_alert_recipients(pool, system.id)
+    recipients = await email_service.resolve_alert_recipients(
+        pool, system.id, organization_id=admin.organization_id
+    )
     assert recipients == [(admin.id, "admin@test", "immediate")]
 
 
@@ -159,7 +163,9 @@ async def test_resolve_recipients_respects_opt_out(pool):
         pool, type=AssetType.SYSTEM, name="A", status="active", updated_by=admin.id
     )
 
-    recipients = await email_service.resolve_alert_recipients(pool, system.id)
+    recipients = await email_service.resolve_alert_recipients(
+        pool, system.id, organization_id=admin.organization_id
+    )
     assert recipients == []
 
 
@@ -327,3 +333,49 @@ async def test_set_email_notifications_enabled_service(pool):
     updated = await set_email_notifications_enabled(pool, user.id, True)
     assert updated is not None
     assert updated.email_notifications_enabled is True
+
+
+@pytest.mark.asyncio
+async def test_admin_fallback_does_not_cross_organizations(pool):
+    """An alert must never be mailed to another tenant's admins.
+
+    The fallback selected every admin with opt-in on, org-wide-blind. `users`
+    is outside RLS and alerts fire from the scheduler inside system_context(),
+    so neither isolation layer covered this.
+    """
+    from grcen.services import organization_service
+
+    org_a = await organization_service.create_organization(
+        pool, slug=f"a_{uuid.uuid4().hex[:6]}", name="Org A"
+    )
+    org_b = await organization_service.create_organization(
+        pool, slug=f"b_{uuid.uuid4().hex[:6]}", name="Org B"
+    )
+    admin_a = await create_user(
+        pool, f"aa_{uuid.uuid4().hex[:8]}", "pw",
+        role=UserRole.ADMIN, organization_id=org_a.id,
+    )
+    admin_b = await create_user(
+        pool, f"bb_{uuid.uuid4().hex[:8]}", "pw",
+        role=UserRole.ADMIN, organization_id=org_b.id,
+    )
+    for u, email in ((admin_a, "a@test"), (admin_b, "b@test")):
+        await pool.execute(
+            "UPDATE users SET email = $1, email_notifications_enabled = true "
+            "WHERE id = $2",
+            email, u.id,
+        )
+
+    # An org-A asset with no owner — the admin fallback path.
+    system = await asset_svc.create_asset(
+        pool, organization_id=org_a.id, type=AssetType.SYSTEM,
+        name="A app", status="active", updated_by=admin_a.id,
+    )
+
+    recipients = await email_service.resolve_alert_recipients(
+        pool, system.id, organization_id=org_a.id
+    )
+
+    emails = {e for _uid, e, _mode in recipients}
+    assert "a@test" in emails
+    assert "b@test" not in emails, "alert leaked to another tenant's admins"

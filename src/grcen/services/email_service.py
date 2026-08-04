@@ -157,7 +157,7 @@ async def _log_delivery(
 
 
 async def resolve_alert_recipients(
-    pool: asyncpg.Pool, asset_id: UUID
+    pool: asyncpg.Pool, asset_id: UUID, *, organization_id: UUID
 ) -> list[tuple[UUID, str, str]]:
     """Return [(user_id, email, mode)] who should receive email for this asset.
 
@@ -165,8 +165,13 @@ async def resolve_alert_recipients(
     so callers can route to either send_email or queue_for_digest.
 
     Rules: the asset owner if owner_id links to a Person asset whose user has
-    email_notifications_enabled=true. Otherwise all admins with opt-in on.
-    Users without an email are skipped.
+    email_notifications_enabled=true. Otherwise that org's admins with opt-in
+    on. Users without an email are skipped.
+
+    ``organization_id`` is required and not optional: ``users`` is outside RLS,
+    and alerts fire from the scheduler inside ``system_context()``, so neither
+    layer of tenant isolation applies here. Without it the admin fallback
+    selected every tenant's admins and mailed them another org's alert.
     """
     pii_encrypted = await encryption_config.is_scope_active(pool, "user_pii")
 
@@ -185,10 +190,12 @@ async def resolve_alert_recipients(
            FROM assets a
            JOIN users u ON u.person_asset_id = a.owner_id
            WHERE a.id = $1
+             AND a.organization_id = $2
+             AND u.organization_id = $2
              AND u.is_active = true
              AND u.email_notifications_enabled = true
              AND u.email IS NOT NULL AND u.email <> ''""",
-        asset_id,
+        asset_id, organization_id,
     )
     recipients = _decrypt(owner_rows)
     if recipients:
@@ -197,8 +204,10 @@ async def resolve_alert_recipients(
     admin_rows = await pool.fetch(
         """SELECT id, email, email_notification_mode FROM users
            WHERE role = 'admin'
+             AND organization_id = $1
              AND is_active = true
              AND email_notifications_enabled = true
-             AND email IS NOT NULL AND email <> ''"""
+             AND email IS NOT NULL AND email <> ''""",
+        organization_id,
     )
     return _decrypt(admin_rows)

@@ -235,7 +235,12 @@ async def get_risk_register(
         meta = _parse_meta(row)
         score = compute_risk_score(meta.get("likelihood"), meta.get("impact"))
 
-        review_due = meta.get("review_date") or meta.get("last_reviewed")
+        # Only "Next Review Due" can be overdue. Falling back to "Last
+        # Reviewed" compared a date that is in the past by definition against
+        # today, so a risk reviewed yesterday read as overdue forever — and the
+        # better maintained the risk, the more certainly it was flagged. A risk
+        # with no next-review date simply has nothing to be late for.
+        review_due = meta.get("review_date")
         is_overdue = False
         if review_due:
             try:

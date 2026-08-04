@@ -162,14 +162,43 @@ async def set_response(
 ) -> None:
     """Map a response to a library answer (auto-filling its canonical text) and/or
     set the filled answer text directly."""
-    if answer_asset_id is not None and filled_answer is None:
-        # Auto-fill from the mapped answer-library entry's canonical answer.
-        filled_answer = await pool.fetchval(
+    async def _canonical(asset_id: UUID | None) -> str:
+        if asset_id is None:
+            return ""
+        return await pool.fetchval(
             """SELECT description FROM assets
                WHERE id = $1 AND type = 'answer' AND organization_id = $2""",
-            answer_asset_id,
+            asset_id,
             organization_id,
         ) or ""
+
+    if answer_asset_id is not None:
+        if filled_answer is None:
+            filled_answer = await _canonical(answer_asset_id)
+        else:
+            # Re-mapping to a different library entry has to bring that entry's
+            # text with it. Auto-fill used to be skipped whenever any text was
+            # supplied, and the edit form always re-posts the current text — so
+            # changing the mapping silently kept the previous answer's wording
+            # while displaying the new source, which is how a questionnaire goes
+            # out attesting to the wrong thing.
+            previous = await pool.fetchrow(
+                """SELECT answer_asset_id, filled_answer
+                   FROM questionnaire_responses
+                   WHERE id = $1 AND organization_id = $2""",
+                response_id,
+                organization_id,
+            )
+            if previous and previous["answer_asset_id"] != answer_asset_id:
+                old_canonical = await _canonical(previous["answer_asset_id"])
+                unedited = (previous["filled_answer"] or "").strip() in (
+                    "", (old_canonical or "").strip(),
+                )
+                # Only overwrite text the user hadn't customised.
+                if unedited and filled_answer.strip() == (
+                    previous["filled_answer"] or ""
+                ).strip():
+                    filled_answer = await _canonical(answer_asset_id)
     status = "unanswered"
     if mark_reviewed:
         status = "reviewed"

@@ -231,3 +231,63 @@ async def test_review_counts_service(pool):
     counts = await get_review_counts(pool)
     assert counts["overdue"] == 1
     assert counts["due_soon"] == 1
+
+
+# --- a finished item has nothing left to review ---------------------------
+
+
+@pytest.mark.asyncio
+async def test_terminal_findings_excluded_from_reviews(pool):
+    """`status` stays 'active' until someone archives the asset.
+
+    Filtering on that alone counted closed and risk-accepted findings as
+    overdue — on the register metric, in /my-work, and in the iCal feed.
+    """
+    from grcen.models.asset import AssetType
+    from grcen.services import asset as asset_svc, organization_service, review_service
+
+    org = await organization_service.get_default_org_id(pool)
+    past = "2020-01-01"
+
+    made = {}
+    for status in ("open", "in_remediation", "verified", "risk_accepted", "closed"):
+        a = await asset_svc.create_asset(
+            pool, organization_id=org, type=AssetType.FINDING,
+            name=f"F-{status}", status="active",
+            metadata_={"finding_status": status, "due_date": past},
+        )
+        made[status] = a.id
+
+    overdue = await review_service.get_reviews(
+        pool, asset_type="finding", status_filter="overdue", organization_id=org
+    )
+    ids = {r["id"] for r in overdue}
+
+    assert made["open"] in ids
+    assert made["in_remediation"] in ids
+    assert made["verified"] in ids, "verified still needs closing — keep it visible"
+    assert made["closed"] not in ids
+    assert made["risk_accepted"] not in ids
+
+
+@pytest.mark.asyncio
+async def test_findings_register_overdue_metric_skips_terminal(pool):
+    from grcen.models.asset import AssetType
+    from grcen.services import asset as asset_svc, organization_service
+    from grcen.services import register_service
+
+    org = await organization_service.get_default_org_id(pool)
+    for status in ("open", "closed", "risk_accepted"):
+        await asset_svc.create_asset(
+            pool, organization_id=org, type=AssetType.FINDING,
+            name=f"M-{status}", status="active",
+            metadata_={"finding_status": status, "due_date": "2020-01-01"},
+        )
+
+    from grcen.registers import REGISTERS
+
+    metrics = await register_service.build_metrics(
+        pool, REGISTERS[AssetType.FINDING], organization_id=org
+    )
+    overdue = next(m for m in metrics if m["label"] == "Overdue")
+    assert overdue["value"] == 1

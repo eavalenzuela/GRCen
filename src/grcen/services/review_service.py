@@ -5,6 +5,9 @@ from datetime import date, timedelta
 
 import asyncpg
 
+from grcen.custom_fields import INCIDENT_TERMINAL_STATUSES
+from grcen.services.findings_service import TERMINAL_STATUSES as FINDING_TERMINAL_STATUSES
+
 # Map of asset_type -> metadata field name that holds the "next due" date.
 # Each type uses a different field name for historical reasons.
 REVIEW_DATE_FIELDS: dict[str, str] = {
@@ -25,6 +28,25 @@ REVIEW_DATE_FIELDS: dict[str, str] = {
     "finding": "due_date",
     "audit": "end_date",  # E4: surface the audit's end date as a calendar event
 }
+
+# Types whose lifecycle lives in a metadata field rather than the asset `status`
+# column: asset_type -> (field, terminal values). Something already finished has
+# nothing left to review, but `status` stays 'active' until someone archives the
+# asset, so filtering on that alone counted closed and risk-accepted findings as
+# overdue — on the register, in /my-work, and in the iCal feed.
+_LIFECYCLE_TERMINAL: dict[str, tuple[str, frozenset[str]]] = {
+    "finding": ("finding_status", frozenset(FINDING_TERMINAL_STATUSES)),
+    "incident": ("incident_status", frozenset(INCIDENT_TERMINAL_STATUSES)),
+}
+
+
+def is_lifecycle_terminal(asset_type: str, meta: dict) -> bool:
+    """True when this asset's own lifecycle field says it is already finished."""
+    entry = _LIFECYCLE_TERMINAL.get(asset_type)
+    if not entry:
+        return False
+    field, terminal = entry
+    return str(meta.get(field, "")).strip().lower() in terminal
 
 
 def review_status(due_date_str: str | None, today: date | None = None) -> str:
@@ -90,6 +112,8 @@ async def get_reviews(
         if isinstance(meta, str):
             meta = json.loads(meta)
         if not meta:
+            continue
+        if is_lifecycle_terminal(asset_type_val, meta):
             continue
         due_str = meta.get(field_name)
         if not due_str:
