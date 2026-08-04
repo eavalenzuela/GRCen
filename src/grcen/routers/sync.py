@@ -138,7 +138,9 @@ async def sync_hris(
     user: User = Depends(_sync_required),
 ) -> JSONResponse:
     """Body = the roster (see ``services.hris_sync`` for the contract). Query:
-    ``dry_run`` (preview, writes nothing), ``deactivate_leavers`` (default true).
+    ``dry_run`` (preview, writes nothing), ``deactivate_leavers`` (default true),
+    ``allow_empty`` (default false — an empty roster is refused rather than
+    treated as "everyone left").
     """
     try:
         roster = await request.json()
@@ -150,6 +152,7 @@ async def sync_hris(
         organization_id=user.organization_id,
         dry_run=_flag(request, "dry_run", False),
         deactivate_leavers=_flag(request, "deactivate_leavers", True),
+        allow_empty=_flag(request, "allow_empty", False),
     )
     status = 200 if not result.errors else 400
     return JSONResponse(dataclasses.asdict(result), status_code=status)
@@ -163,7 +166,8 @@ async def sync_vulns(
 ) -> JSONResponse:
     """Body = the findings export (see ``services.vuln_sync`` for the contract).
     Query: ``dry_run`` (preview), ``resolve_missing`` (default true — findings
-    that dropped out are archived as remediated)."""
+    that dropped out are archived as remediated), ``allow_empty`` (default
+    false — an empty export is refused rather than resolving every finding)."""
     try:
         export = await request.json()
     except Exception:
@@ -174,6 +178,7 @@ async def sync_vulns(
         organization_id=user.organization_id,
         dry_run=_flag(request, "dry_run", False),
         resolve_missing=_flag(request, "resolve_missing", True),
+        allow_empty=_flag(request, "allow_empty", False),
     )
     status = 200 if not result.errors else 400
     return JSONResponse(dataclasses.asdict(result), status_code=status)
@@ -186,7 +191,8 @@ async def sync_cspm(
     user: User = Depends(_sync_required),
 ) -> JSONResponse:
     """Body = the CSPM findings export (see ``services.cspm_sync`` for the
-    contract). Query: ``dry_run``, ``resolve_missing`` (default true)."""
+    contract). Query: ``dry_run``, ``resolve_missing`` (default true),
+    ``allow_empty`` (default false)."""
     try:
         export = await request.json()
     except Exception:
@@ -197,6 +203,7 @@ async def sync_cspm(
         organization_id=user.organization_id,
         dry_run=_flag(request, "dry_run", False),
         resolve_missing=_flag(request, "resolve_missing", True),
+        allow_empty=_flag(request, "allow_empty", False),
     )
     status = 200 if not result.errors else 400
     return JSONResponse(dataclasses.asdict(result), status_code=status)

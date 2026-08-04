@@ -365,3 +365,51 @@ async def test_admin_scim_settings_page_and_save(auth_client, pool):
     assert resp.status_code in (302, 303)
     assert (await scim_service.get_default_role(pool)).value == "editor"
     assert await scim_service.get_group_role_map(pool) == {"GRCen Admins": "admin"}
+
+
+@pytest.mark.asyncio
+async def test_patch_replace_members_revokes_dropped_member(pool):
+    """PATCH `replace` on members is authoritative, like PUT already was.
+
+    Handled as add-only, a member the IdP dropped stayed in the group and kept
+    the role that group grants — so an offboarded admin kept admin.
+    """
+    org = await _org(pool)
+    await scim_service.set_group_role_map(pool, {"Admins": "admin"})  # default = viewer
+    u1 = await _member(pool)
+    u2 = await _member(pool)
+    grp = await scim_service.create_group(
+        pool, org, {"displayName": "Admins", "members": [{"value": str(u1.id)}]})
+    gid = uuid.UUID(grp["id"])
+    assert (await get_user_by_id(pool, u1.id)).role == UserRole.ADMIN
+
+    # The IdP now says the group contains only u2.
+    out = await scim_service.patch_group(pool, org, gid, {
+        "Operations": [
+            {"op": "replace", "path": "members", "value": [{"value": str(u2.id)}]}
+        ]})
+
+    member_ids = {m["value"] for m in out["members"]}
+    assert member_ids == {str(u2.id)}
+    assert (await get_user_by_id(pool, u1.id)).role == UserRole.VIEWER  # demoted
+    assert (await get_user_by_id(pool, u2.id)).role == UserRole.ADMIN
+
+
+@pytest.mark.asyncio
+async def test_patch_add_members_is_still_additive(pool):
+    """`add` must keep its own semantics — existing members stay."""
+    org = await _org(pool)
+    await scim_service.set_group_role_map(pool, {"Admins": "admin"})
+    u1 = await _member(pool)
+    u2 = await _member(pool)
+    grp = await scim_service.create_group(
+        pool, org, {"displayName": "Admins", "members": [{"value": str(u1.id)}]})
+    gid = uuid.UUID(grp["id"])
+
+    out = await scim_service.patch_group(pool, org, gid, {
+        "Operations": [
+            {"op": "add", "path": "members", "value": [{"value": str(u2.id)}]}
+        ]})
+
+    assert {m["value"] for m in out["members"]} == {str(u1.id), str(u2.id)}
+    assert (await get_user_by_id(pool, u1.id)).role == UserRole.ADMIN

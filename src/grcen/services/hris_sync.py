@@ -160,12 +160,26 @@ async def sync_roster(
     dry_run: bool = False,
     deactivate_leavers: bool = True,
     reassign_owned_to: UUID | None = None,
+    allow_empty: bool = False,
 ) -> HrisSyncResult:
     """Project ``roster`` into the People graph for one organization."""
     result = HrisSyncResult(dry_run=dry_run)
     errors = validate_roster(roster)
     if errors:
         result.errors = errors
+        return result
+
+    # An empty roster is indistinguishable from "everyone left", and the leaver
+    # step would archive every Person this source owns and disable their logins.
+    # In practice an empty payload almost always means an upstream failure — an
+    # expired credential, a filter that matched nothing, a truncated export — so
+    # winding down an entire org has to be asked for explicitly. Harmless when
+    # deactivate_leavers is off, since nothing is archived then.
+    if not roster["employees"] and deactivate_leavers and not allow_empty:
+        result.errors.append(
+            "roster contains no employees; refusing to treat every synced person "
+            "as a leaver. Pass allow_empty=True if the roster is genuinely empty."
+        )
         return result
 
     src = source or roster.get("source") or DEFAULT_SOURCE

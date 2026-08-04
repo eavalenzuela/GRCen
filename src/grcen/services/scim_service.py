@@ -676,13 +676,48 @@ async def patch_group(pool, organization_id: UUID, group_id: UUID, payload: obje
                     str(new_name), group_id, organization_id)
             continue
 
-        # member add / remove
+        # member add / remove / replace
         m = _MEMBER_REMOVE_RE.match(path)
+        member_replace = operation == "replace" and (
+            path == "members"
+            or (not path and isinstance(value, dict) and "members" in value)
+        )
         if operation == "remove" and m:
             ids = await _valid_member_ids(pool, organization_id, [m.group(1)])
         else:
-            raw = [v.get("value") for v in (value or []) if isinstance(v, dict) and v.get("value")]
+            raw_members = (
+                value.get("members")
+                if (not path and isinstance(value, dict))
+                else value
+            )
+            raw = [
+                v.get("value") for v in (raw_members or [])
+                if isinstance(v, dict) and v.get("value")
+            ]
             ids = await _valid_member_ids(pool, organization_id, raw)
+
+        if member_replace:
+            # `replace` on members is authoritative — the supplied list *is* the
+            # membership, so anyone absent from it is no longer a member. This
+            # was handled as add-only, which left users the IdP had dropped
+            # still in the group and still holding the role it grants. PUT
+            # (replace_group) already had these semantics; PATCH did not.
+            existing = [
+                r["user_id"] for r in await pool.fetch(
+                    "SELECT user_id FROM scim_group_members WHERE group_id = $1",
+                    group_id,
+                )
+            ]
+            keep = set(ids)
+            removed = [u for u in existing if u not in keep]
+            if removed:
+                await pool.execute(
+                    "DELETE FROM scim_group_members "
+                    "WHERE group_id = $1 AND user_id = ANY($2::uuid[])",
+                    group_id, removed,
+                )
+                affected.update(removed)
+
         if not ids:
             continue
         for uid in ids:

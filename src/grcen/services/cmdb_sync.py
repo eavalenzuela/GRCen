@@ -285,8 +285,13 @@ async def sync_inventory(
                     seen_edge_refs.append(esref)
                     result.dependency_edges += 1
 
+            # Scoped to the CIs this inventory actually carried, for the same
+            # reason the archival below is: a devices-only sync can't speak for
+            # the depends_on edges between Systems it never mentioned, and
+            # would otherwise delete every one of them.
             result.edges_pruned = await external_sync.prune_stale_edges(
                 conn, organization_id=org, source=src, seen_refs=seen_edge_refs,
+                from_asset_ids=list(ci_to_asset.values()),
             )
 
             # Decommissioned CIs (dropped out of the inventory). Only archive a

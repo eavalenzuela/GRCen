@@ -294,3 +294,62 @@ async def test_http_invalid_inventory_400(pool):
             headers={"Authorization": f"Bearer {raw}"})
         assert r.status_code == 400
         assert r.json()["errors"]
+
+
+# --- a partial inventory must only prune what it can speak for -------------
+
+
+@pytest.mark.asyncio
+async def test_devices_only_sync_keeps_system_dependency_edges(pool):
+    """Archival is already scoped to the CI classes carried; the edge prune was not.
+
+    Syncing devices alone is a supported flow, and it must not delete the
+    depends_on edges between Systems it never mentioned.
+    """
+    org = await _org(pool)
+    await cmdb_sync.sync_inventory(
+        pool,
+        _inv(systems=[_sys("app", "App", depends_on=["db"]), _sys("db", "DB")]),
+        organization_id=org,
+    )
+    edge = await pool.fetchrow(
+        "SELECT id FROM relationships "
+        "WHERE source = 'cmdb' AND source_ref = 'depends_on:app:db'"
+    )
+    assert edge is not None
+
+    # A devices-only run: says nothing about systems or their edges.
+    result = await cmdb_sync.sync_inventory(
+        pool, _inv(devices=[_sys("lap1", "Laptop 1")]), organization_id=org
+    )
+
+    assert result.edges_pruned == 0
+    still = await pool.fetchrow(
+        "SELECT id FROM relationships "
+        "WHERE source = 'cmdb' AND source_ref = 'depends_on:app:db'"
+    )
+    assert still is not None, "devices-only sync deleted the System depends_on edge"
+
+
+@pytest.mark.asyncio
+async def test_full_sync_still_prunes_dropped_dependency_edge(pool):
+    """The prune must still work for edges the run does speak for."""
+    org = await _org(pool)
+    await cmdb_sync.sync_inventory(
+        pool,
+        _inv(systems=[_sys("app", "App", depends_on=["db"]), _sys("db", "DB")]),
+        organization_id=org,
+    )
+    # app no longer depends on db.
+    result = await cmdb_sync.sync_inventory(
+        pool,
+        _inv(systems=[_sys("app", "App"), _sys("db", "DB")]),
+        organization_id=org,
+    )
+
+    assert result.edges_pruned == 1
+    gone = await pool.fetchrow(
+        "SELECT id FROM relationships "
+        "WHERE source = 'cmdb' AND source_ref = 'depends_on:app:db'"
+    )
+    assert gone is None

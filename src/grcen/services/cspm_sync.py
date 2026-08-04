@@ -174,12 +174,25 @@ async def sync_findings(
     source: str | None = None,
     dry_run: bool = False,
     resolve_missing: bool = True,
+    allow_empty: bool = False,
 ) -> CspmSyncResult:
     """Project a CSPM misconfiguration ``export`` into the asset graph."""
     result = CspmSyncResult(dry_run=dry_run)
     errors = validate_export(export)
     if errors:
         result.errors = errors
+        return result
+
+    # An empty export is indistinguishable from "everything is remediated", and
+    # the resolve step would archive every open finding this source owns. A
+    # scanner that fails auth, times out, or filters to nothing returns exactly
+    # this shape, so silently closing the whole finding backlog — a false
+    # negative in a compliance tool — has to be asked for explicitly.
+    if not export["findings"] and resolve_missing and not allow_empty:
+        result.errors.append(
+            "export contains no findings; refusing to mark every open finding "
+            "as remediated. Pass allow_empty=True if the export is genuinely empty."
+        )
         return result
 
     src = source or export.get("source") or DEFAULT_SOURCE

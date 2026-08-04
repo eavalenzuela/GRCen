@@ -293,3 +293,45 @@ async def test_http_invalid_export_400(pool):
             headers={"Authorization": f"Bearer {raw}"})
         assert r.status_code == 400
         assert r.json()["errors"]
+
+
+# --- an empty export must not close the whole backlog ----------------------
+
+
+@pytest.mark.asyncio
+async def test_empty_export_is_refused(pool):
+    """A scanner that fails auth returns {"findings": []}.
+
+    Treating that as "everything is remediated" silently closes the entire
+    open-vulnerability backlog — a false negative in a compliance tool.
+    """
+    org = await _org(pool)
+    await vuln_sync.sync_findings(
+        pool, _export(_finding("v1", "CVE-1"), _finding("v2", "CVE-2")),
+        organization_id=org,
+    )
+    assert (await _finding_row(pool, org, "finding:v1"))["status"] == "active"
+
+    result = await vuln_sync.sync_findings(pool, _export(), organization_id=org)
+
+    assert result.errors, "empty export was accepted"
+    assert "no findings" in result.errors[0]
+    assert result.findings_resolved == 0
+    assert (await _finding_row(pool, org, "finding:v1"))["status"] == "active"
+    assert (await _finding_row(pool, org, "finding:v2"))["status"] == "active"
+
+
+@pytest.mark.asyncio
+async def test_empty_export_allowed_when_explicit(pool):
+    org = await _org(pool)
+    await vuln_sync.sync_findings(
+        pool, _export(_finding("v1", "CVE-1")), organization_id=org
+    )
+
+    result = await vuln_sync.sync_findings(
+        pool, _export(), organization_id=org, allow_empty=True
+    )
+
+    assert not result.errors
+    assert result.findings_resolved == 1
+    assert (await _finding_row(pool, org, "finding:v1"))["status"] == "archived"

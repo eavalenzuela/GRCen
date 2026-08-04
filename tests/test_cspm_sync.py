@@ -135,12 +135,24 @@ async def test_missing_finding_archived_as_remediated(pool):
     org = await _org(pool)
     await _system(pool, org, cloud_resource_id=_ARN)
     await cspm_sync.sync_findings(
-        pool, _export(_f("W1", "x", resource={"resource_id": _ARN}), source="cspm:wiz"),
+        pool,
+        _export(
+            _f("W1", "x", resource={"resource_id": _ARN}),
+            _f("W2", "y", resource={"resource_id": _ARN}),
+            source="cspm:wiz",
+        ),
         organization_id=org)
-    result = await cspm_sync.sync_findings(pool, _export(source="cspm:wiz"), organization_id=org)
+    # W1 fixed upstream — drops out of an otherwise populated export.
+    result = await cspm_sync.sync_findings(
+        pool,
+        _export(_f("W2", "y", resource={"resource_id": _ARN}), source="cspm:wiz"),
+        organization_id=org)
     assert result.resolved == ["finding:W1"]
     assert result.findings_resolved == 1
-    fnd = await _finding(pool, org, "cspm:wiz")
+    fnd = await pool.fetchrow(
+        "SELECT id, metadata, status FROM assets "
+        "WHERE source = $1 AND organization_id = $2 AND source_ref = $3",
+        "cspm:wiz", org, "finding:W1")
     assert fnd["status"] == "archived"
     assert _meta(fnd)["finding_status"] == "remediated"
 
@@ -214,3 +226,36 @@ async def test_http_sync(pool):
         assert r.status_code == 200
         assert r.json()["findings_created"] == 1
         assert r.json()["affects_edges"] == 1
+
+
+# --- an empty export must not close the whole backlog ----------------------
+
+
+@pytest.mark.asyncio
+async def test_empty_export_is_refused(pool):
+    """Same failure mode as the vuln connector: see test_vuln_sync."""
+    org = await _org(pool)
+    await cspm_sync.sync_findings(
+        pool, _export(_f("c1", "Public bucket")), organization_id=org
+    )
+
+    result = await cspm_sync.sync_findings(pool, _export(), organization_id=org)
+
+    assert result.errors, "empty export was accepted"
+    assert "no findings" in result.errors[0]
+    assert result.findings_resolved == 0
+
+
+@pytest.mark.asyncio
+async def test_empty_export_allowed_when_explicit(pool):
+    org = await _org(pool)
+    await cspm_sync.sync_findings(
+        pool, _export(_f("c1", "Public bucket")), organization_id=org
+    )
+
+    result = await cspm_sync.sync_findings(
+        pool, _export(), organization_id=org, allow_empty=True
+    )
+
+    assert not result.errors
+    assert result.findings_resolved == 1

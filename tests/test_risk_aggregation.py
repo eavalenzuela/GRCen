@@ -19,7 +19,13 @@ async def _system(pool, org, name="Prod Web", hostname="web01"):
 
 
 async def _sync(pool, org, findings):
-    return await vuln_sync.sync_findings(pool, {"findings": findings}, organization_id=org)
+    # These tests drive the backlog to genuinely zero to check the "everything
+    # resolved" rollup, which is exactly what allow_empty is for — an empty
+    # export is otherwise refused, since it usually means a broken scanner.
+    return await vuln_sync.sync_findings(
+        pool, {"findings": findings}, organization_id=org,
+        allow_empty=not findings,
+    )
 
 
 def _f(fid, sev, host=None, **over):

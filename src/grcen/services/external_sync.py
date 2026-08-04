@@ -180,17 +180,35 @@ async def prune_stale_edges(
     organization_id: UUID,
     source: str,
     seen_refs: list[str],
+    from_asset_ids: list[UUID] | None = None,
 ) -> int:
     """Delete edges tagged ``source`` whose source_ref isn't in ``seen_refs``.
 
-    Edges cascade to nothing, so unlike assets they're always safe to prune —
-    no gating flag. Returns the count deleted.
+    Deleting an edge cascades to nothing, so unlike an asset it needs no
+    gating flag — but "safe to delete" is not "correct to delete". A caller
+    that syncs only part of what it owns (one CI class, one page) would sweep
+    away the edges belonging to the part it did not carry, because those refs
+    are legitimately absent from ``seen_refs``.
+
+    ``from_asset_ids`` narrows the sweep to edges originating at assets this
+    run actually covered, which is the scope such a caller can speak for.
+    Omit it when the run covers everything the source owns. Returns the count
+    deleted.
     """
     _require(source, "source")
-    result = await conn.execute(
-        """DELETE FROM relationships
-           WHERE organization_id = $1 AND source = $2
-             AND source_ref <> ALL($3::text[])""",
-        organization_id, source, seen_refs,
-    )
+    if from_asset_ids is None:
+        result = await conn.execute(
+            """DELETE FROM relationships
+               WHERE organization_id = $1 AND source = $2
+                 AND source_ref <> ALL($3::text[])""",
+            organization_id, source, seen_refs,
+        )
+    else:
+        result = await conn.execute(
+            """DELETE FROM relationships
+               WHERE organization_id = $1 AND source = $2
+                 AND source_ref <> ALL($3::text[])
+                 AND source_asset_id = ANY($4::uuid[])""",
+            organization_id, source, seen_refs, from_asset_ids,
+        )
     return int(result.split()[-1])

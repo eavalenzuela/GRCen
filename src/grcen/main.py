@@ -555,7 +555,7 @@ async def _sync_catalog():
 
 
 async def _sync_hris():
-    """`grcen sync-hris <file> [--org=SLUG] [--dry-run] [--source=NAME] [--keep-leavers] [--reassign-to=UUID]`.
+    """`grcen sync-hris <file> [--org=SLUG] [--dry-run] [--source=NAME] [--keep-leavers] [--reassign-to=UUID] [--allow-empty]`.
 
     Project an HRIS roster (employees + optional org units) into the People
     graph: upserts People/OUs and manager + membership edges, and archives
@@ -571,7 +571,7 @@ async def _sync_hris():
     argv = sys.argv[2:]
     positional = [a for a in argv if not a.startswith("--")]
     if not positional:
-        print("Usage: grcen sync-hris <file> [--org=SLUG] [--dry-run] [--source=NAME] [--keep-leavers] [--reassign-to=UUID]")
+        print("Usage: grcen sync-hris <file> [--org=SLUG] [--dry-run] [--source=NAME] [--keep-leavers] [--reassign-to=UUID] [--allow-empty]")
         sys.exit(1)
     path = Path(positional[0])
     if not path.exists():
@@ -580,6 +580,7 @@ async def _sync_hris():
 
     dry_run = "--dry-run" in argv
     keep_leavers = "--keep-leavers" in argv
+    allow_empty = "--allow-empty" in argv
     org_slug = next((a.split("=", 1)[1] for a in argv if a.startswith("--org=")), None)
     source = next((a.split("=", 1)[1] for a in argv if a.startswith("--source=")), None)
     reassign_raw = next((a.split("=", 1)[1] for a in argv if a.startswith("--reassign-to=")), None)
@@ -612,7 +613,7 @@ async def _sync_hris():
     result = await hris_sync.sync_roster(
         pool, roster, organization_id=org_id, source=source,
         dry_run=dry_run, deactivate_leavers=not keep_leavers,
-        reassign_owned_to=reassign_to,
+        reassign_owned_to=reassign_to, allow_empty=allow_empty,
     )
 
     if result.errors:
@@ -640,7 +641,7 @@ async def _sync_hris():
 
 
 async def _sync_vulns():
-    """`grcen sync-vulns <file> [--org=SLUG] [--dry-run] [--source=NAME] [--keep-resolved]`.
+    """`grcen sync-vulns <file> [--org=SLUG] [--dry-run] [--source=NAME] [--keep-resolved] [--allow-empty]`.
 
     Project a vulnerability-findings export (from uvt, or a per-scanner exporter)
     into the asset graph: upserts Finding assets, links each to the System it
@@ -655,7 +656,7 @@ async def _sync_vulns():
     argv = sys.argv[2:]
     positional = [a for a in argv if not a.startswith("--")]
     if not positional:
-        print("Usage: grcen sync-vulns <file> [--org=SLUG] [--dry-run] [--source=NAME] [--keep-resolved]")
+        print("Usage: grcen sync-vulns <file> [--org=SLUG] [--dry-run] [--source=NAME] [--keep-resolved] [--allow-empty]")
         sys.exit(1)
     path = Path(positional[0])
     if not path.exists():
@@ -688,6 +689,7 @@ async def _sync_vulns():
     result = await vuln_sync.sync_findings(
         pool, export, organization_id=org_id, source=source,
         dry_run=dry_run, resolve_missing=not keep_resolved,
+        allow_empty="--allow-empty" in argv,
     )
 
     if result.errors:
@@ -822,7 +824,7 @@ async def _aggregate_risks():
 
 
 async def _sync_cspm():
-    """`grcen sync-cspm <file> [--org=SLUG] [--dry-run] [--source=NAME] [--keep-resolved]`.
+    """`grcen sync-cspm <file> [--org=SLUG] [--dry-run] [--source=NAME] [--keep-resolved] [--allow-empty]`.
 
     Project a CSPM misconfiguration export into the asset graph: upserts Finding
     assets, links each to the cloud System it affects (by resource id), and
@@ -837,7 +839,7 @@ async def _sync_cspm():
     argv = sys.argv[2:]
     positional = [a for a in argv if not a.startswith("--")]
     if not positional:
-        print("Usage: grcen sync-cspm <file> [--org=SLUG] [--dry-run] [--source=NAME] [--keep-resolved]")
+        print("Usage: grcen sync-cspm <file> [--org=SLUG] [--dry-run] [--source=NAME] [--keep-resolved] [--allow-empty]")
         sys.exit(1)
     path = Path(positional[0])
     if not path.exists():
@@ -869,7 +871,8 @@ async def _sync_cspm():
 
     result = await cspm_sync.sync_findings(
         pool, export, organization_id=org_id, source=source,
-        dry_run=dry_run, resolve_missing=not keep_resolved)
+        dry_run=dry_run, resolve_missing=not keep_resolved,
+        allow_empty="--allow-empty" in argv)
 
     if result.errors:
         print(f"Export invalid — {len(result.errors)} error(s), nothing written:")

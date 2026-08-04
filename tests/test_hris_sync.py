@@ -299,3 +299,70 @@ async def test_http_invalid_roster_400(pool):
         )
         assert r.status_code == 400
         assert r.json()["errors"]
+
+
+# --- an empty roster must not be read as "everyone left" -------------------
+
+
+@pytest.mark.asyncio
+async def test_empty_roster_is_refused(pool):
+    """A failed export returns {"employees": []}, which is not a mass leaver event."""
+    org = await _org(pool)
+    await hris_sync.sync_roster(
+        pool, _roster(_emp("e1", "Alice"), _emp("e2", "Bob")), organization_id=org
+    )
+    assert (await _person_ref(pool, org, "emp:e1"))["status"] == "active"
+
+    result = await hris_sync.sync_roster(pool, _roster(), organization_id=org)
+
+    assert result.errors, "empty roster was accepted"
+    assert "no employees" in result.errors[0]
+    assert result.persons_archived == 0
+    # Untouched, not archived.
+    assert (await _person_ref(pool, org, "emp:e1"))["status"] == "active"
+    assert (await _person_ref(pool, org, "emp:e2"))["status"] == "active"
+
+
+@pytest.mark.asyncio
+async def test_empty_roster_allowed_when_explicit(pool):
+    """Winding an org down is legitimate — it just has to be asked for."""
+    org = await _org(pool)
+    await hris_sync.sync_roster(pool, _roster(_emp("e1", "Alice")), organization_id=org)
+
+    result = await hris_sync.sync_roster(
+        pool, _roster(), organization_id=org, allow_empty=True
+    )
+
+    assert not result.errors
+    assert result.persons_archived == 1
+    assert (await _person_ref(pool, org, "emp:e1"))["status"] == "archived"
+
+
+@pytest.mark.asyncio
+async def test_empty_roster_harmless_when_leavers_disabled(pool):
+    org = await _org(pool)
+    await hris_sync.sync_roster(pool, _roster(_emp("e1", "Alice")), organization_id=org)
+
+    result = await hris_sync.sync_roster(
+        pool, _roster(), organization_id=org, deactivate_leavers=False
+    )
+
+    assert not result.errors
+    assert (await _person_ref(pool, org, "emp:e1"))["status"] == "active"
+
+
+@pytest.mark.asyncio
+async def test_empty_roster_does_not_disable_logins(pool):
+    """The login half of deprovisioning must not fire either."""
+    org = await _org(pool)
+    await hris_sync.sync_roster(pool, _roster(_emp("e1", "Alice")), organization_id=org)
+    person = await _person_ref(pool, org, "emp:e1")
+    u = await create_user(
+        pool, f"alice_{uuid.uuid4().hex[:8]}", "pw",
+        role=UserRole.EDITOR, organization_id=org,
+    )
+    await set_person_asset_link(pool, u.id, person["id"])
+
+    await hris_sync.sync_roster(pool, _roster(), organization_id=org)
+
+    assert (await get_user_by_id(pool, u.id)).is_active is True
