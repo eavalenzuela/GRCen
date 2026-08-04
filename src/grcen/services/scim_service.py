@@ -232,9 +232,17 @@ async def create_user(
         )
 
     role = await get_default_role(pool)
-    user = await auth_svc.create_user(
-        pool, parsed["username"], None, role, organization_id
-    )
+    try:
+        user = await auth_svc.create_user(
+            pool, parsed["username"], None, role, organization_id
+        )
+    except auth_svc.UserExistsError as exc:
+        # The check above is a separate statement, so a concurrent POST can slip
+        # between it and this insert; the unique index catches that.
+        raise ScimError(
+            409, f"userName '{parsed['username']}' already exists",
+            scim_type="uniqueness",
+        ) from exc
     if parsed["email"]:
         await auth_svc.set_user_email(pool, user.id, parsed["email"])
     if not parsed["active"]:

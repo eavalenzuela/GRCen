@@ -89,15 +89,25 @@ async def flush_digests(pool: asyncpg.Pool) -> int:
     org (a user belongs to one org by default; additional memberships are
     flushed in separate envelopes since branding differs per tenant).
     """
+    # Claim before sending. This job runs in every gunicorn worker, so a plain
+    # `WHERE sent_at IS NULL` select let both workers drain the same rows and
+    # every subscriber received one copy of the digest per worker. Stamping
+    # sent_at inside the claim makes it at-most-once; SKIP LOCKED lets the other
+    # worker move past rows this one already holds. Delivery failures are still
+    # recorded in notification_deliveries by send_email.
     rows = await pool.fetch(
-        """SELECT id, user_id, organization_id, alert_id, asset_id,
-                  asset_name, title, message, link
-           FROM pending_email_digest
-           WHERE sent_at IS NULL
-           ORDER BY user_id, organization_id, queued_at"""
+        """UPDATE pending_email_digest SET sent_at = now()
+           WHERE id IN (
+               SELECT id FROM pending_email_digest
+               WHERE sent_at IS NULL
+               FOR UPDATE SKIP LOCKED
+           )
+           RETURNING id, user_id, organization_id, alert_id, asset_id,
+                     asset_name, title, message, link, queued_at"""
     )
     if not rows:
         return 0
+    rows = sorted(rows, key=lambda r: (r["user_id"], r["organization_id"], r["queued_at"]))
 
     # Group by (user_id, organization_id) so each envelope reflects one org's
     # branding and goes to that user's email.
@@ -111,19 +121,13 @@ async def flush_digests(pool: asyncpg.Pool) -> int:
             "SELECT email, email_notifications_enabled FROM users WHERE id = $1",
             user_id,
         )
+        # These rows are already claimed (sent_at stamped above), so the
+        # discard cases just fall through — there is nothing left to mark.
         if not user_row or not user_row["email_notifications_enabled"]:
             # User opted out between queue and flush — discard quietly.
-            await pool.execute(
-                "UPDATE pending_email_digest SET sent_at = now() WHERE id = ANY($1::uuid[])",
-                [i["id"] for i in items],
-            )
             continue
         email = user_row["email"]
         if not email:
-            await pool.execute(
-                "UPDATE pending_email_digest SET sent_at = now() WHERE id = ANY($1::uuid[])",
-                [i["id"] for i in items],
-            )
             continue
         # PII may be encrypted at rest.
         from grcen.services import encryption_config
@@ -145,9 +149,13 @@ async def flush_digests(pool: asyncpg.Pool) -> int:
             user_id=user_id,
         )
         if ok:
+            sent += 1
+        else:
+            # Release the claim so the next hourly flush retries, rather than
+            # dropping the digest because a transient SMTP error happened to
+            # land after we had already marked the rows.
             await pool.execute(
-                "UPDATE pending_email_digest SET sent_at = now() WHERE id = ANY($1::uuid[])",
+                "UPDATE pending_email_digest SET sent_at = NULL WHERE id = ANY($1::uuid[])",
                 [i["id"] for i in items],
             )
-            sent += 1
     return sent

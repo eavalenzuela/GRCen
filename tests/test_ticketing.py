@@ -296,3 +296,82 @@ async def test_admin_itsm_settings_page_and_save(auth_client, pool):
 async def test_admin_itsm_settings_requires_manage_users(viewer_client):
     resp = await viewer_client.get("/admin/itsm-settings")
     assert resp.status_code in (302, 403)
+
+
+@pytest.mark.asyncio
+async def test_concurrent_push_creates_one_ticket(pool):
+    """The 'already linked' guard is separated from the write by an HTTP call.
+
+    Both callers passed the check, both created a real ticket at the provider,
+    and the second write buried the first ticket's ref.
+    """
+    import asyncio
+
+    org = await _org(pool)
+    await _configure(pool)
+    finding = await _finding(pool, org)
+
+    created: list[str] = []
+
+    def handler(req):
+        created.append(req.url.path)
+        return httpx.Response(201, json={"key": f"SEC-{len(created)}"})
+
+    with _patch_httpx(httpx.MockTransport(handler)):
+        results = await asyncio.gather(
+            ticketing_service.push_finding(pool, finding.id, organization_id=org),
+            ticketing_service.push_finding(pool, finding.id, organization_id=org),
+            return_exceptions=True,
+        )
+
+    ok = [r for r in results if not isinstance(r, Exception)]
+    assert len(ok) == 1, f"{len(ok)} pushes succeeded"
+    assert len(created) == 1, f"{len(created)} tickets created at the provider"
+
+    meta = await _meta(pool, finding.id)
+    assert meta["external_ticket"] == ok[0]["ticket_key"]
+
+
+@pytest.mark.asyncio
+async def test_push_preserves_concurrent_metadata_edits(pool):
+    """The stamp must merge, not overwrite the blob read before the HTTP call."""
+    org = await _org(pool)
+    await _configure(pool)
+    finding = await _finding(pool, org)
+
+    def handler(req):
+        # Someone edits the finding while the provider request is in flight.
+        return httpx.Response(201, json={"key": "SEC-9"})
+
+    await pool.execute(
+        """UPDATE assets SET metadata = coalesce(metadata,'{}'::jsonb)
+               || '{"finding_status": "in_remediation"}'::jsonb WHERE id = $1""",
+        finding.id,
+    )
+
+    with _patch_httpx(httpx.MockTransport(handler)):
+        await ticketing_service.push_finding(pool, finding.id, organization_id=org)
+
+    meta = await _meta(pool, finding.id)
+    assert meta["external_ticket"] == "SEC-9"
+    assert meta["finding_status"] == "in_remediation", "concurrent edit was reverted"
+
+
+@pytest.mark.asyncio
+async def test_failed_push_releases_the_claim(pool):
+    """A provider error must leave the finding pushable again."""
+    org = await _org(pool)
+    await _configure(pool)
+    finding = await _finding(pool, org)
+
+    with _patch_httpx(httpx.MockTransport(lambda r: httpx.Response(500, text="nope"))):
+        with pytest.raises(ticketing_service.TicketingError):
+            await ticketing_service.push_finding(pool, finding.id, organization_id=org)
+
+    meta = await _meta(pool, finding.id)
+    assert "external_ticket" not in meta
+    assert meta.get("external_ticket_status") != "creating"
+
+    with _patch_httpx(httpx.MockTransport(lambda r: httpx.Response(201, json={"key": "SEC-2"}))):
+        out = await ticketing_service.push_finding(pool, finding.id, organization_id=org)
+    assert out["ticket_key"] == "SEC-2"

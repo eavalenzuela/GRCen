@@ -58,6 +58,18 @@ async def _prepare_email(pool: asyncpg.Pool, email: str | None) -> tuple[str | N
 # ── public API ────────────────────────────────────────────────────────────
 
 
+class UserExistsError(Exception):
+    """A user with this username already exists.
+
+    ``users.username`` is globally unique, not per-org, so this can be raised by
+    a username already taken in a *different* organization.
+    """
+
+    def __init__(self, username: str):
+        self.username = username
+        super().__init__(f"username '{username}' is already taken")
+
+
 async def create_user(
     pool: asyncpg.Pool,
     username: str,
@@ -65,28 +77,38 @@ async def create_user(
     role: UserRole = UserRole.VIEWER,
     organization_id: UUID | None = None,
 ) -> User:
+    """Create a user. Raises ``UserExistsError`` if the username is taken.
+
+    This used to be an upsert — ``ON CONFLICT (username) DO UPDATE`` setting
+    hashed_password, is_admin and role. Since usernames are globally unique and
+    ``organization_id`` was *not* in the update list, "creating" a user whose
+    name already existed in another tenant silently reset that user's password
+    and role while leaving them in their own org: an admin of any org could take
+    over any account anywhere, then log in as them. Every caller already
+    pre-checked for a duplicate and reported one, so nothing wanted the
+    overwrite — the checks were just racy, which letting the unique index decide
+    now fixes as well.
+    """
     from grcen.services import organization_service
     if organization_id is None:
         organization_id = await organization_service.get_default_org_id(pool)
     hashed = hash_password(password) if password else _UNUSABLE_PASSWORD
-    row = await pool.fetchrow(
-        """
-        INSERT INTO users (id, username, hashed_password, is_active, is_admin, role, organization_id)
-        VALUES ($1, $2, $3, true, $4, $5, $6)
-        ON CONFLICT (username) DO UPDATE
-            SET hashed_password = EXCLUDED.hashed_password,
-                is_admin = EXCLUDED.is_admin,
-                role = EXCLUDED.role,
-                updated_at = now()
-        RETURNING *
-        """,
-        uuid.uuid4(),
-        username,
-        hashed,
-        role == UserRole.ADMIN,
-        role.value,
-        organization_id,
-    )
+    try:
+        row = await pool.fetchrow(
+            """
+            INSERT INTO users (id, username, hashed_password, is_active, is_admin, role, organization_id)
+            VALUES ($1, $2, $3, true, $4, $5, $6)
+            RETURNING *
+            """,
+            uuid.uuid4(),
+            username,
+            hashed,
+            role == UserRole.ADMIN,
+            role.value,
+            organization_id,
+        )
+    except asyncpg.UniqueViolationError as exc:
+        raise UserExistsError(username) from exc
     user = User.from_row(row)
     # Mirror the create into user_organizations so the multi-org membership
     # table stays the source of truth — saves callers from having to remember

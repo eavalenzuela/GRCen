@@ -268,3 +268,36 @@ async def test_future_review_date_is_not_overdue(pool):
     register = await risk_service.get_risk_register(pool, organization_id=org)
     by_id = {x["id"]: x for x in register}
     assert by_id[r.id]["is_overdue"] is False
+
+
+@pytest.mark.asyncio
+async def test_bulk_update_preserves_unrelated_metadata(pool):
+    """Bulk update was a read-modify-write of the whole metadata blob.
+
+    Anything changed between the read and the write — another bulk update over
+    an overlapping selection, or an edit to an unrelated key — was reverted.
+    """
+    from grcen.models.asset import AssetType
+    from grcen.services import asset as asset_svc, organization_service, risk_service
+
+    org = await organization_service.get_default_org_id(pool)
+    risk = await asset_svc.create_asset(
+        pool, organization_id=org, type=AssetType.RISK, name="Merge me",
+        status="active",
+        metadata_={"likelihood": "3", "impact": "4", "category": "operational"},
+    )
+
+    await risk_service.bulk_update_risks(
+        pool, [risk.id], treatment="mitigate", organization_id=org
+    )
+
+    row = await pool.fetchrow("SELECT metadata FROM assets WHERE id = $1", risk.id)
+    meta = row["metadata"]
+    if isinstance(meta, str):
+        import json as _json
+        meta = _json.loads(meta)
+    assert meta["treatment"] == "mitigate"
+    # The keys this call never mentioned must survive.
+    assert meta["likelihood"] == "3"
+    assert meta["impact"] == "4"
+    assert meta["category"] == "operational"

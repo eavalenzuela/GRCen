@@ -589,3 +589,47 @@ async def test_prepare_connection_sets_role_when_rls_enabled(monkeypatch):
         await tenancy.prepare_connection(_Conn())
 
     assert any(f"SET ROLE {tenancy.APP_ROLE}" in s for s in executed)
+
+
+@pytest.mark.asyncio
+async def test_apply_policies_is_atomic(pool):
+    """A partial re-apply must never leave a table RLS-enabled with no policy.
+
+    Each statement used to autocommit, so between DROP POLICY and CREATE POLICY
+    the table was default-deny. With 2+ workers, one is serving traffic while
+    another boots and re-applies, so live reads returned nothing and live writes
+    failed. Wrapping the re-apply means an interrupted run rolls back whole.
+    """
+    from grcen import tenancy
+
+    class _FailAfter:
+        """Proxy that fails once a CREATE POLICY has been seen."""
+
+        def __init__(self, conn):
+            self._conn = conn
+            self._created = 0
+
+        async def execute(self, sql, *args):
+            if sql.startswith("CREATE POLICY"):
+                self._created += 1
+                if self._created > 3:
+                    raise RuntimeError("boom, mid-apply")
+            return await self._conn.execute(sql, *args)
+
+        def __getattr__(self, name):
+            return getattr(self._conn, name)
+
+    with tenancy.system_context():
+        async with pool.acquire() as conn:
+            before = await tenancy.protected_tables(conn)
+            assert before, "expected policies to be in place at baseline"
+
+            with pytest.raises(RuntimeError, match="boom"):
+                await tenancy.apply_policies(_FailAfter(conn))
+
+            after = await tenancy.protected_tables(conn)
+
+    assert after == before, (
+        "a failed re-apply left tables unprotected: "
+        f"{sorted(before - after)}"
+    )

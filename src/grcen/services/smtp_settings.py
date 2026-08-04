@@ -6,6 +6,8 @@ Mirrors the shape of ``oidc_settings`` / ``saml_settings``: key-value rows in
 
 from dataclasses import dataclass
 
+import time
+
 import asyncpg
 
 from grcen.services import encryption_config
@@ -58,11 +60,24 @@ class SMTPSettings:
         return self.use_ssl.lower() == "true"
 
 
+# Module-level cache with a short TTL.
+#
+# The TTL matters because this cache is per-process and the app runs under
+# gunicorn with several workers: an admin saving the settings form only
+# invalidates the cache in the worker that served that request, so without
+# expiry every other worker keeps serving the previous configuration
+# indefinitely. Converging within the TTL is the point, not the caching.
 _cache: SMTPSettings | None = None
+_cache_at: float = 0.0
+_CACHE_TTL = 30.0
+
+
+def _cache_fresh() -> bool:
+    return _cache is not None and (time.monotonic() - _cache_at) < _CACHE_TTL
 
 
 async def _load(pool: asyncpg.Pool) -> SMTPSettings:
-    global _cache
+    global _cache, _cache_at
     rows = await pool.fetch("SELECT key, value FROM smtp_config")
     values = {r["key"]: r["value"] for r in rows}
 
@@ -72,12 +87,13 @@ async def _load(pool: asyncpg.Pool) -> SMTPSettings:
             if sk in values and values[sk]:
                 values[sk] = decrypt_field(values[sk], "smtp_secrets")
 
+    _cache_at = time.monotonic()
     _cache = SMTPSettings(**{k: values.get(k, v) for k, v in _DEFAULTS.items()})
     return _cache
 
 
 async def get_settings(pool: asyncpg.Pool) -> SMTPSettings:
-    if _cache is None:
+    if not _cache_fresh():
         return await _load(pool)
     return _cache
 

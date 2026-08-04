@@ -153,33 +153,75 @@ async def push_finding(
     if meta.get("external_ticket"):
         raise TicketingError(f"finding already linked to ticket {meta['external_ticket']}")
 
-    url, payload, auth, headers = _build_request(
-        cfg, finding["name"], _describe_finding(finding["name"], finding["description"], meta)
+    # Claim the finding before calling out. The check above and the write below
+    # are separated by an HTTP round trip of up to _TIMEOUT_SECONDS, so without
+    # a claim two concurrent pushes both passed the check, both created a ticket
+    # in Jira/ServiceNow, and the second write buried the first ticket's ref —
+    # leaving a real ticket nobody in GRCen can see. The conditional UPDATE only
+    # matches while the finding is still unlinked and unclaimed.
+    claimed = await pool.fetchval(
+        """UPDATE assets
+              SET metadata = coalesce(metadata, '{}'::jsonb)
+                             || '{"external_ticket_status": "creating"}'::jsonb,
+                  updated_at = now()
+            WHERE id = $1 AND organization_id = $2 AND type = 'finding'
+              AND coalesce(metadata->>'external_ticket', '') = ''
+              AND coalesce(metadata->>'external_ticket_status', '') <> 'creating'
+            RETURNING 1""",
+        finding_id, organization_id,
     )
-    try:
-        async with httpx.AsyncClient(timeout=_TIMEOUT_SECONDS) as client:
-            resp = await client.post(url, json=payload, auth=auth, headers=headers)
-    except Exception as exc:  # noqa: BLE001 — surface as a clean error
-        raise TicketingError(f"ITSM request failed: {type(exc).__name__}", status=502) from exc
-    if not (200 <= resp.status_code < 300):
+    if not claimed:
         raise TicketingError(
-            f"ITSM returned HTTP {resp.status_code}: {resp.text[:300]}", status=502
+            "a ticket is already being created for this finding", status=409
         )
-    try:
-        data = resp.json()
-    except Exception:  # noqa: BLE001
-        data = {}
-    key, ticket_url = _parse_response(cfg, data)
-    if not key:
-        raise TicketingError("ITSM response did not include a ticket id", status=502)
 
-    meta["external_ticket"] = key
+    async def _release() -> None:
+        await pool.execute(
+            """UPDATE assets
+                  SET metadata = coalesce(metadata, '{}'::jsonb) - 'external_ticket_status',
+                      updated_at = now()
+                WHERE id = $1 AND organization_id = $2
+                  AND coalesce(metadata->>'external_ticket', '') = ''""",
+            finding_id, organization_id,
+        )
+
+    try:
+        url, payload, auth, headers = _build_request(
+            cfg, finding["name"], _describe_finding(finding["name"], finding["description"], meta)
+        )
+        try:
+            async with httpx.AsyncClient(timeout=_TIMEOUT_SECONDS) as client:
+                resp = await client.post(url, json=payload, auth=auth, headers=headers)
+        except Exception as exc:  # noqa: BLE001 — surface as a clean error
+            raise TicketingError(f"ITSM request failed: {type(exc).__name__}", status=502) from exc
+        if not (200 <= resp.status_code < 300):
+            raise TicketingError(
+                f"ITSM returned HTTP {resp.status_code}: {resp.text[:300]}", status=502
+            )
+        try:
+            data = resp.json()
+        except Exception:  # noqa: BLE001
+            data = {}
+        key, ticket_url = _parse_response(cfg, data)
+        if not key:
+            raise TicketingError("ITSM response did not include a ticket id", status=502)
+    except Exception:
+        # Put the finding back the way we found it so a retry can proceed.
+        await _release()
+        raise
+
+    # Merge into whatever metadata is there NOW rather than writing back the
+    # blob read before the HTTP call — anything changed meanwhile (a status
+    # update, an owner edit) would otherwise be silently reverted.
+    stamp = {"external_ticket": key, "external_ticket_status": "created"}
     if ticket_url:
-        meta["external_ticket_url"] = ticket_url
-    meta["external_ticket_status"] = "created"
+        stamp["external_ticket_url"] = ticket_url
     await pool.execute(
-        "UPDATE assets SET metadata = $1::jsonb, updated_at = now() WHERE id = $2",
-        json.dumps(meta), finding_id,
+        """UPDATE assets
+              SET metadata = coalesce(metadata, '{}'::jsonb) || $1::jsonb,
+                  updated_at = now()
+            WHERE id = $2 AND organization_id = $3""",
+        json.dumps(stamp), finding_id, organization_id,
     )
     return {"ticket_key": key, "ticket_url": ticket_url, "provider": cfg.provider}
 

@@ -308,3 +308,56 @@ async def test_concurrent_approvals_apply_the_change_once(pool, two_admins_and_e
 
     final = await workflow_service.get(pool, uuid.UUID(change_id))
     assert final.status == "approved"
+
+
+@pytest.mark.asyncio
+async def test_deciding_an_already_decided_change_is_a_clean_error(pool, two_admins_and_editor):
+    """Withdraw/reject fed a 0-row conditional UPDATE into from_row(None).
+
+    The status check at the top of each is against a stale in-memory copy, so
+    it cannot see a decision made in between; the result was a TypeError
+    surfacing as a 500 rather than a clear "already decided".
+    """
+    fx = two_admins_and_editor
+    await workflow_service.upsert_config(
+        pool, AssetType.POLICY, require_approval_create=True,
+        require_approval_update=False, require_approval_delete=False,
+        required_approvals=1,
+    )
+    submit = await fx["ced"].post(
+        "/api/assets/", json={"type": "policy", "name": "DecideTwice"}
+    )
+    change_id = uuid.UUID(submit.json()["pending_change_id"])
+    stale = await workflow_service.get(pool, change_id)
+
+    # Someone else rejects it first.
+    await workflow_service.reject(pool, stale, fx["a1"], note=None)
+
+    # The submitter now withdraws using their stale copy.
+    with pytest.raises(ValueError, match="already been decided"):
+        await workflow_service.withdraw(pool, stale, fx["editor"], note=None)
+
+    # And a second reject behaves the same way.
+    with pytest.raises(ValueError, match="already been decided"):
+        await workflow_service.reject(pool, stale, fx["a2"], note=None)
+
+    assert (await workflow_service.get(pool, change_id)).status == "rejected"
+
+
+@pytest.mark.asyncio
+async def test_reject_over_http_is_400_not_500(pool, two_admins_and_editor):
+    fx = two_admins_and_editor
+    await workflow_service.upsert_config(
+        pool, AssetType.POLICY, require_approval_create=True,
+        require_approval_update=False, require_approval_delete=False,
+        required_approvals=1,
+    )
+    submit = await fx["ced"].post(
+        "/api/assets/", json={"type": "policy", "name": "RejectTwice"}
+    )
+    change_id = submit.json()["pending_change_id"]
+
+    first = await fx["ca1"].post(f"/api/approvals/{change_id}/reject", json={})
+    assert first.status_code == 200
+    second = await fx["ca2"].post(f"/api/approvals/{change_id}/reject", json={})
+    assert second.status_code == 400, f"expected a clean 400, got {second.status_code}"

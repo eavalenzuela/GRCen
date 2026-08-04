@@ -444,29 +444,27 @@ async def bulk_update_risks(
                     )
                 if not row:
                     continue
-                meta = row["metadata"]
-                if isinstance(meta, str):
-                    meta = json.loads(meta) or {}
-                elif meta is None:
-                    meta = {}
-                else:
-                    meta = dict(meta)
-
-                changed = False
+                patch: dict = {}
                 if treatment is not None:
-                    meta["treatment"] = treatment
-                    changed = True
+                    patch["treatment"] = treatment
                 if review_date is not None:
-                    meta["review_date"] = review_date
-                    changed = True
+                    patch["review_date"] = review_date
 
+                changed = bool(patch)
                 if changed:
+                    # Merge server-side. Writing back the whole blob read a
+                    # moment ago made this a read-modify-write: a concurrent
+                    # bulk update over an overlapping selection, or any edit to
+                    # an unrelated metadata key, was silently reverted by
+                    # whichever write landed second. `||` applies only the keys
+                    # this call actually changes.
                     await conn.execute(
                         """UPDATE assets
-                             SET metadata = $1::jsonb, updated_at = now(),
+                             SET metadata = coalesce(metadata, '{}'::jsonb) || $1::jsonb,
+                                 updated_at = now(),
                                  updated_by = COALESCE($2, updated_by)
                              WHERE id = $3""",
-                        json.dumps(meta),
+                        json.dumps(patch),
                         updated_by,
                         rid,
                     )

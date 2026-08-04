@@ -300,30 +300,51 @@ async def assert_enforcing(conn) -> None:
 
 
 async def apply_policies(conn) -> list[str]:
-    """Enable + FORCE RLS and (re)create the isolation policy. Idempotent."""
+    """Enable + FORCE RLS and (re)create the isolation policy. Idempotent.
+
+    The whole re-apply runs in ONE transaction. Postgres makes DDL
+    transactional, and it has to be used here: each statement would otherwise
+    autocommit, so between ``DROP POLICY`` and ``CREATE POLICY`` the table sits
+    RLS-enabled with *no* policy, which is default-deny. That gap is not
+    theoretical — with 2+ gunicorn workers the first worker is already serving
+    traffic while the second runs this on boot (they serialise on the migration
+    advisory lock, they do not wait for each other to finish booting), so live
+    reads returned zero rows and live writes failed with an RLS violation on
+    every deploy and every worker respawn.
+
+    Wrapping it also means a failure part-way leaves the previous policy set
+    intact rather than a half-applied one.
+    """
     applied = []
-    for table in await tenant_tables(conn):
-        await conn.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
-        # Without FORCE the owning role — which is the app role — ignores every
-        # policy below. This line is the difference between real and theatre.
-        await conn.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
-        await conn.execute(f"DROP POLICY IF EXISTS {POLICY_NAME} ON {table}")
-        await conn.execute(
-            f"CREATE POLICY {POLICY_NAME} ON {table} "
-            f"FOR ALL USING ({_USING}) WITH CHECK ({_USING})"
-        )
-        applied.append(table)
+    async with conn.transaction():
+        for table in await tenant_tables(conn):
+            await conn.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
+            # Without FORCE the owning role — which is the app role — ignores
+            # every policy below. This line is the difference between real and
+            # theatre.
+            await conn.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
+            await conn.execute(f"DROP POLICY IF EXISTS {POLICY_NAME} ON {table}")
+            await conn.execute(
+                f"CREATE POLICY {POLICY_NAME} ON {table} "
+                f"FOR ALL USING ({_USING}) WITH CHECK ({_USING})"
+            )
+            applied.append(table)
     return applied
 
 
 async def drop_policies(conn) -> list[str]:
-    """Reverse ``apply_policies`` so RLS_ENABLED=false is actually reversible."""
+    """Reverse ``apply_policies`` so RLS_ENABLED=false is actually reversible.
+
+    One transaction, for the same reason as ``apply_policies``: dropping the
+    policy before disabling RLS leaves a default-deny gap in between.
+    """
     dropped = []
-    for table in await tenant_tables(conn):
-        await conn.execute(f"DROP POLICY IF EXISTS {POLICY_NAME} ON {table}")
-        await conn.execute(f"ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY")
-        await conn.execute(f"ALTER TABLE {table} DISABLE ROW LEVEL SECURITY")
-        dropped.append(table)
+    async with conn.transaction():
+        for table in await tenant_tables(conn):
+            await conn.execute(f"DROP POLICY IF EXISTS {POLICY_NAME} ON {table}")
+            await conn.execute(f"ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY")
+            await conn.execute(f"ALTER TABLE {table} DISABLE ROW LEVEL SECURITY")
+            dropped.append(table)
     return dropped
 
 

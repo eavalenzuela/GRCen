@@ -379,3 +379,95 @@ async def test_admin_fallback_does_not_cross_organizations(pool):
     emails = {e for _uid, e, _mode in recipients}
     assert "a@test" in emails
     assert "b@test" not in emails, "alert leaked to another tenant's admins"
+
+
+# ── the ticker must claim its work before firing ─────────────────────────
+
+
+async def _due_alert(pool, admin, *, schedule_type="once", cron=None):
+    from grcen.services import alert_service
+    from datetime import UTC, datetime, timedelta
+
+    asset = await asset_svc.create_asset(
+        pool, type=AssetType.SYSTEM, name="Ticker asset", status="active",
+        updated_by=admin.id,
+    )
+    alert = await alert_service.create_alert(
+        pool, asset_id=asset.id, title="Due now", schedule_type=schedule_type,
+        cron_expression=cron,
+    )
+    await pool.execute(
+        "UPDATE alerts SET next_fire_at = $1 WHERE id = $2",
+        datetime.now(UTC) - timedelta(minutes=1), alert.id,
+    )
+    return alert
+
+
+@pytest.mark.asyncio
+async def test_concurrent_tickers_fire_each_alert_once(pool):
+    """The scheduler runs in every gunicorn worker.
+
+    Selecting due alerts and firing them before claiming meant each worker
+    delivered the same alert — duplicate notifications, emails and webhook
+    POSTs, none of which can be taken back.
+    """
+    import asyncio
+
+    from grcen.main import _tick_alerts
+
+    admin = await create_user(
+        pool, f"admin_{uuid.uuid4().hex[:8]}", "pw", role=UserRole.ADMIN
+    )
+    alert = await _due_alert(pool, admin)
+
+    # Two workers' tickers firing at the same instant.
+    await asyncio.gather(_tick_alerts(), _tick_alerts())
+
+    fired = await pool.fetchval(
+        "SELECT count(*) FROM notifications WHERE alert_id = $1", alert.id
+    )
+    assert fired == 1, f"alert fired {fired} times"
+
+
+@pytest.mark.asyncio
+async def test_one_shot_alert_does_not_refire(pool):
+    """`once` alerts never had next_fire_at advanced, so they re-fired forever."""
+    from grcen.main import _tick_alerts
+
+    admin = await create_user(
+        pool, f"admin_{uuid.uuid4().hex[:8]}", "pw", role=UserRole.ADMIN
+    )
+    alert = await _due_alert(pool, admin, schedule_type="once")
+
+    await _tick_alerts()
+    await _tick_alerts()
+    await _tick_alerts()
+
+    fired = await pool.fetchval(
+        "SELECT count(*) FROM notifications WHERE alert_id = $1", alert.id
+    )
+    assert fired == 1, f"one-shot alert fired {fired} times"
+    assert await pool.fetchval(
+        "SELECT next_fire_at FROM alerts WHERE id = $1", alert.id
+    ) is None
+
+
+@pytest.mark.asyncio
+async def test_recurring_alert_is_rescheduled_not_retired(pool):
+    from grcen.main import _tick_alerts
+
+    admin = await create_user(
+        pool, f"admin_{uuid.uuid4().hex[:8]}", "pw", role=UserRole.ADMIN
+    )
+    alert = await _due_alert(pool, admin, schedule_type="recurring", cron="0 9 * * *")
+
+    await _tick_alerts()
+
+    next_at = await pool.fetchval(
+        "SELECT next_fire_at FROM alerts WHERE id = $1", alert.id
+    )
+    assert next_at is not None, "recurring alert was retired instead of rescheduled"
+    fired = await pool.fetchval(
+        "SELECT count(*) FROM notifications WHERE alert_id = $1", alert.id
+    )
+    assert fired == 1

@@ -370,3 +370,53 @@ async def test_successful_mfa_clears_failed_count(pool):
     assert await pool.fetchval(
         "SELECT failed_login_count FROM users WHERE id = $1", u.id
     ) == 0
+
+
+@pytest.mark.asyncio
+async def test_recovery_code_is_single_use_under_concurrency(pool):
+    """Two redemptions of the same code must not both succeed.
+
+    Consumption rewrote the whole array from a copy read earlier, so both
+    callers saw the code present and both returned True.
+    """
+    import asyncio
+
+    u = await create_user(pool, f"u_{uuid.uuid4().hex[:8]}", "pw", role=UserRole.VIEWER)
+    secret, codes = await totp_service.begin_enrollment(pool, u.id)
+    await totp_service.confirm_enrollment(pool, u.id, pyotp.TOTP(secret).now())
+
+    results = await asyncio.gather(
+        totp_service.verify_login_code(pool, u.id, codes[0]),
+        totp_service.verify_login_code(pool, u.id, codes[0]),
+    )
+
+    assert sorted(results) == [False, True], f"code accepted {sum(results)} times"
+
+
+@pytest.mark.asyncio
+async def test_concurrent_recovery_codes_do_not_resurrect_each_other(pool):
+    """Redeeming two different codes at once must consume both.
+
+    Each caller wrote back a list still containing the other's code, so one
+    consumed code came back to life.
+    """
+    import asyncio
+
+    u = await create_user(pool, f"u_{uuid.uuid4().hex[:8]}", "pw", role=UserRole.VIEWER)
+    secret, codes = await totp_service.begin_enrollment(pool, u.id)
+    await totp_service.confirm_enrollment(pool, u.id, pyotp.TOTP(secret).now())
+
+    first, second = await asyncio.gather(
+        totp_service.verify_login_code(pool, u.id, codes[0]),
+        totp_service.verify_login_code(pool, u.id, codes[1]),
+    )
+    assert first and second
+
+    # Neither may be redeemable again.
+    assert await totp_service.verify_login_code(pool, u.id, codes[0]) is False
+    assert await totp_service.verify_login_code(pool, u.id, codes[1]) is False
+
+    remaining = await pool.fetchval(
+        "SELECT cardinality(recovery_codes) FROM user_totp WHERE user_id = $1", u.id
+    )
+    assert remaining == len(codes) - 2

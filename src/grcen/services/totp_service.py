@@ -166,13 +166,23 @@ async def verify_login_code(
     submitted_hash = _hash_code(cleaned.upper())
     for stored in enrollment["recovery_codes"]:
         if _hmac.compare_digest(stored, submitted_hash):
-            # Consume it.
-            remaining = [c for c in enrollment["recovery_codes"] if c != stored]
-            await pool.execute(
-                """UPDATE user_totp SET recovery_codes = $1, updated_at = now()
-                   WHERE user_id = $2""",
-                remaining,
+            # Consume it in the database, not in Python. Rewriting the whole
+            # array from the copy read earlier lost concurrent removals — two
+            # redemptions of *different* codes each wrote back a list still
+            # containing the other's code, resurrecting it — and two redemptions
+            # of the *same* code both succeeded, which defeats the point of a
+            # single-use code. Deleting conditionally makes the row itself the
+            # arbiter: exactly one caller can observe the removal.
+            # The constant-time match above still decides *which* code; this
+            # only removes the value it settled on.
+            consumed = await pool.fetchval(
+                """UPDATE user_totp
+                      SET recovery_codes = array_remove(recovery_codes, $1),
+                          updated_at = now()
+                    WHERE user_id = $2 AND $1 = ANY(recovery_codes)
+                    RETURNING 1""",
+                stored,
                 user_id,
             )
-            return True
+            return bool(consumed)
     return False

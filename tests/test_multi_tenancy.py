@@ -402,3 +402,69 @@ async def test_admin_token_list_and_revoke_scoped_to_org(two_orgs, pool):
     assert await pool.fetchval(
         "SELECT revoked FROM api_tokens WHERE id = $1", token_b.id
     ) is False
+
+
+# ---------------------------------------------------------------------------
+# Creating a user must never overwrite an existing one
+#
+# `users.username` is globally unique, so a "create" whose name collides used to
+# reach ON CONFLICT DO UPDATE and reset that account's password and role.
+# organization_id was not in the update list, so the victim stayed in their own
+# org and the attacker simply logged in as them.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_create_user_refuses_to_overwrite_an_existing_account(pool, two_orgs):
+    from grcen.services.auth import UserExistsError, authenticate_user
+
+    victim = two_orgs["user_b"]
+    original_hash = victim.hashed_password
+
+    with pytest.raises(UserExistsError):
+        await create_user(
+            pool, victim.username, "AttackerPicked123",
+            role=UserRole.VIEWER, organization_id=two_orgs["org_a"].id,
+        )
+
+    row = await pool.fetchrow(
+        "SELECT hashed_password, role, organization_id FROM users WHERE id = $1",
+        victim.id,
+    )
+    assert row["hashed_password"] == original_hash
+    assert row["role"] == "admin"
+    assert row["organization_id"] == two_orgs["org_b"].id
+
+    from grcen.rate_limit import _reset as _reset_rate_limit
+    _reset_rate_limit()
+    assert await authenticate_user(pool, victim.username, "AttackerPicked123") is None
+    assert await authenticate_user(pool, victim.username, "testpass") is not None
+
+
+@pytest.mark.asyncio
+async def test_admin_cannot_hijack_another_orgs_user_via_new_user_form(two_orgs, pool):
+    """The full takeover through /admin/users/new."""
+    ca = two_orgs["ca"]
+    victim = two_orgs["user_b"]
+    original_hash = victim.hashed_password
+
+    resp = await ca.post(
+        "/admin/users/new",
+        data={"username": victim.username, "password": "AttackerPicked123",
+              "role": "viewer"},
+    )
+    assert resp.status_code == 200
+    assert "already taken" in resp.text
+
+    row = await pool.fetchrow(
+        "SELECT hashed_password, role, organization_id FROM users WHERE id = $1",
+        victim.id,
+    )
+    assert row["hashed_password"] == original_hash, "cross-org password reset"
+    assert row["role"] == "admin"
+    assert row["organization_id"] == two_orgs["org_b"].id
+
+    # Exactly one account still carries that username.
+    assert await pool.fetchval(
+        "SELECT count(*) FROM users WHERE username = $1", victim.username
+    ) == 1

@@ -92,10 +92,24 @@ async def admin_user_create_submit(
         )
     # Without an explicit org, create_user falls back to the "default" org —
     # so an admin of any other tenant was creating accounts outside their own.
-    new_user = await auth_svc.create_user(
-        pool, username, password, role=role,
-        organization_id=user.organization_id,
-    )
+    try:
+        new_user = await auth_svc.create_user(
+            pool, username, password, role=role,
+            organization_id=user.organization_id,
+        )
+    except auth_svc.UserExistsError:
+        # Usernames are global, so the clash may be with an account in another
+        # org. Say only that it's taken — confirming which tenant owns it would
+        # leak across the boundary.
+        notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
+        return templates.TemplateResponse(request, "admin/user_form.html", context={
+                "user": user,
+                "edit_user": None,
+                "roles": list(UserRole),
+                "notif_count": notif_count,
+                "error": "That username is already taken.",
+            },
+        )
     await audit_svc.log_audit_event(
         pool,
         user_id=user.id,

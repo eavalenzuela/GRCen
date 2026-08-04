@@ -400,6 +400,12 @@ async def withdraw(
         note,
         change.id,
     )
+    if row is None:
+        # The conditional UPDATE matched nothing: someone else decided this
+        # change between the caller's read and now. The status check above is
+        # against a stale in-memory copy, so it cannot see that. Passing None
+        # into from_row raised TypeError and surfaced as a 500.
+        raise ValueError("This change has already been decided.")
     return PendingChange.from_row(row)
 
 
@@ -426,6 +432,12 @@ async def reject(
         note,
         change.id,
     )
+    if row is None:
+        # The conditional UPDATE matched nothing: someone else decided this
+        # change between the caller's read and now. The status check above is
+        # against a stale in-memory copy, so it cannot see that. Passing None
+        # into from_row raised TypeError and surfaced as a 500.
+        raise ValueError("This change has already been decided.")
     return PendingChange.from_row(row)
 
 

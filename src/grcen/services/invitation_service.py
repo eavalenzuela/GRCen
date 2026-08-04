@@ -18,7 +18,7 @@ from uuid import UUID
 import asyncpg
 
 from grcen.permissions import UserRole
-from grcen.services.auth import create_user
+from grcen.services.auth import UserExistsError, create_user
 
 DEFAULT_TTL_DAYS = 7
 _MIN_PASSWORD_LEN = 8
@@ -144,13 +144,17 @@ async def accept_invitation(
     if existing:
         raise InvitationError("That username is already taken.")
 
-    user = await create_user(
-        pool,
-        username,
-        password,
-        role=UserRole(invitation["role"]),
-        organization_id=invitation["organization_id"],
-    )
+    try:
+        user = await create_user(
+            pool,
+            username,
+            password,
+            role=UserRole(invitation["role"]),
+            organization_id=invitation["organization_id"],
+        )
+    except UserExistsError as exc:
+        # Lost the race with a concurrent accept, or the check above went stale.
+        raise InvitationError("That username is already taken.") from exc
     consumed = await pool.execute(
         """UPDATE org_invitations SET accepted_at = now(), accepted_by = $1
            WHERE id = $2 AND accepted_at IS NULL AND revoked_at IS NULL""",

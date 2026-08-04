@@ -7,18 +7,34 @@ through the admin UI without restarting the application.
 
 from __future__ import annotations
 
+import time
+
 import asyncpg
 
 from grcen.services.encryption import is_encryption_enabled
 from grcen.services.encryption_scopes import ALL_PROFILES, ALL_SCOPES
 
-# Module-level cache — invalidated by :func:`reload`.
+# Module-level cache — invalidated by :func:`reload`, and expiring on its own
+# after _CACHE_TTL.
+#
+# The TTL is the load-bearing part. This cache is per-process and the app runs
+# under gunicorn with several workers, so an admin changing the encryption
+# posture only invalidates the cache in whichever worker served that request.
+# Without expiry the other workers believed the old posture forever: after
+# switching a profile on, they would keep writing PII, TOTP secrets and session
+# IPs in plaintext while their sibling wrote ciphertext into the same columns.
 _cache: set[str] | None = None
 _profile_cache: str | None = None
+_cache_at: float = 0.0
+_CACHE_TTL = 30.0
+
+
+def _cache_fresh() -> bool:
+    return _cache is not None and (time.monotonic() - _cache_at) < _CACHE_TTL
 
 
 async def _load(pool: asyncpg.Pool) -> tuple[str, set[str]]:
-    global _cache, _profile_cache
+    global _cache, _profile_cache, _cache_at
     rows = await pool.fetch("SELECT key, value FROM encryption_config")
     cfg = {r["key"]: r["value"] for r in rows}
 
@@ -26,6 +42,7 @@ async def _load(pool: asyncpg.Pool) -> tuple[str, set[str]]:
     raw_scopes = cfg.get("enabled_scopes", "")
     _profile_cache = profile
     _cache = {s.strip() for s in raw_scopes.split(",") if s.strip()} if raw_scopes else set()
+    _cache_at = time.monotonic()
     return profile, _cache
 
 
@@ -37,7 +54,7 @@ async def get_active_scopes(pool: asyncpg.Pool) -> set[str]:
     """
     if not is_encryption_enabled():
         return set()
-    if _cache is None:
+    if not _cache_fresh():
         _, scopes = await _load(pool)
         return scopes
     return _cache
@@ -45,7 +62,7 @@ async def get_active_scopes(pool: asyncpg.Pool) -> set[str]:
 
 async def get_active_profile(pool: asyncpg.Pool) -> str:
     """Return the active profile name, or ``""`` if none is set."""
-    if _profile_cache is None:
+    if not _cache_fresh():
         profile, _ = await _load(pool)
         return profile
     return _profile_cache

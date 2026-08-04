@@ -46,27 +46,47 @@ scheduler = AsyncIOScheduler()
 
 
 async def _tick_alerts():
-    """Check for alerts whose next_fire_at has passed and fire them."""
+    """Fire alerts whose next_fire_at has passed.
+
+    The scheduler starts in ``lifespan``, so this runs in *every* gunicorn
+    worker. It therefore has to claim its work: alerts are claimed atomically by
+    clearing ``next_fire_at`` before anything with side effects happens, and
+    ``SKIP LOCKED`` lets a second worker move past rows the first already holds.
+
+    Selecting first and firing before the claim meant both workers saw the same
+    due alert and each sent the notification, the email and the webhook — and
+    duplicate outbound mail and POSTs cannot be taken back. Clearing the column
+    also fixes one-shot alerts: nothing else ever advanced ``next_fire_at`` for
+    ``schedule_type='once'``, so those stayed due and re-fired every minute,
+    forever, in every worker.
+    """
     with tenancy.system_context():
         from grcen.services.alert_service import fire_alert
 
         pool = await get_pool()
         now = datetime.now(UTC)
         rows = await pool.fetch(
-            "SELECT id, schedule_type, cron_expression FROM alerts"
-            " WHERE enabled = true AND next_fire_at <= $1",
+            """UPDATE alerts SET next_fire_at = NULL, updated_at = now()
+               WHERE id IN (
+                   SELECT id FROM alerts
+                   WHERE enabled = true AND next_fire_at <= $1
+                   FOR UPDATE SKIP LOCKED
+               )
+               RETURNING id, schedule_type, cron_expression""",
             now,
         )
         for row in rows:
-            await fire_alert(pool, row["id"])
             if row["schedule_type"] == "recurring" and row["cron_expression"]:
+                # Reschedule before firing: a delivery failure must not leave a
+                # recurring alert parked with a NULL next_fire_at, which would
+                # silently retire it.
                 trigger = CronTrigger.from_crontab(row["cron_expression"])
-                next_time = trigger.get_next_fire_time(None, now)
                 await pool.execute(
                     "UPDATE alerts SET next_fire_at = $1, updated_at = now() WHERE id = $2",
-                    next_time,
+                    trigger.get_next_fire_time(None, now),
                     row["id"],
                 )
+            await fire_alert(pool, row["id"])
 
 
 async def _nightly_risk_snapshot():
@@ -385,7 +405,19 @@ async def _create_admin():
             sys.exit(1)
         org_id = org.id
 
-    user = await create_user(pool, username, password, role=UserRole.ADMIN, organization_id=org_id)
+    from grcen.services.auth import UserExistsError
+
+    try:
+        user = await create_user(pool, username, password, role=UserRole.ADMIN, organization_id=org_id)
+    except UserExistsError:
+        # This used to silently reset the existing account's password and role
+        # and still print "created" — including for a user in another org.
+        print(
+            f"User '{username}' already exists. Usernames are global across "
+            f"organizations. Change the password from /admin/users instead."
+        )
+        await close_pool()
+        sys.exit(1)
     print(f"Admin user '{user.username}' created (id={user.id}, role={user.role.value}, org={user.organization_id})")
     await close_pool()
 
@@ -428,8 +460,16 @@ async def _create_superadmin():
         )
         print(f"Promoted '{username}' to superadmin.")
     else:
+        from grcen.services.auth import UserExistsError
+
         password = input("Password: ")
-        user = await create_user(pool, username, password, role=UserRole.ADMIN)
+        try:
+            user = await create_user(pool, username, password, role=UserRole.ADMIN)
+        except UserExistsError:
+            # Raced with a concurrent create between the lookup above and here.
+            print(f"User '{username}' already exists; re-run to promote them.")
+            await close_pool()
+            sys.exit(1)
         await pool.execute(
             "UPDATE users SET is_superadmin = true WHERE id = $1", user.id
         )

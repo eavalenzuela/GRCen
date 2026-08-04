@@ -330,3 +330,68 @@ class TestEncryptionConfig:
             "SELECT value FROM oidc_config WHERE key = 'client_secret'"
         )
         assert raw_after == "to-be-decrypted"
+
+
+# --- config caches must converge across workers ---------------------------
+
+
+@pytest.mark.asyncio
+async def test_encryption_scope_cache_expires(pool, monkeypatch):
+    """A second worker must not serve the old encryption posture forever.
+
+    The cache is per-process and only the worker that served the admin form
+    calls reload(), so without a TTL the others keep deciding "is this scope
+    active?" from pre-change state — writing PII in plaintext alongside a
+    sibling writing ciphertext into the same column.
+    """
+    import time
+
+    from grcen.services import encryption_config
+
+    # get_active_scopes short-circuits to empty when no key is configured, and
+    # the test env sets none — so stand one up for this test.
+    monkeypatch.setattr(encryption_config, "is_encryption_enabled", lambda: True)
+
+    # Prime this process's cache, then change the posture behind its back the
+    # way another worker's admin request would.
+    await encryption_config.reload(pool)
+    primed = await encryption_config.get_active_scopes(pool)
+
+    await pool.execute(
+        "INSERT INTO encryption_config (key, value) VALUES ('enabled_scopes', $1) "
+        "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
+        "user_pii",
+    )
+
+    # Still cached — that is fine and expected within the TTL.
+    assert await encryption_config.get_active_scopes(pool) == primed
+
+    # Once the TTL lapses the worker must pick the change up on its own.
+    real_monotonic = time.monotonic
+    monkeypatch.setattr(
+        encryption_config.time, "monotonic",
+        lambda: real_monotonic() + encryption_config._CACHE_TTL + 1,
+    )
+    assert "user_pii" in await encryption_config.get_active_scopes(pool)
+
+
+@pytest.mark.asyncio
+async def test_smtp_settings_cache_expires(pool, monkeypatch):
+    import time
+
+    from grcen.services import smtp_settings
+
+    await smtp_settings.reload(pool)
+    await pool.execute(
+        "INSERT INTO smtp_config (key, value) VALUES ('host', $1) "
+        "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
+        "changed.example.com",
+    )
+    assert (await smtp_settings.get_settings(pool)).host != "changed.example.com"
+
+    real_monotonic = time.monotonic
+    monkeypatch.setattr(
+        smtp_settings.time, "monotonic",
+        lambda: real_monotonic() + smtp_settings._CACHE_TTL + 1,
+    )
+    assert (await smtp_settings.get_settings(pool)).host == "changed.example.com"
