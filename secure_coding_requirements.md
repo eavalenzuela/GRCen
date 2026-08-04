@@ -125,6 +125,29 @@ they call has neither layer. `email_service.resolve_alert_recipients` requires i
 `organization_id` for that reason — without it, the admin fallback mailed one tenant's alert
 to every other tenant's admins.
 
+**Claim before you act.** There are 2+ worker processes and every scheduled job runs in all of
+them, so a `SELECT` that picks up work, followed by side effects, followed by a status write is
+executed concurrently by each worker. Anything that sends mail, calls a webhook, or hits a
+third-party API must claim its row first, in one statement:
+
+```python
+rows = await pool.fetch(
+    """UPDATE queue_table SET claimed_at = now()
+       WHERE id IN (SELECT id FROM queue_table WHERE claimed_at IS NULL
+                    FOR UPDATE SKIP LOCKED)
+       RETURNING ..."""
+)
+```
+
+The same applies within a request: a check and the write that depends on it are not atomic if
+an `await` separates them. Use a conditional `UPDATE ... WHERE <still-in-the-expected-state>`
+and treat 0 rows as "someone got there first" — and never pass that 0-row result into a
+`from_row()`, which turns a lost race into a 500.
+
+**Never write back a whole JSONB blob you read earlier.** Merge the keys you actually changed
+(`metadata = coalesce(metadata,'{}'::jsonb) || $1::jsonb`); rewriting the blob reverts every
+concurrent edit to keys you never touched.
+
 For dynamic `WHERE` / `SET` clauses, use the index-counting pattern:
 
 ```python

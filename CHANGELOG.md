@@ -5,7 +5,42 @@ All notable changes to GRCen are documented here. The format follows
 
 ## [Unreleased]
 
-### Fixed — Adversarial review pass
+### Fixed — Adversarial review pass 2: concurrency & transaction boundaries
+
+A second review round, scoped to what happens when things run at the same
+time. The premise it worked from: production is gunicorn with 2+ worker
+processes, each with its own event loop, pool and module state. 8 defects
+fixed, 16 regression tests added (1032 → 1048).
+
+- **Creating a user could take over an existing one.** `create_user` upserted
+  on username — globally unique — setting password and role but *not*
+  organization_id. So "create a user" named after someone in another tenant
+  reset their credentials, left them in their own org, and handed the caller a
+  working login while locking the victim out. Needs no race; the review only
+  found the racy variant. Verified end to end before fixing.
+- **Every scheduled job runs in every worker**, and the two that are work
+  queues didn't claim their work: the alert ticker and the digest flush each
+  delivered once per worker — duplicate notifications, emails and webhook
+  POSTs, none recallable. Both now claim with `FOR UPDATE SKIP LOCKED` before
+  any side effect. The other four jobs upsert on a natural key and are already
+  idempotent, so no leader election was needed.
+- **One-shot alerts never stopped firing.** Nothing advanced `next_fire_at` for
+  `schedule_type='once'`, so they stayed due and re-fired every minute, forever,
+  in every worker.
+- **RLS had a default-deny window on every boot.** `apply_policies` dropped and
+  recreated each policy in separate autocommit statements, so tables sat
+  RLS-enabled with no policy in between — while a sibling worker served live
+  traffic. Reads returned nothing; writes failed.
+- **Config caches never expired.** After an admin enabled encryption, workers
+  that didn't serve that request kept writing PII, TOTP secrets and session IPs
+  in plaintext into columns their sibling was writing ciphertext to.
+- **Check-then-act and read-modify-write:** duplicate Jira/ServiceNow tickets
+  from concurrent pushes (and a 15-second window where any concurrent metadata
+  edit was reverted); bulk risk updates reverting keys they never touched; MFA
+  recovery codes resurrecting each other so a consumed code worked again;
+  `withdraw`/`reject` 500ing instead of 400 on an already-decided change.
+
+### Fixed — Adversarial review pass 1
 
 A multi-agent review across four areas (auth/web security, tenant isolation,
 integrations, domain correctness), with every finding independently verified

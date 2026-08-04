@@ -147,6 +147,35 @@ backstop under these three tables, so any query touching them must carry its own
 exactly this reason; the lookups take an optional one because pre-auth callers have no
 tenant yet.
 
+## Concurrency
+
+**Production is gunicorn with 2+ worker processes** (`deploy/docker-entrypoint.sh`,
+`GUNICORN_WORKERS` default 2), each with its own event loop, its own asyncpg pool
+(`max_size=10`) and its own module-level state. Within a worker it's single-threaded
+asyncio, so there are no thread races — but any check and act that straddle an `await`
+are not atomic, and anything module-level exists once *per worker*.
+
+Three consequences worth knowing before writing code here:
+
+- **Every scheduled job runs in every worker.** The APScheduler instance starts in
+  `lifespan`. Jobs that reconcile idempotently (the snapshots, risk aggregation, the
+  access-log purge upsert on a natural key) are fine. Jobs that consume a *queue* must
+  claim their work with `FOR UPDATE SKIP LOCKED` **before** doing anything with side
+  effects — `_tick_alerts` and `digest_service.flush_digests` show the pattern. Firing
+  first and marking afterwards sends every email and webhook once per worker.
+- **Process-local caches need a TTL, not just invalidation.** `encryption_config`,
+  `smtp_settings`, `oidc_settings`, `saml_settings` and the rate-limit settings are
+  per-process; an admin's save only invalidates the worker that served it. They all
+  expire after `_CACHE_TTL` so the others converge.
+- **Merge JSONB server-side.** `metadata = metadata || $1::jsonb` with just the changed
+  keys, not a whole blob read earlier — otherwise concurrent edits to untouched keys are
+  silently reverted.
+
+`create_user` **raises `UserExistsError` rather than upserting.** It used to
+`ON CONFLICT (username) DO UPDATE` the password and role, and since usernames are
+globally unique while `organization_id` was left alone, that was a cross-tenant account
+takeover.
+
 ## Known Gaps (see `feature_roadmap.md` for the full list)
 
 - WebAuthn / FIDO2 for MFA, Redis-backed rate limiter, per-org SSO/SMTP/webhook/encryption overrides
