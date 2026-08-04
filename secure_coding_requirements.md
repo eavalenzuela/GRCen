@@ -72,9 +72,18 @@ async def list_things(
     ...
 ```
 
-Available permissions: `VIEW`, `CREATE`, `EDIT`, `DELETE`, `MANAGE_USERS`, `VIEW_AUDIT`.
+Available permissions: see `Permission` in `permissions.py` — currently `VIEW`, `CREATE`,
+`EDIT`, `DELETE`, `MANAGE_USERS`, `VIEW_AUDIT`, `VIEW_PII`, `APPROVE`, `MANAGE_ORGS`, `SYNC`.
 
 The only unauthenticated routes are `/health`, `/login`, `/api/auth/login`, and the OIDC callback.
+
+**Role is not the whole check.** When a request arrives on an API token, the caller's
+reach is the *intersection* of their role and that token's declared scope.
+`require_permission` enforces both; anything deciding access from a bare `User` must
+consult `user.token_permissions` too (`None` means a session caller, so role alone
+applies). Getting this wrong is silent: `redaction.can_view_pii` checked only the role,
+so a token minted without `view_pii` still received unmasked PII, and token creation
+bounded new scopes by role alone, so a read-only token could mint a full-role one.
 
 ---
 
@@ -103,6 +112,18 @@ the paths that legitimately run privileged. If you write `tenancy.system_context
 switched the backstop off for that block — scope the query yourself, and keep the block as small
 as the lookup that needs it (`routers/vendor_campaigns.py` shows the pattern: bypass the token
 lookup, then narrow to the org it returned).
+
+**Three tables have no backstop at all.** `users`, `user_organizations` and `api_tokens` are
+outside RLS by design (they're read before a tenant exists). A missing filter there is a
+straight cross-tenant read or write with nothing underneath to catch it — that is how
+`/admin/users/{id}/edit` let an admin of one org reset the password of an admin of another.
+Prefer putting the filter in the SQL via a **required** `organization_id` parameter rather
+than an ownership check in the route, so it can't be omitted at a new call site.
+
+Scheduler jobs are the other place to watch: they run inside `system_context()`, so a service
+they call has neither layer. `email_service.resolve_alert_recipients` requires its
+`organization_id` for that reason — without it, the admin fallback mailed one tenant's alert
+to every other tenant's admins.
 
 For dynamic `WHERE` / `SET` clauses, use the index-counting pattern:
 

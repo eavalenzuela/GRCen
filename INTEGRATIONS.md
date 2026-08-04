@@ -190,7 +190,10 @@ SIEM connectors remain greenfield.
   counterpart to SCIM. Projects a roster → People (+ Org Units), `manages` / `member_of` /
   `parent_of` edges, all idempotent via I0. Movers re-point edges (stale ones pruned); **leavers
   are archived and their linked login disabled** (`deactivate_leavers`, default on), with
-  optional owned-asset reassignment. Delivered as CLI `grcen sync-hris <file>` **and**
+  optional owned-asset reassignment. An **empty** roster is refused rather than read as
+  "everyone left" — that payload nearly always means a broken upstream, so winding an org
+  down needs `allow_empty` (`--allow-empty`, or `?allow_empty=1`). Delivered as CLI
+  `grcen sync-hris <file>` **and**
   `POST /api/sync/hris` (`routers/sync.py`, `sync`-scoped token — this also lands I0's remaining
   generic HTTP ingress surface). Roster contract in the `hris_sync` module docstring. Tests:
   `tests/test_hris_sync.py`.
@@ -205,7 +208,10 @@ SIEM connectors remain greenfield.
   consumes uvt's triaged findings export → Finding assets (via I0), each linked
   `System --affected_by--> Finding` by resolving the affected host (external_id → hostname →
   fqdn → ip_address → name; GRCen never invents Systems). Findings that drop out are archived as
-  `remediated`. CLI `grcen sync-vulns` / `POST /api/sync/vulns`. **Risk aggregation:**
+  `remediated` — but an **empty** export is refused rather than closing the whole backlog, since
+  a scanner that fails auth or times out returns exactly that shape; pass `allow_empty` when the
+  zero really is real. (`cspm_sync` behaves identically.) CLI `grcen sync-vulns` /
+  `POST /api/sync/vulns`. **Risk aggregation:**
   `services/risk_aggregation.py` rolls open Findings up into Risk assets — by affected **System**
   (default) or by **severity** — mapping worst-severity to likelihood × impact so they land on
   the register + 5×5 heatmap, linking `Risk --threatens--> System` + `Risk --relates_to-->

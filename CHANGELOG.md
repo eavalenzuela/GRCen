@@ -5,6 +5,55 @@ All notable changes to GRCen are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed — Adversarial review pass
+
+A multi-agent review across four areas (auth/web security, tenant isolation,
+integrations, domain correctness), with every finding independently verified
+before it was acted on. 25 defects fixed and 46 regression tests added (986 →
+1032), with the load-bearing ones checked by reverting the fix and confirming
+the new test goes red.
+
+**Availability**
+
+- **Login was broken in production.** The RLS rollout left the auth routes
+  without a tenant context, so the closing audit write was rejected by the
+  policy and every local and SSO login 500ed before the session cookie was
+  emitted. The test suite couldn't see it: `conftest` enables a process-wide
+  bypass and only `get_current_user` cleared it, which the auth routes never
+  call. `TenantContextMiddleware` now resets every request to
+  enforced-and-tenant-less, so the suite exercises what production runs.
+- **OIDC login authenticated nobody** — the callback parked a bare
+  `session['user_id']` and created no server-side session record. Its success
+  path had no test at all.
+- **`RLS_ENABLED=false` didn't boot** — the acquire hook dropped to a role
+  that only exists when RLS is on.
+
+**Tenant isolation.** `users` and `api_tokens` sit outside RLS by design, so
+nothing backstops a missing filter there: an admin of any org could reset the
+password of an admin of any other and take over that tenant, `/api/tokens/all`
+spanned every org, admin-created users landed in the `default` org, SSO
+first-login Person assets landed in the wrong tenant, and alert emails were
+sent to every other tenant's admins.
+
+**Sync connectors.** An empty HRIS roster was read as "everyone left" and
+archived every Person plus their logins; an empty vuln/CSPM export closed the
+entire findings backlog. Both now need explicit `allow_empty`. A devices-only
+CMDB sync deleted every `depends_on` edge between Systems. SCIM PATCH
+`replace` on members was add-only, so an offboarded admin kept admin.
+
+**Authorization.** PII redaction ignored API-token scope, and the REST and PDF
+paths ignored admin-configured sensitivity promotions. A read-only token could
+mint a full-role token. `/login/mfa` had no throttle of any kind and its
+failures fed no lockout. The rate-limit bucket was keyed by the raw, unvalidated
+`Authorization` header — a free budget per request, plus unbounded memory growth.
+
+**Wrong numbers.** Every diligently-reviewed risk read as permanently overdue
+(overdue fell back to "Last Reviewed"); closed and risk-accepted findings still
+counted as outstanding; `/my-work` disagreed with `findings_service` about what
+"done" means in both directions; re-mapping a questionnaire answer kept the
+previous answer's text under the new source; concurrent approvers could apply
+the same pending change twice.
+
 ### Added — External System Integrations (Tier 6)
 
 GRCen went from a self-contained graph to the **org-graph layer of a wider

@@ -127,10 +127,25 @@ than booting with inert policies.
 Cross-tenant work — migrations, scheduler jobs, the CLI, and pre-auth capability-token
 lookups (invite, OAuth, vendor portal, calendar feed) — runs in `tenancy.system_context()`,
 which simply doesn't drop privileges. Grep for it: every occurrence is a deliberate
-exemption. The identity plane (`users`, `user_organizations`, `api_tokens`) is outside
-RLS by design — it's read *before* a tenant is known, and multi-org membership means
-`organization_id` isn't its access key. Toggle with `RLS_ENABLED` (default on;
-`init_schema` applies or drops policies, so it's reversible).
+exemption. Toggle with `RLS_ENABLED` (default on; `init_schema` applies or drops
+policies, so it's reversible).
+
+**`middleware.TenantContextMiddleware` resets every request to enforced-and-tenant-less**
+as the outermost layer, so request handling can never inherit a process-wide bypass
+(the test suite sets one; so does the CLI). Without it the auth routes — which have no
+`get_current_user` dependency to call `set_tenant` for them — ran privileged under
+pytest and enforced in production, which is how an RLS rollout that broke every login
+still passed the whole suite. Routes that authenticate call `tenancy.set_tenant`
+themselves the moment the user is known.
+
+**The identity plane (`users`, `user_organizations`, `api_tokens`) is outside RLS by
+design** — it's read *before* a tenant is known, and multi-org membership means
+`organization_id` isn't its access key. The corollary is load-bearing: **there is no
+backstop under these three tables, so any query touching them must carry its own
+`organization_id` filter.** The mutating service functions (`update_user_role`,
+`set_user_active`, `delete_user`, `revoke_token`) take a required `organization_id` for
+exactly this reason; the lookups take an optional one because pre-auth callers have no
+tenant yet.
 
 ## Known Gaps (see `feature_roadmap.md` for the full list)
 
