@@ -320,3 +320,54 @@ async def test_openapi_json_accessible(admin_session, pool):
     assert resp.status_code == 200
     schema = resp.json()
     assert "BearerAuth" in schema.get("components", {}).get("securitySchemes", {})
+
+
+@pytest.mark.asyncio
+async def test_token_cannot_mint_token_beyond_its_own_scope(pool, admin_user):
+    """A restricted token must not be an escalation step to an unrestricted one.
+
+    Minting was bounded by the owner's role but not by the scope of the token
+    making the request, so a leaked read-only token could produce a token with
+    the owner's full permissions.
+    """
+    _tok, raw = await token_service.create_token(
+        pool, admin_user.id, "readonly", ["view"],
+    )
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as c:
+        resp = await c.post(
+            "/api/tokens/",
+            headers={"Authorization": f"Bearer {raw}"},
+            json={"name": "escalated", "permissions": ["view", "create", "delete"]},
+        )
+        assert resp.status_code == 403
+        # The app's HTTPException handler returns the detail as a bare body.
+        assert "scope" in resp.text.lower()
+
+
+@pytest.mark.asyncio
+async def test_token_can_mint_within_its_own_scope(pool, admin_user):
+    """Narrowing or matching the caller's scope stays allowed."""
+    _tok, raw = await token_service.create_token(
+        pool, admin_user.id, "rw", ["view", "create"],
+    )
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as c:
+        resp = await c.post(
+            "/api/tokens/",
+            headers={"Authorization": f"Bearer {raw}"},
+            json={"name": "narrower", "permissions": ["view"]},
+        )
+        assert resp.status_code == 201
+
+
+@pytest.mark.asyncio
+async def test_session_user_can_still_mint_full_role_token(auth_client):
+    """Session callers are bounded by role alone, as before."""
+    resp = await auth_client.post(
+        "/api/tokens/",
+        json={"name": "session-minted", "permissions": ["view", "create"]},
+    )
+    assert resp.status_code == 201

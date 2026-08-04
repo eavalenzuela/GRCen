@@ -334,7 +334,7 @@ async def test_login_rate_limit_allows_after_cooldown(client, pool):
 
     # Fake the timestamp to simulate cooldown elapsed
     ip = "127.0.0.1"
-    rate_limit._last_attempt[ip] = time.monotonic() - 3.0
+    rate_limit._last_attempt[f"login:{ip}"] = time.monotonic() - 3.0
 
     # Should be allowed now
     resp = await client.post(
@@ -544,3 +544,48 @@ async def test_api_login_writes_audit_under_enforced_rls(client, pool):
     )
     assert len(rows) == 1
     assert rows[0]["organization_id"] == user.organization_id
+
+
+@pytest.mark.asyncio
+async def test_prepare_connection_skips_set_role_when_rls_disabled(monkeypatch):
+    """The grcen_app role only exists when RLS is on.
+
+    init_schema provisions it under the RLS_ENABLED flag, but the acquire hook
+    dropped to it unconditionally — so a fresh install with RLS_ENABLED=false
+    failed on every non-bypassed acquire, i.e. every authenticated request.
+    """
+    from grcen import tenancy
+    from grcen.config import settings
+
+    executed: list[str] = []
+
+    class _Conn:
+        async def execute(self, sql, *args):
+            executed.append(sql)
+
+    monkeypatch.setattr(settings, "RLS_ENABLED", False)
+    with tenancy.tenant_context("00000000-0000-0000-0000-000000000001"):
+        await tenancy.prepare_connection(_Conn())
+
+    assert not any(f"SET ROLE {tenancy.APP_ROLE}" in s for s in executed), (
+        "dropped to a role that does not exist with RLS disabled"
+    )
+    assert any("RESET ROLE" in s for s in executed)
+
+
+@pytest.mark.asyncio
+async def test_prepare_connection_sets_role_when_rls_enabled(monkeypatch):
+    from grcen import tenancy
+    from grcen.config import settings
+
+    executed: list[str] = []
+
+    class _Conn:
+        async def execute(self, sql, *args):
+            executed.append(sql)
+
+    monkeypatch.setattr(settings, "RLS_ENABLED", True)
+    with tenancy.tenant_context("00000000-0000-0000-0000-000000000001"):
+        await tenancy.prepare_connection(_Conn())
+
+    assert any(f"SET ROLE {tenancy.APP_ROLE}" in s for s in executed)

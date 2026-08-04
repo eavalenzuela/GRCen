@@ -175,13 +175,20 @@ async def prepare_connection(conn: asyncpg.Connection) -> None:
     the next borrower. The role is set explicitly in *both* directions because
     ``RESET ALL`` does not restore it.
     """
+    from grcen.config import settings
+
     bypassing = _bypass.get()
     await conn.execute(
         "SELECT set_config($1, $2, false), set_config($3, $4, false)",
         ORG_GUC, _current_org.get(),
         BYPASS_GUC, "on" if bypassing else "off",
     )
-    if bypassing:
+    # The role only exists when RLS is on — ``init_schema`` provisions it under
+    # the same flag. Dropping to it regardless meant an install with
+    # RLS_ENABLED=false failed on every acquire that wasn't bypassed, i.e. every
+    # authenticated request. With RLS off there are no policies to enforce, so
+    # there is nothing to drop privileges for.
+    if bypassing or not settings.RLS_ENABLED:
         await conn.execute("RESET ROLE")
     else:
         await conn.execute(f"SET ROLE {APP_ROLE}")

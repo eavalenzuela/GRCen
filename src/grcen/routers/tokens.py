@@ -19,8 +19,15 @@ router = APIRouter(prefix="/api/tokens", tags=["tokens"])
 
 
 def _validate_permissions(requested: list[str], user: User) -> list[str]:
-    """Validate that requested permissions are real and within the user's role."""
+    """Validate that requested permissions are real and within the caller's reach.
+
+    Bounded by the user's role *and*, when the request arrives on an API token,
+    that token's declared scope. Without the second bound a minimal token could
+    mint one carrying its owner's full role, so any leaked read-only token was
+    an escalation away from being a write token.
+    """
     role_perms = ROLE_PERMISSIONS.get(user.role, set())
+    token_perms = getattr(user, "token_permissions", None)
     valid_values = {p.value for p in Permission}
     checked: list[str] = []
     for p in requested:
@@ -32,10 +39,24 @@ def _validate_permissions(requested: list[str], user: User) -> list[str]:
                 status_code=403,
                 detail=f"Permission '{p}' exceeds your role's capabilities",
             )
+        if token_perms is not None and p not in token_perms:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Permission '{p}' exceeds the scope of the token you are using",
+            )
         checked.append(p)
     if not checked:
         raise HTTPException(status_code=400, detail="At least one permission is required")
     return checked
+
+
+def _caller_has(user: User, perm: Permission) -> bool:
+    """Role and, for token callers, token scope — the same conjunction as
+    ``require_permission``."""
+    if not has_permission(user.role, perm):
+        return False
+    token_perms = getattr(user, "token_permissions", None)
+    return token_perms is None or perm.value in token_perms
 
 
 # --- Self-service endpoints ---
@@ -49,7 +70,7 @@ async def create_token(
 ):
     perms = _validate_permissions(data.permissions, user)
 
-    if data.is_service_account and not has_permission(user.role, Permission.MANAGE_USERS):
+    if data.is_service_account and not _caller_has(user, Permission.MANAGE_USERS):
         raise HTTPException(
             status_code=403,
             detail="Only admins can create service account tokens",

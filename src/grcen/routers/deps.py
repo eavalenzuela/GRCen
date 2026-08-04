@@ -33,6 +33,12 @@ async def _resolve_bearer_token(request: Request, pool: asyncpg.Pool) -> tuple[s
     if token is None:
         return None
 
+    # Let the rate limiter, which runs before authentication, recognise this
+    # token on later requests and give it its own budget instead of billing the
+    # caller's IP.
+    from grcen.rate_limit import note_valid_token
+    note_valid_token(raw_token)
+
     return str(token.user_id), token.permissions
 
 

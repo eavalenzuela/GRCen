@@ -7,7 +7,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from grcen import tenancy
 from grcen.models.user import User
-from grcen.rate_limit import check_login_rate_limit
+from grcen.rate_limit import check_login_rate_limit, check_mfa_rate_limit
 from grcen.routers._pages_shared import (
     _csrf_check,
     _sso_context,
@@ -149,7 +149,9 @@ async def login_mfa_page(request: Request):
 async def login_mfa_submit(
     request: Request,
     pool: asyncpg.Pool = Depends(get_db),
+    _rl=Depends(check_mfa_rate_limit),
 ):
+    from grcen.config import settings as app_settings
     from grcen.services import session_service, totp_service
     pending = request.session.get("mfa_pending_user_id")
     if not pending:
@@ -159,18 +161,40 @@ async def login_mfa_submit(
     form = await request.form()
     code = str(form.get("code", "")).strip()
 
-    if not await totp_service.verify_login_code(pool, user_id, code):
-        return templates.TemplateResponse(
-            request, "auth/mfa.html",
-            context={"error": "Invalid code. Try again."},
-        )
-
+    # The second factor needs the same throttling as the first. A TOTP code is
+    # six digits over a short window, so an unthrottled endpoint is guessable:
+    # this route is exempt from the general limiter (the /login prefix matches
+    # it) and had no login limiter of its own, so it had none at all. Failures
+    # also count toward the account lockout the password step already uses.
     user = await auth_svc.get_user_by_id(pool, user_id)
     if not user or not user.is_active:
         request.session.clear()
         return RedirectResponse("/login", status_code=302)
 
+    if await auth_svc.check_lockout(pool, user.username):
+        request.session.clear()
+        ctx = await _sso_context(pool)
+        ctx["error"] = "Too many failed attempts. Try again later."
+        return templates.TemplateResponse(
+            request, "auth/login.html", context=ctx
+        )
+
+    if not await totp_service.verify_login_code(pool, user_id, code):
+        await auth_svc.record_failed_login(
+            pool, user.username,
+            app_settings.LOGIN_MAX_FAILED_ATTEMPTS,
+            app_settings.LOGIN_LOCKOUT_MINUTES,
+        )
+        return templates.TemplateResponse(
+            request, "auth/mfa.html",
+            context={"error": "Invalid code. Try again."},
+        )
+
     tenancy.set_tenant(user.organization_id)
+
+    # Clear the counter the failed-code branch above may have run up; the
+    # password step's reset happened before those attempts existed.
+    await auth_svc.record_successful_login(pool, user.id)
 
     request.session.clear()
     session_id = await session_service.create_session(

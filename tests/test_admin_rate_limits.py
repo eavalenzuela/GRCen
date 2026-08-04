@@ -76,3 +76,72 @@ async def test_admin_page_renders(auth_client):
     resp = await auth_client.get("/admin/rate-limits")
     assert resp.status_code == 200
     assert "Rate Limit Budgets" in resp.text
+
+
+# --- limiter identity must not be attacker-controlled ----------------------
+
+
+def _req(headers=None, session=None):
+    """Minimal Request stand-in for the key function."""
+    from starlette.datastructures import Headers
+    from starlette.requests import Request
+
+    scope = {
+        "type": "http",
+        "method": "GET",
+        "path": "/api/assets/",
+        "headers": Headers(headers or {}).raw,
+        "client": ("203.0.113.9", 1234),
+        "session": session if session is not None else {},
+    }
+    return Request(scope)
+
+
+def test_unrecognised_bearer_falls_back_to_ip():
+    """Otherwise any caller gets a fresh budget per request just by varying it.
+
+    The key was the raw header value, so an unauthenticated client could rotate
+    it to sidestep the limiter entirely — and permanently add a never-evicted
+    entry to the window map on every request while doing so.
+    """
+    from grcen.rate_limit import _api_caller_key, _reset
+
+    _reset()
+    k1 = _api_caller_key(_req({"authorization": "Bearer made-up-aaa"}))
+    k2 = _api_caller_key(_req({"authorization": "Bearer made-up-bbb"}))
+
+    assert k1 == k2 == "ip:203.0.113.9"
+
+
+def test_recognised_bearer_gets_its_own_bucket():
+    from grcen.rate_limit import _api_caller_key, _reset, note_valid_token
+
+    _reset()
+    note_valid_token("real-token-value")
+
+    key = _api_caller_key(_req({"authorization": "Bearer real-token-value"}))
+
+    assert key.startswith("token:")
+    assert "real-token-value" not in key, "raw credential held in limiter state"
+    # A different token is a different bucket.
+    note_valid_token("other-token-value")
+    other = _api_caller_key(_req({"authorization": "Bearer other-token-value"}))
+    assert other != key
+
+
+def test_stale_windows_are_evicted():
+    """The window map is a defaultdict; without eviction it grows forever."""
+    import time
+
+    from grcen.rate_limit import _WINDOW_SECONDS, _api_window, _evict_stale_windows, _reset
+
+    _reset()
+    now = time.monotonic()
+    for i in range(50):
+        _api_window[(f"ip:10.0.0.{i}", "read", "")].append(now - _WINDOW_SECONDS - 10)
+    _api_window[("ip:10.1.1.1", "read", "")].append(now)
+    assert len(_api_window) == 51
+
+    _evict_stale_windows(now)
+
+    assert list(_api_window) == [("ip:10.1.1.1", "read", "")]

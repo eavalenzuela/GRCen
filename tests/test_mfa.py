@@ -250,3 +250,123 @@ async def test_sso_user_cannot_begin_mfa(pool):
         )
         assert resp.status_code in (302, 303)
         assert "fail:" in resp.headers["location"]
+
+
+# ── the second factor must be throttled like the first ───────────────────
+
+
+@pytest.mark.asyncio
+async def test_mfa_failures_count_toward_lockout(pool):
+    """Unlimited guesses make a 6-digit second factor worthless.
+
+    /login/mfa is exempt from the general limiter (the /login prefix matches
+    it) and had no login limiter of its own, so it had no throttle at all and
+    failures incremented nothing.
+    """
+    from grcen.config import settings
+    from grcen.rate_limit import _reset as _reset_rate_limit
+    from grcen.services.auth import check_lockout
+    from tests.conftest import _extract_csrf_from_session_cookie, get_csrf_token
+
+    u = await create_user(pool, f"u_{uuid.uuid4().hex[:8]}", "pw", role=UserRole.VIEWER)
+    secret, _ = await totp_service.begin_enrollment(pool, u.id)
+    await totp_service.confirm_enrollment(pool, u.id, pyotp.TOTP(secret).now())
+
+    async with await _fresh_client() as c:
+        _reset_rate_limit()
+        csrf = await get_csrf_token(c)
+        await c.post(
+            "/login",
+            data={"username": u.username, "password": "pw", "csrf_token": csrf},
+            follow_redirects=False,
+        )
+        await c.get("/login/mfa")
+        csrf2 = _extract_csrf_from_session_cookie(c)
+
+        for _ in range(settings.LOGIN_MAX_FAILED_ATTEMPTS):
+            _reset_rate_limit()  # isolate the lockout counter from the debounce
+            await c.post(
+                "/login/mfa",
+                data={"code": "000000", "csrf_token": csrf2},
+                follow_redirects=False,
+            )
+
+    assert await check_lockout(pool, u.username) is True
+
+    # And the count is real, not just the timestamp.
+    assert await pool.fetchval(
+        "SELECT failed_login_count FROM users WHERE id = $1", u.id
+    ) >= settings.LOGIN_MAX_FAILED_ATTEMPTS
+
+
+@pytest.mark.asyncio
+async def test_mfa_endpoint_is_rate_limited(pool):
+    """Back-to-back guesses hit the login debounce."""
+    from grcen.rate_limit import _reset as _reset_rate_limit
+    from tests.conftest import _extract_csrf_from_session_cookie, get_csrf_token
+
+    u = await create_user(pool, f"u_{uuid.uuid4().hex[:8]}", "pw", role=UserRole.VIEWER)
+    secret, _ = await totp_service.begin_enrollment(pool, u.id)
+    await totp_service.confirm_enrollment(pool, u.id, pyotp.TOTP(secret).now())
+
+    async with await _fresh_client() as c:
+        _reset_rate_limit()
+        csrf = await get_csrf_token(c)
+        await c.post(
+            "/login",
+            data={"username": u.username, "password": "pw", "csrf_token": csrf},
+            follow_redirects=False,
+        )
+        await c.get("/login/mfa")
+        csrf2 = _extract_csrf_from_session_cookie(c)
+
+        _reset_rate_limit()
+        first = await c.post(
+            "/login/mfa", data={"code": "000000", "csrf_token": csrf2},
+            follow_redirects=False,
+        )
+        second = await c.post(
+            "/login/mfa", data={"code": "000001", "csrf_token": csrf2},
+            follow_redirects=False,
+        )
+
+    assert first.status_code == 200
+    assert second.status_code == 429, "second factor accepted an unthrottled retry"
+
+
+@pytest.mark.asyncio
+async def test_successful_mfa_clears_failed_count(pool):
+    from grcen.rate_limit import _reset as _reset_rate_limit
+    from tests.conftest import _extract_csrf_from_session_cookie, get_csrf_token
+
+    u = await create_user(pool, f"u_{uuid.uuid4().hex[:8]}", "pw", role=UserRole.VIEWER)
+    secret, _ = await totp_service.begin_enrollment(pool, u.id)
+    await totp_service.confirm_enrollment(pool, u.id, pyotp.TOTP(secret).now())
+
+    async with await _fresh_client() as c:
+        _reset_rate_limit()
+        csrf = await get_csrf_token(c)
+        await c.post(
+            "/login",
+            data={"username": u.username, "password": "pw", "csrf_token": csrf},
+            follow_redirects=False,
+        )
+        await c.get("/login/mfa")
+        csrf2 = _extract_csrf_from_session_cookie(c)
+
+        _reset_rate_limit()
+        await c.post(
+            "/login/mfa", data={"code": "000000", "csrf_token": csrf2},
+            follow_redirects=False,
+        )
+        _reset_rate_limit()
+        ok = await c.post(
+            "/login/mfa",
+            data={"code": pyotp.TOTP(secret).now(), "csrf_token": csrf2},
+            follow_redirects=False,
+        )
+
+    assert ok.status_code == 302
+    assert await pool.fetchval(
+        "SELECT failed_login_count FROM users WHERE id = $1", u.id
+    ) == 0

@@ -130,6 +130,12 @@ async def create_token(
         org_id,
         allowed_ips or [],
     )
+    # Let the rate limiter — which runs before authentication and so can only
+    # recognise tokens it has been told about — give this one its own budget
+    # from its very first request rather than billing it to the caller's IP.
+    from grcen.rate_limit import note_valid_token
+    note_valid_token(raw)
+
     return ApiToken.from_row(row), raw
 
 
