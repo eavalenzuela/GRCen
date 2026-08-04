@@ -183,21 +183,47 @@ async def list_tokens_for_user(
     return [ApiToken.from_row(r) for r in rows]
 
 
-async def list_all_tokens(pool: asyncpg.Pool) -> list[ApiToken]:
+async def list_all_tokens(
+    pool: asyncpg.Pool, *, organization_id: UUID
+) -> list[ApiToken]:
+    """Every token in one organization — the admin view.
+
+    ``api_tokens`` sits outside RLS (it is read to resolve a bearer before any
+    tenant is known), so the scope has to be explicit here or this lists every
+    tenant's tokens.
+    """
     rows = await pool.fetch(
-        "SELECT * FROM api_tokens ORDER BY created_at DESC"
+        "SELECT * FROM api_tokens WHERE organization_id = $1 "
+        "ORDER BY created_at DESC",
+        organization_id,
     )
     return [ApiToken.from_row(r) for r in rows]
 
 
-async def get_token_by_id(pool: asyncpg.Pool, token_id: UUID) -> ApiToken | None:
-    row = await pool.fetchrow("SELECT * FROM api_tokens WHERE id = $1", token_id)
+async def get_token_by_id(
+    pool: asyncpg.Pool, token_id: UUID, organization_id: UUID | None = None
+) -> ApiToken | None:
+    """Look up a token, optionally constrained to one organization.
+
+    Optional because bearer resolution legitimately runs before a tenant is
+    known; every caller acting for a tenant must pass it. See list_all_tokens.
+    """
+    if organization_id is not None:
+        row = await pool.fetchrow(
+            "SELECT * FROM api_tokens WHERE id = $1 AND organization_id = $2",
+            token_id, organization_id,
+        )
+    else:
+        row = await pool.fetchrow("SELECT * FROM api_tokens WHERE id = $1", token_id)
     return ApiToken.from_row(row) if row else None
 
 
-async def revoke_token(pool: asyncpg.Pool, token_id: UUID) -> bool:
+async def revoke_token(
+    pool: asyncpg.Pool, token_id: UUID, *, organization_id: UUID
+) -> bool:
     result = await pool.execute(
-        "UPDATE api_tokens SET revoked = true WHERE id = $1 AND revoked = false",
-        token_id,
+        "UPDATE api_tokens SET revoked = true "
+        "WHERE id = $1 AND organization_id = $2 AND revoked = false",
+        token_id, organization_id,
     )
     return result == "UPDATE 1"

@@ -27,9 +27,21 @@ REDACTED_PLACEHOLDER = "[redacted]"
 
 
 def can_view_pii(user: User | None) -> bool:
+    """Whether this caller may see unmasked sensitive fields.
+
+    Role *and* token scope, the same conjunction ``require_permission``
+    enforces: a token that deliberately omits ``view_pii`` must not hand back
+    PII just because the user who minted it happens to hold the permission.
+    ``token_permissions is None`` means a session caller — role alone decides.
+    """
     if user is None:
         return False
-    return has_permission(user.role, Permission.VIEW_PII)
+    if not has_permission(user.role, Permission.VIEW_PII):
+        return False
+    token_perms = getattr(user, "token_permissions", None)
+    if token_perms is not None and Permission.VIEW_PII.value not in token_perms:
+        return False
+    return True
 
 
 def code_sensitive_field_names(asset_type: AssetType) -> set[str]:

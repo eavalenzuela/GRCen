@@ -55,8 +55,7 @@ async def list_assets(
         created_after=created_after, created_before=created_before,
         tag=tag, unlinked=unlinked, organization_id=user.organization_id,
     )
-    for a in items:
-        a.metadata_ = redaction.redact_metadata(a.metadata_, a.type, user)
+    await redaction.redact_assets_by_type(pool, items, user, user.organization_id)
     await access_log_service.record_list_sampled(
         pool, user=user, entity_type="asset",
         path=str(request.url.path), result_count=total,
@@ -83,8 +82,7 @@ async def search_assets(
     results = await asset_svc.search_assets(
         pool, q, types=type_list, organization_id=user.organization_id
     )
-    for a in results:
-        a.metadata_ = redaction.redact_metadata(a.metadata_, a.type, user)
+    await redaction.redact_assets_by_type(pool, results, user, user.organization_id)
     return [AssetResponse.model_validate(a, from_attributes=True) for a in results]
 
 
@@ -168,7 +166,10 @@ async def get_asset(
     )
     if not asset:
         raise HTTPException(status_code=404, detail="Asset not found")
-    asset.metadata_ = redaction.redact_metadata(asset.metadata_, asset.type, user)
+    asset.metadata_ = await redaction.redact_metadata_async(
+        pool, asset.metadata_, asset.type, user, user.organization_id,
+        asset_id=asset.id,
+    )
     return AssetResponse.model_validate(asset, from_attributes=True)
 
 

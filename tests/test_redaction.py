@@ -218,10 +218,10 @@ async def test_pdf_service_passes_user_to_redaction(pool, admin_user, monkeypatc
     captured = {}
     original = redaction.redact_metadata
 
-    def spy(metadata, asset_type, user):
+    def spy(metadata, asset_type, user, **kwargs):
         captured["user"] = user
         captured["asset_type"] = asset_type
-        return original(metadata, asset_type, user)
+        return original(metadata, asset_type, user, **kwargs)
 
     monkeypatch.setattr(pdf_service.redaction, "redact_metadata", spy)
 
@@ -230,3 +230,122 @@ async def test_pdf_service_passes_user_to_redaction(pool, admin_user, monkeypatc
     await pdf_service.render_asset_report(pool, p.id, user=viewer)
     assert captured["user"] == viewer
     assert captured["asset_type"] == AssetType.PERSON
+
+
+# ── token scope must gate PII, not just role ─────────────────────────────
+
+
+def _admin_with_token_scope(admin, perms):
+    """Copy of an admin carrying an API token's declared permission scope."""
+    import dataclasses
+    return dataclasses.replace(admin, token_permissions=perms)
+
+
+@pytest.mark.asyncio
+async def test_token_without_view_pii_gets_redacted(pool, admin_user):
+    """A least-privilege token must not inherit its owner's PII access.
+
+    require_permission already enforces role AND token scope; can_view_pii
+    consulted the role alone, so a token minted without view_pii still
+    received unmasked sensitive fields.
+    """
+    meta = {"email": "a@b", "phone": "555", "title": "CEO"}
+    scoped = _admin_with_token_scope(admin_user, ["view"])
+
+    assert redaction.can_view_pii(scoped) is False
+    out = redaction.redact_metadata(meta, AssetType.PERSON, scoped)
+    assert out["email"] == redaction.REDACTED_PLACEHOLDER
+    assert out["phone"] == redaction.REDACTED_PLACEHOLDER
+    assert out["title"] == "CEO"
+
+
+@pytest.mark.asyncio
+async def test_token_with_view_pii_sees_plaintext(pool, admin_user):
+    meta = {"email": "a@b", "phone": "555"}
+    scoped = _admin_with_token_scope(admin_user, ["view", "view_pii"])
+
+    assert redaction.can_view_pii(scoped) is True
+    assert redaction.redact_metadata(meta, AssetType.PERSON, scoped) == meta
+
+
+@pytest.mark.asyncio
+async def test_session_user_unaffected_by_token_scope(pool, admin_user):
+    """token_permissions is None for session callers — role alone decides."""
+    assert admin_user.token_permissions is None
+    assert redaction.can_view_pii(admin_user) is True
+
+
+@pytest.mark.asyncio
+async def test_api_token_without_view_pii_redacts_over_http(pool, admin_user):
+    from httpx import ASGITransport, AsyncClient
+
+    from grcen.main import app
+    from grcen.services import token_service
+
+    asset = await _person(pool, admin_user.id)
+    _tok, raw = await token_service.create_token(
+        pool, admin_user.id, "no-pii", ["view"],
+    )
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as c:
+        resp = await c.get(
+            f"/api/assets/{asset.id}",
+            headers={"Authorization": f"Bearer {raw}"},
+        )
+        assert resp.status_code == 200
+        meta = resp.json()["metadata_"]
+        assert meta["email"] == redaction.REDACTED_PLACEHOLDER
+        assert meta["title"] == "Engineer"
+
+
+# ── admin-configured overrides must apply on every egress path ───────────
+
+
+@pytest.mark.asyncio
+async def test_org_override_applies_on_rest_and_pdf(pool, admin_user):
+    """A field promoted to sensitive by an admin must be masked everywhere.
+
+    The REST and PDF paths used the code-only synchronous lookup, so
+    override-promoted fields leaked there while the HTML page masked them.
+    """
+    from httpx import ASGITransport, AsyncClient
+
+    from grcen.main import app
+    from grcen.services import token_service
+
+    asset = await _person(pool, admin_user.id)
+    # Promote a normally-public field for this org.
+    await pool.execute(
+        """INSERT INTO sensitive_field_overrides
+               (organization_id, asset_type, field_name, sensitive)
+           VALUES ($1, $2, $3, true)""",
+        admin_user.organization_id, AssetType.PERSON.value, "department",
+    )
+
+    viewer = await create_user(
+        pool, f"v_{uuid.uuid4().hex[:8]}", "pw", role=UserRole.VIEWER,
+        organization_id=admin_user.organization_id,
+    )
+    _tok, raw = await token_service.create_token(
+        pool, viewer.id, "viewer-tok", ["view"],
+    )
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as c:
+        headers = {"Authorization": f"Bearer {raw}"}
+
+        detail = await c.get(f"/api/assets/{asset.id}", headers=headers)
+        assert detail.status_code == 200
+        assert detail.json()["metadata_"]["department"] == redaction.REDACTED_PLACEHOLDER
+
+        listing = await c.get("/api/assets/?types=person", headers=headers)
+        assert listing.status_code == 200
+        rows = [r for r in listing.json()["items"] if r["id"] == str(asset.id)]
+        assert rows and rows[0]["metadata_"]["department"] == redaction.REDACTED_PLACEHOLDER
+
+    pdf = await pdf_service.render_asset_report(
+        pool, asset.id, user=viewer, organization_id=viewer.organization_id
+    )
+    assert pdf[:4] == b"%PDF"
+    assert b"Security" not in pdf

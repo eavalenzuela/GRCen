@@ -295,3 +295,110 @@ async def test_user_listing_isolated_between_orgs(two_orgs):
     assert user_b_name not in a_users
     assert user_b_name in b_users
     assert user_a_name not in b_users
+
+
+# ---------------------------------------------------------------------------
+# Admin user-management writes must not cross tenants
+#
+# `users` and `api_tokens` are deliberately outside RLS — they are read before
+# a tenant is known — so nothing underneath catches a missing filter on these
+# routes. The listing was already scoped; the writes were not.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_admin_cannot_edit_user_in_another_org(two_orgs, pool):
+    """The full takeover: reset another tenant's admin password, then log in."""
+    ca = two_orgs["ca"]
+    victim = two_orgs["user_b"]
+    old_hash = victim.hashed_password
+
+    resp = await ca.post(
+        f"/admin/users/{victim.id}/edit",
+        data={"role": "admin", "password": "attackerpw123"},
+    )
+    assert resp.status_code == 404
+
+    row = await pool.fetchrow(
+        "SELECT hashed_password, role FROM users WHERE id = $1", victim.id
+    )
+    assert row["hashed_password"] == old_hash, "cross-org password reset succeeded"
+    assert row["role"] == "admin"
+
+    # And the stolen credential must not work. (The fixture's own logins have
+    # already consumed the login-rate budget for this client key.)
+    from grcen.rate_limit import _reset as _reset_rate_limit
+    _reset_rate_limit()
+
+    c = AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
+    try:
+        resp = await c.post(
+            "/api/auth/login",
+            json={"username": victim.username, "password": "attackerpw123"},
+        )
+        assert resp.status_code == 401
+    finally:
+        await c.aclose()
+
+
+@pytest.mark.asyncio
+async def test_admin_cannot_disable_or_delete_user_in_another_org(two_orgs, pool):
+    ca = two_orgs["ca"]
+    victim = two_orgs["user_b"]
+
+    resp = await ca.post(f"/admin/users/{victim.id}/toggle-active")
+    assert resp.status_code == 404
+    assert await pool.fetchval(
+        "SELECT is_active FROM users WHERE id = $1", victim.id
+    ) is True
+
+    resp = await ca.post(f"/admin/users/{victim.id}/delete")
+    assert resp.status_code == 404
+    assert await pool.fetchval(
+        "SELECT count(*) FROM users WHERE id = $1", victim.id
+    ) == 1
+
+
+@pytest.mark.asyncio
+async def test_admin_cannot_view_user_in_another_org(two_orgs):
+    ca = two_orgs["ca"]
+    resp = await ca.get(f"/admin/users/{two_orgs['user_b'].id}/edit")
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_admin_created_user_lands_in_admins_org(two_orgs, pool):
+    """create_user falls back to the 'default' org when none is given."""
+    cb = two_orgs["cb"]
+    username = f"new_{uuid.uuid4().hex[:8]}"
+    resp = await cb.post(
+        "/admin/users/new",
+        data={"username": username, "password": "testpass123", "role": "viewer"},
+    )
+    assert resp.status_code in (200, 302)
+    org_id = await pool.fetchval(
+        "SELECT organization_id FROM users WHERE username = $1", username
+    )
+    assert org_id == two_orgs["org_b"].id
+
+
+@pytest.mark.asyncio
+async def test_admin_token_list_and_revoke_scoped_to_org(two_orgs, pool):
+    from grcen.services import token_service
+
+    token_b, _raw = await token_service.create_token(
+        pool, two_orgs["user_b"].id, "org-b-token", ["view"],
+    )
+
+    ca = two_orgs["ca"]
+    listing = await ca.get("/api/tokens/all")
+    assert listing.status_code == 200
+    assert all(t["id"] != str(token_b.id) for t in listing.json()), (
+        "org A admin can see org B's tokens"
+    )
+
+    resp = await ca.request("DELETE", f"/api/tokens/all/{token_b.id}")
+    assert resp.status_code == 404
+    assert await pool.fetchval(
+        "SELECT revoked FROM api_tokens WHERE id = $1", token_b.id
+    ) is False

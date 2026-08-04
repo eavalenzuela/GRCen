@@ -499,7 +499,10 @@ async def asset_detail(
         path=str(request.url.path),
         ip_address=request.client.host if request.client else None,
     )
-    asset.metadata_ = redaction.redact_metadata(asset.metadata_, asset.type, user)
+    asset.metadata_ = await redaction.redact_metadata_async(
+        pool, asset.metadata_, asset.type, user, user.organization_id,
+        asset_id=asset.id,
+    )
     rels = await rel_svc.list_relationships_for_asset(pool, asset_id, organization_id=user.organization_id)
     if rels:
         rel_ids = [r.id for r in rels]

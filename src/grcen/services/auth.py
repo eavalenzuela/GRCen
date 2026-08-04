@@ -157,8 +157,23 @@ async def authenticate_user(
     return user
 
 
-async def get_user_by_id(pool: asyncpg.Pool, user_id: UUID) -> User | None:
-    row = await pool.fetchrow("SELECT * FROM users WHERE id = $1", user_id)
+async def get_user_by_id(
+    pool: asyncpg.Pool, user_id: UUID, organization_id: UUID | None = None
+) -> User | None:
+    """Look up a user by id, optionally constrained to one organization.
+
+    ``users`` is outside RLS (it is read before a tenant is known), so nothing
+    underneath scopes this — callers acting on behalf of a tenant must pass
+    ``organization_id`` themselves. It stays optional because the pre-auth
+    callers (session resolution, login, SSO) have no tenant yet by definition.
+    """
+    if organization_id is not None:
+        row = await pool.fetchrow(
+            "SELECT * FROM users WHERE id = $1 AND organization_id = $2",
+            user_id, organization_id,
+        )
+    else:
+        row = await pool.fetchrow("SELECT * FROM users WHERE id = $1", user_id)
     return _decrypt_user_email(User.from_row(row)) if row else None
 
 
@@ -176,22 +191,36 @@ async def list_users(
     return _decrypt_users_email(users)
 
 
-async def update_user_role(pool: asyncpg.Pool, user_id: UUID, role: UserRole) -> User | None:
+async def update_user_role(
+    pool: asyncpg.Pool, user_id: UUID, role: UserRole, *, organization_id: UUID
+) -> User | None:
+    """Change a user's role within one organization.
+
+    ``organization_id`` is required and lands in the WHERE clause: ``users`` has
+    no RLS policy to fall back on, so an unscoped id here is a cross-tenant
+    write. A caller acting for the wrong tenant simply matches no row.
+    """
     row = await pool.fetchrow(
         """UPDATE users SET role = $1, is_admin = $2, updated_at = now()
-           WHERE id = $3 RETURNING *""",
+           WHERE id = $3 AND organization_id = $4 RETURNING *""",
         role.value,
         role == UserRole.ADMIN,
         user_id,
+        organization_id,
     )
     return _decrypt_user_email(User.from_row(row)) if row else None
 
 
-async def set_user_active(pool: asyncpg.Pool, user_id: UUID, active: bool) -> User | None:
+async def set_user_active(
+    pool: asyncpg.Pool, user_id: UUID, active: bool, *, organization_id: UUID
+) -> User | None:
+    """Enable/disable a login within one organization. See update_user_role."""
     row = await pool.fetchrow(
-        "UPDATE users SET is_active = $1, updated_at = now() WHERE id = $2 RETURNING *",
+        """UPDATE users SET is_active = $1, updated_at = now()
+           WHERE id = $2 AND organization_id = $3 RETURNING *""",
         active,
         user_id,
+        organization_id,
     )
     return _decrypt_user_email(User.from_row(row)) if row else None
 
@@ -237,8 +266,14 @@ async def set_email_notification_mode(
     return _decrypt_user_email(User.from_row(row)) if row else None
 
 
-async def delete_user(pool: asyncpg.Pool, user_id: UUID) -> bool:
-    result = await pool.execute("DELETE FROM users WHERE id = $1", user_id)
+async def delete_user(
+    pool: asyncpg.Pool, user_id: UUID, *, organization_id: UUID
+) -> bool:
+    """Delete a user within one organization. See update_user_role."""
+    result = await pool.execute(
+        "DELETE FROM users WHERE id = $1 AND organization_id = $2",
+        user_id, organization_id,
+    )
     return result == "DELETE 1"
 
 

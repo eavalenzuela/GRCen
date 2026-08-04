@@ -16,6 +16,10 @@ class ApiToken:
     created_at: datetime
     revoked: bool
     allowed_ips: list[str]
+    # A token is bound to the org it was minted in and never switches (see
+    # deps.get_current_user). Carrying it here lets callers scope writes to the
+    # token's own tenant — `api_tokens` sits outside RLS, so nothing else will.
+    organization_id: UUID | None = None
 
     @classmethod
     def from_row(cls, row) -> "ApiToken":
@@ -31,4 +35,5 @@ class ApiToken:
             created_at=row["created_at"],
             revoked=row["revoked"],
             allowed_ips=list(row.get("allowed_ips") or []),
+            organization_id=row.get("organization_id"),
         )

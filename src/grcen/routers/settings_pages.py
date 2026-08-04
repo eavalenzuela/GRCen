@@ -425,7 +425,9 @@ async def my_token_revoke(
         request.session["token_error"] = "Token not found."
         return RedirectResponse("/tokens", status_code=302)
 
-    await token_service.revoke_token(pool, token_id)
+    await token_service.revoke_token(
+        pool, token_id, organization_id=token.organization_id
+    )
     await audit_svc.log_audit_event(
         pool,
         user_id=user.id,

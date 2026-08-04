@@ -139,7 +139,9 @@ async def test_revoked_token_returns_401(pool, admin_user):
     token, raw = await token_service.create_token(
         pool, admin_user.id, "revoke-test", ["view"],
     )
-    await token_service.revoke_token(pool, token.id)
+    await token_service.revoke_token(
+        pool, token.id, organization_id=admin_user.organization_id
+    )
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:

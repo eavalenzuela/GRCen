@@ -210,9 +210,10 @@ async def render_asset_list_report(
         page=1, page_size=500,  # cap so the doc stays sane
         organization_id=organization_id,
     )
+    await redaction.redact_assets_by_type(pool, items, user, organization_id)
     redacted = []
     for a in items:
-        meta = redaction.redact_metadata(a.metadata_, a.type, user)
+        meta = a.metadata_
         redacted.append({
             "id": a.id, "name": a.name, "type": a.type.value,
             "status": a.status.value, "owner": a.owner or "",
@@ -287,7 +288,9 @@ async def render_asset_report(
     if isinstance(meta, str):
         meta = json.loads(meta or "{}")
     meta = meta or {}
-    meta = redaction.redact_metadata(meta, asset.type, user)
+    meta = await redaction.redact_metadata_async(
+        pool, meta, asset.type, user, organization_id, asset_id=asset.id
+    )
 
     branding = await _branding_context(pool, organization_id)
     return _render(

@@ -25,6 +25,11 @@ class User:
     locked_until: datetime | None = None
     email_notifications_enabled: bool = False
     email_notification_mode: str = "immediate"  # 'immediate' | 'digest'
+    # Permission scope of the API token this request arrived on, if any. Not a
+    # column — set per-request by deps.get_current_user. ``None`` means the
+    # caller is a session user, whose scope is their role alone. An empty list
+    # is a real, and maximally restrictive, token scope.
+    token_permissions: list[str] | None = None
 
     @property
     def is_admin(self) -> bool:

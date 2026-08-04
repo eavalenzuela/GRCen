@@ -238,7 +238,7 @@ async def create_user(
     if parsed["email"]:
         await auth_svc.set_user_email(pool, user.id, parsed["email"])
     if not parsed["active"]:
-        await auth_svc.set_user_active(pool, user.id, False)
+        await auth_svc.set_user_active(pool, user.id, False, organization_id=organization_id)
 
     up = await external_sync.upsert_external_asset(
         pool,
@@ -354,7 +354,7 @@ async def replace_user(
         raise ScimError(404, f"User {user_id} not found")
     parsed = parse_user(payload)
     await auth_svc.set_user_email(pool, user.id, parsed["email"])
-    await auth_svc.set_user_active(pool, user.id, parsed["active"])
+    await auth_svc.set_user_active(pool, user.id, parsed["active"], organization_id=organization_id)
     await _write_person(pool, organization_id, user, parsed)
     user = await auth_svc.get_user_by_id(pool, user.id)
     return await _load_view(pool, user)
@@ -385,7 +385,7 @@ async def patch_user(
         # Other paths are intentionally ignored in this slice.
 
     if new_active is not None and new_active != user.is_active:
-        await auth_svc.set_user_active(pool, user.id, new_active)
+        await auth_svc.set_user_active(pool, user.id, new_active, organization_id=organization_id)
         if user.person_asset_id:
             await pool.execute(
                 "UPDATE assets SET status = $1, updated_at = now() "
@@ -404,7 +404,7 @@ async def deactivate_user(
     user = await auth_svc.get_user_by_id(pool, user_id)
     if not user or user.organization_id != organization_id:
         raise ScimError(404, f"User {user_id} not found")
-    await auth_svc.set_user_active(pool, user.id, False)
+    await auth_svc.set_user_active(pool, user.id, False, organization_id=organization_id)
     if user.person_asset_id:
         await pool.execute(
             "UPDATE assets SET status = 'archived', updated_at = now() "
@@ -480,7 +480,7 @@ async def recompute_user_role(
         min(candidates, key=lambda x: _ROLE_PRIORITY.index(x))
         if candidates else await get_default_role(pool)
     )
-    await auth_svc.update_user_role(pool, user_id, role)
+    await auth_svc.update_user_role(pool, user_id, role, organization_id=organization_id)
 
 
 def parse_group(payload: object) -> dict:

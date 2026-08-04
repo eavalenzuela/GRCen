@@ -88,6 +88,11 @@ async def get_current_user(
     if not user or not user.is_active:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
+    # Carry the token's scope on the user so checks that only receive a User —
+    # redaction.can_view_pii in particular — can honor it too.
+    if via_token:
+        user.token_permissions = token_permissions
+
     # Tokens are bound to their issuing org — never switch them.
     if via_token:
         tenancy.set_tenant(user.organization_id)
@@ -125,6 +130,7 @@ async def get_current_user_or_none(
     request: Request, pool: asyncpg.Pool = Depends(get_db)
 ) -> User | None:
     user_id: str | None = None
+    token_permissions: list[str] | None = None
 
     bearer = await _resolve_bearer_token(request, pool)
     if bearer is not None:
@@ -137,6 +143,7 @@ async def get_current_user_or_none(
         return None
     user = await get_user_by_id(pool, UUID(user_id))
     if user is not None:
+        user.token_permissions = token_permissions
         tenancy.set_tenant(user.organization_id)
     return user
 

@@ -96,7 +96,11 @@ async def revoke_my_token(
     token = await token_service.get_token_by_id(pool, token_id)
     if not token or token.user_id != user.id:
         raise HTTPException(status_code=404, detail="Token not found")
-    if not await token_service.revoke_token(pool, token_id):
+    # Ownership is the gate here, and a token is bound to its issuing org — so
+    # scope the write to that org, not the caller's currently-active one.
+    if not await token_service.revoke_token(
+        pool, token_id, organization_id=token.organization_id
+    ):
         raise HTTPException(status_code=400, detail="Token already revoked")
     await audit_svc.log_audit_event(
         pool,
@@ -146,7 +150,9 @@ async def list_all_tokens(
     pool: asyncpg.Pool = Depends(get_db),
     _user: User = Depends(require_permission(Permission.MANAGE_USERS)),
 ):
-    tokens = await token_service.list_all_tokens(pool)
+    tokens = await token_service.list_all_tokens(
+        pool, organization_id=_user.organization_id
+    )
     return [TokenResponse.model_validate(t, from_attributes=True) for t in tokens]
 
 
@@ -156,10 +162,14 @@ async def admin_revoke_token(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.MANAGE_USERS)),
 ):
-    token = await token_service.get_token_by_id(pool, token_id)
+    token = await token_service.get_token_by_id(
+        pool, token_id, organization_id=user.organization_id
+    )
     if not token:
         raise HTTPException(status_code=404, detail="Token not found")
-    if not await token_service.revoke_token(pool, token_id):
+    if not await token_service.revoke_token(
+        pool, token_id, organization_id=user.organization_id
+    ):
         raise HTTPException(status_code=400, detail="Token already revoked")
     await audit_svc.log_audit_event(
         pool,

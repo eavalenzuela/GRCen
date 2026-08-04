@@ -90,7 +90,12 @@ async def admin_user_create_submit(
                 "error": "Username and password are required.",
             },
         )
-    new_user = await auth_svc.create_user(pool, username, password, role=role)
+    # Without an explicit org, create_user falls back to the "default" org —
+    # so an admin of any other tenant was creating accounts outside their own.
+    new_user = await auth_svc.create_user(
+        pool, username, password, role=role,
+        organization_id=user.organization_id,
+    )
     await audit_svc.log_audit_event(
         pool,
         user_id=user.id,
@@ -111,12 +116,16 @@ async def admin_user_edit(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.MANAGE_USERS)),
 ):
-    edit_user = await auth_svc.get_user_by_id(pool, user_id)
+    edit_user = await auth_svc.get_user_by_id(
+        pool, user_id, organization_id=user.organization_id
+    )
     if not edit_user:
         return HTMLResponse("Not found", status_code=404)
     notif_count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     person_assets = await pool.fetch(
-        "SELECT id, name FROM assets WHERE type = 'person' ORDER BY name"
+        "SELECT id, name FROM assets WHERE type = 'person' AND organization_id = $1 "
+        "ORDER BY name",
+        user.organization_id,
     )
     return templates.TemplateResponse(request, "admin/user_form.html", context={
             "user": user,
@@ -136,22 +145,43 @@ async def admin_user_update_submit(
     user: User = Depends(require_permission(Permission.MANAGE_USERS)),
 ):
     form = await request.form()
-    old_user = await auth_svc.get_user_by_id(pool, user_id)
+    # Resolve the target within the acting admin's org. `users` has no RLS
+    # policy behind it, so without this an admin of one tenant could reset the
+    # password of — and then log in as — an admin of another.
+    old_user = await auth_svc.get_user_by_id(
+        pool, user_id, organization_id=user.organization_id
+    )
+    if not old_user:
+        return HTMLResponse("Not found", status_code=404)
     role = UserRole(form["role"])
-    await auth_svc.update_user_role(pool, user_id, role)
+    await auth_svc.update_user_role(
+        pool, user_id, role, organization_id=user.organization_id
+    )
     # Update password if provided
     password = str(form.get("password", "")).strip()
     if password:
         hashed = auth_svc.hash_password(password)
         await pool.execute(
-            "UPDATE users SET hashed_password = $1, updated_at = now() WHERE id = $2",
-            hashed, user_id,
+            "UPDATE users SET hashed_password = $1, updated_at = now() "
+            "WHERE id = $2 AND organization_id = $3",
+            hashed, user_id, user.organization_id,
         )
-    # Update person asset link
+    # Update person asset link. The id comes from a form field, so confirm it
+    # names an asset in this org rather than trusting the rendered options.
     person_asset_raw = str(form.get("person_asset_id", "")).strip()
     person_asset_id = UUID(person_asset_raw) if person_asset_raw else None
+    if person_asset_id is not None:
+        owned = await pool.fetchval(
+            "SELECT 1 FROM assets WHERE id = $1 AND organization_id = $2 "
+            "AND type = 'person'",
+            person_asset_id, user.organization_id,
+        )
+        if not owned:
+            return HTMLResponse("Not found", status_code=404)
     await auth_svc.set_person_asset_link(pool, user_id, person_asset_id)
-    updated_user = await auth_svc.get_user_by_id(pool, user_id)
+    updated_user = await auth_svc.get_user_by_id(
+        pool, user_id, organization_id=user.organization_id
+    )
     if old_user and updated_user:
         diff = audit_svc.compute_diff(old_user.__dict__, updated_user.__dict__, _USER_FIELDS)
         if password:
@@ -176,13 +206,17 @@ async def admin_user_toggle_active(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.MANAGE_USERS)),
 ):
-    target = await auth_svc.get_user_by_id(pool, user_id)
+    target = await auth_svc.get_user_by_id(
+        pool, user_id, organization_id=user.organization_id
+    )
     if not target:
         return HTMLResponse("Not found", status_code=404)
     if target.id == user.id:
         return RedirectResponse("/admin/users", status_code=302)
     new_active = not target.is_active
-    await auth_svc.set_user_active(pool, user_id, new_active)
+    await auth_svc.set_user_active(
+        pool, user_id, new_active, organization_id=user.organization_id
+    )
     action = "activate" if new_active else "deactivate"
     await audit_svc.log_audit_event(
         pool,
@@ -205,8 +239,14 @@ async def admin_user_delete_submit(
 ):
     if user_id == user.id:
         return RedirectResponse("/admin/users", status_code=302)
-    target = await auth_svc.get_user_by_id(pool, user_id)
-    await auth_svc.delete_user(pool, user_id)
+    target = await auth_svc.get_user_by_id(
+        pool, user_id, organization_id=user.organization_id
+    )
+    if not target:
+        return HTMLResponse("Not found", status_code=404)
+    await auth_svc.delete_user(
+        pool, user_id, organization_id=user.organization_id
+    )
     if target:
         await audit_svc.log_audit_event(
             pool,
@@ -1441,7 +1481,9 @@ async def admin_tokens_page(
 ):
     from grcen.services import token_service
 
-    tokens = await token_service.list_all_tokens(pool)
+    tokens = await token_service.list_all_tokens(
+        pool, organization_id=user.organization_id
+    )
     max_expiry_days = await token_service.get_max_expiry_days(pool)
     users = await auth_svc.list_users(pool, organization_id=user.organization_id)
     users_by_id = {u.id: u for u in users}
@@ -1497,12 +1539,16 @@ async def admin_token_revoke(
 ):
     from grcen.services import token_service
 
-    token = await token_service.get_token_by_id(pool, token_id)
+    token = await token_service.get_token_by_id(
+        pool, token_id, organization_id=user.organization_id
+    )
     if not token:
         request.session["token_error"] = "Token not found."
         return RedirectResponse("/admin/tokens", status_code=302)
 
-    await token_service.revoke_token(pool, token_id)
+    await token_service.revoke_token(
+        pool, token_id, organization_id=user.organization_id
+    )
     await audit_svc.log_audit_event(
         pool,
         user_id=user.id,
