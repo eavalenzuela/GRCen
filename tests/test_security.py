@@ -463,3 +463,84 @@ async def test_https_redirect_respects_x_forwarded_proto():
         resp = await c.get("/test", headers={"X-Forwarded-Proto": "https"})
         assert resp.status_code == 200
         assert "max-age=" in resp.headers.get("Strict-Transport-Security", "")
+
+
+# ---------------------------------------------------------------------------
+# Tenant context on unauthenticated routes
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_tenant_context_middleware_clears_ambient_bypass():
+    """A request must never inherit a process-wide RLS bypass.
+
+    The suite sets one at import so fixtures can read raw tables; production
+    has none. Without this reset the two environments disagree about whether
+    RLS is enforced during request handling, which is precisely how a login
+    path that 500s in production passed the entire suite.
+    """
+    from fastapi import FastAPI
+
+    from grcen import tenancy
+    from grcen.middleware import TenantContextMiddleware
+
+    test_app = FastAPI()
+    test_app.add_middleware(TenantContextMiddleware)
+
+    @test_app.get("/probe")
+    async def _probe():
+        return {"bypassing": tenancy.is_bypassing(), "org": tenancy.current_org()}
+
+    assert tenancy.is_bypassing() is True  # ambient suite context
+
+    transport = ASGITransport(app=test_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as c:
+        resp = await c.get("/probe")
+
+    assert resp.json() == {"bypassing": False, "org": ""}
+    assert tenancy.is_bypassing() is True  # ...and restored afterwards
+
+
+@pytest.mark.asyncio
+async def test_html_login_writes_audit_under_enforced_rls(client, pool):
+    """Login must establish a tenant context before its RLS-protected writes.
+
+    Regression for the d082f49 RLS rollout: the auth routes have no
+    get_current_user dependency, so nothing called set_tenant for them and the
+    closing audit write was rejected by the policy — a 500 before the session
+    cookie was ever emitted, i.e. nobody could log in at all.
+    """
+    from grcen.services.auth import create_user
+    from tests.conftest import login_with_csrf
+
+    user = await create_user(pool, "rlsloginuser", "testpass123")
+    await login_with_csrf(client, "rlsloginuser", "testpass123")
+
+    rows = await pool.fetch(
+        "SELECT organization_id FROM audit_log "
+        "WHERE user_id = $1 AND action = 'login'",
+        user.id,
+    )
+    assert len(rows) == 1, "login audit row missing — the RLS policy rejected it"
+    assert rows[0]["organization_id"] == user.organization_id
+
+
+@pytest.mark.asyncio
+async def test_api_login_writes_audit_under_enforced_rls(client, pool):
+    """Same regression on the JSON login route."""
+    from grcen.services.auth import create_user
+
+    user = await create_user(pool, "rlsapiuser", "testpass123")
+    resp = await client.post(
+        "/api/auth/login",
+        json={"username": "rlsapiuser", "password": "testpass123"},
+    )
+    assert resp.status_code == 200
+
+    rows = await pool.fetch(
+        "SELECT organization_id FROM audit_log "
+        "WHERE user_id = $1 AND action = 'login'",
+        user.id,
+    )
+    assert len(rows) == 1
+    assert rows[0]["organization_id"] == user.organization_id

@@ -7,7 +7,48 @@ from fastapi import HTTPException, Request
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import JSONResponse, RedirectResponse, Response
 
+from grcen import tenancy
 from grcen.rate_limit import _cache_fresh, check_api_rate_limit, refresh_db_settings
+
+# ---------------------------------------------------------------------------
+# Tenant context middleware
+# ---------------------------------------------------------------------------
+
+
+class TenantContextMiddleware:
+    """Start every request enforced and tenant-less, whatever the process context.
+
+    Pure ASGI rather than ``BaseHTTPMiddleware`` so the contextvars set here are
+    the ones the endpoint observes, in the same task context.
+
+    A request must never inherit an ambient bypass. Only two things exist that
+    set one process-wide — the test suite's ``enable_process_bypass()`` and the
+    CLI — and inheriting either turns the RLS backstop off for real request
+    handling. That inheritance is what let the login routes pass 986 tests while
+    500ing in production: they have no ``get_current_user`` dependency, so
+    nothing ever called ``set_tenant`` to clear the test-suite bypass, and they
+    ran privileged under pytest and enforced in production. Resetting here makes
+    the suite exercise the same enforcement production does.
+
+    Handlers that legitimately need cross-tenant reach still opt in explicitly
+    with ``tenancy.system_context()``.
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        org_token = tenancy._current_org.set("")
+        bypass_token = tenancy._bypass.set(False)
+        try:
+            await self.app(scope, receive, send)
+        finally:
+            tenancy._current_org.reset(org_token)
+            tenancy._bypass.reset(bypass_token)
+
 
 # ---------------------------------------------------------------------------
 # Security headers middleware

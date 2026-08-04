@@ -307,3 +307,106 @@ async def test_users_page_has_sso_settings_link(auth_client, pool):
     assert resp.status_code == 200
     assert b"SSO Settings" in resp.content
     assert b"/admin/oidc-settings" in resp.content
+
+
+# --- Callback establishes a real server-side session ---
+
+
+@pytest.mark.asyncio
+async def test_oidc_callback_creates_server_side_session(client, pool, monkeypatch):
+    """A successful OIDC callback must authenticate the user for real.
+
+    get_current_user resolves the caller from the server-side session record
+    named by session['session_id']. The callback previously parked a bare
+    session['user_id'] and created no record, so every OIDC user was bounced
+    straight back to /login — SSO login authenticated nobody.
+    """
+    from grcen.routers import oidc as oidc_router
+
+    oidc_settings._cache = None
+    await oidc_settings.update_settings(
+        pool,
+        issuer_url="https://idp.example.com",
+        client_id="test-client",
+        client_secret="test-secret",
+        display_name="Company SSO",
+    )
+
+    class _StubOIDC:
+        async def authorize_access_token(self, request):
+            return {
+                "id_token": "stub-id-token",
+                "userinfo": {
+                    "sub": "oidc-subject-123",
+                    "email": "sso.user@example.com",
+                    "name": "SSO User",
+                },
+            }
+
+    class _StubOAuth:
+        oidc = _StubOIDC()
+
+    async def _stub_get_oauth(pool):
+        return _StubOAuth()
+
+    monkeypatch.setattr(oidc_router, "get_oauth", _stub_get_oauth)
+
+    resp = await client.get("/auth/oidc/callback", follow_redirects=False)
+    assert resp.status_code == 302
+
+    user = await auth_svc.get_user_by_oidc_sub(pool, "oidc-subject-123")
+    assert user is not None
+
+    # A session row must exist for the user — not just a cookie value.
+    sessions = await pool.fetch(
+        "SELECT session_id FROM sessions WHERE user_id = $1", user.id
+    )
+    assert len(sessions) == 1, "no server-side session created for the OIDC user"
+
+    # And the client must now actually be authenticated.
+    me = await client.get("/api/assets/")
+    assert me.status_code == 200, "OIDC session does not authenticate requests"
+
+
+@pytest.mark.asyncio
+async def test_oidc_first_login_person_lands_in_user_org(client, pool, monkeypatch):
+    """The auto-created Person must belong to the user's org, not the default one."""
+    from grcen.routers import oidc as oidc_router
+
+    oidc_settings._cache = None
+    await oidc_settings.update_settings(
+        pool,
+        issuer_url="https://idp.example.com",
+        client_id="test-client",
+        client_secret="test-secret",
+    )
+
+    class _StubOIDC:
+        async def authorize_access_token(self, request):
+            return {
+                "id_token": "stub",
+                "userinfo": {
+                    "sub": "oidc-subject-org",
+                    "email": "org.user@example.com",
+                    "name": "Org User",
+                },
+            }
+
+    class _StubOAuth:
+        oidc = _StubOIDC()
+
+    monkeypatch.setattr(oidc_router, "get_oauth", lambda pool: _async_stub(_StubOAuth()))
+
+    resp = await client.get("/auth/oidc/callback", follow_redirects=False)
+    assert resp.status_code == 302
+
+    user = await auth_svc.get_user_by_oidc_sub(pool, "oidc-subject-org")
+    assert user.person_asset_id is not None
+    person_org = await pool.fetchval(
+        "SELECT organization_id FROM assets WHERE id = $1", user.person_asset_id
+    )
+    assert person_org == user.organization_id
+
+
+async def _async_stub(value):
+    return value

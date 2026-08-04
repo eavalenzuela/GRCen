@@ -80,9 +80,12 @@ async def login_with_csrf(client: AsyncClient, username: str, password: str):
 # and truncate tables directly, the way they did before RLS. Set at import time
 # rather than in a fixture: tasks copy the context at creation, so this reaches
 # every test task, while a `with` inside an async fixture would not escape it.
-# Requests through the app override it per-request — deps.get_current_user calls
-# tenancy.set_tenant, which clears the bypass — so every existing HTTP test
-# exercises the policies for real rather than around them.
+#
+# Requests through the app do NOT inherit this: middleware.TenantContextMiddleware
+# resets every request to enforced-and-tenant-less, so HTTP tests exercise the
+# policies for real. Relying on deps.get_current_user to clear the bypass instead
+# is what previously let the auth routes — which have no such dependency — pass
+# the whole suite while 500ing in production on the first RLS-protected write.
 tenancy.enable_process_bypass()
 
 

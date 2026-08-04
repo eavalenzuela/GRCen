@@ -7,10 +7,11 @@ import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
+from grcen import tenancy
 from grcen.models.asset import AssetType
 from grcen.permissions import UserRole
 from grcen.routers.deps import get_db
-from grcen.services import oidc_settings
+from grcen.services import oidc_settings, session_service
 
 logger = logging.getLogger(__name__)
 
@@ -144,10 +145,16 @@ async def oidc_callback(request: Request, pool: asyncpg.Pool = Depends(get_db), 
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Account is deactivated")
 
+    # Authenticated, so the tenant is known. The callback has no
+    # get_current_user dependency, and everything below (the Person asset, the
+    # audit event) writes to RLS-protected tables.
+    tenancy.set_tenant(user.organization_id)
+
     # Auto-create Person asset on first login
     if first_login:
         person = await asset_svc.create_asset(
             pool,
+            organization_id=user.organization_id,
             type=AssetType.PERSON,
             name=display_name,
             status="active",
@@ -156,9 +163,20 @@ async def oidc_callback(request: Request, pool: asyncpg.Pool = Depends(get_db), 
         )
         await auth_svc.set_person_asset_link(pool, user.id, person.id)
 
-    # Set session
-    request.session["user_id"] = str(user.id)
+    # Session fixation prevention, then a real server-side session — the cookie
+    # carries only the session id, and get_current_user resolves the user from
+    # that record alone. Parking a bare user_id here authenticates nobody.
+    request.session.clear()
+    session_id = await session_service.create_session(
+        pool,
+        user.id,
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+    )
+    request.session["session_id"] = session_id
     request.session["oidc_id_token"] = token.get("id_token")
+
+    await auth_svc.record_successful_login(pool, user.id)
 
     # Audit log
     try:

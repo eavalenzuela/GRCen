@@ -72,6 +72,12 @@ async def login_submit(request: Request, pool: asyncpg.Pool = Depends(get_db), _
             request, "auth/login.html", context=ctx
         )
 
+    # Authenticated, so the tenant is known from here on. Login has no
+    # get_current_user dependency to have set this for us, and everything below
+    # (session-eviction notices, the login audit event) writes to RLS-protected
+    # tables — without a context those writes are rejected by the policy.
+    tenancy.set_tenant(user.organization_id)
+
     await auth_svc.record_successful_login(pool, user.id)
 
     # If the user has TOTP enabled, the password step only established intent —
@@ -163,6 +169,8 @@ async def login_mfa_submit(
     if not user or not user.is_active:
         request.session.clear()
         return RedirectResponse("/login", status_code=302)
+
+    tenancy.set_tenant(user.organization_id)
 
     request.session.clear()
     session_id = await session_service.create_session(

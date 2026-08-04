@@ -173,7 +173,11 @@ def create_app() -> FastAPI:
         redoc_url=None,
     )
 
-    from grcen.middleware import RateLimitMiddleware, SecurityHeadersMiddleware
+    from grcen.middleware import (
+        RateLimitMiddleware,
+        SecurityHeadersMiddleware,
+        TenantContextMiddleware,
+    )
 
     # When TLS is configured (directly or behind a proxy), redirect HTTP→HTTPS and set HSTS
     if settings.SSL_CERTFILE or not settings.DEBUG:
@@ -188,6 +192,9 @@ def create_app() -> FastAPI:
         https_only=not settings.DEBUG,
         same_site="lax",
     )
+    # Added last, so it is the outermost layer: no request handling, including
+    # anything the layers below do, may inherit a process-wide RLS bypass.
+    app.add_middleware(TenantContextMiddleware)
 
     app.mount("/static", StaticFiles(directory="src/grcen/static"), name="static")
 

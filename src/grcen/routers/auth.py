@@ -1,6 +1,7 @@
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Request
 
+from grcen import tenancy
 from grcen.config import settings
 from grcen.rate_limit import check_login_rate_limit
 from grcen.routers.deps import get_db
@@ -34,6 +35,10 @@ async def login(
             settings.LOGIN_LOCKOUT_MINUTES,
         )
         raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    # See routers/auth_pages.login_submit: authenticated means the tenant is
+    # known, and the writes below land on RLS-protected tables.
+    tenancy.set_tenant(user.organization_id)
 
     await record_successful_login(pool, user.id)
 
