@@ -34,7 +34,7 @@
                         <button type="submit" class="btn btn-sm">Send Ping</button>
                     </form>
                     <form method="post" action="/admin/webhooks/{{ w.id }}/delete" style="display:inline;"
-                          onsubmit="return confirm('Delete this webhook?');">
+                          data-confirm="Delete this webhook?">
                         {% include "partials/csrf.html" %}
                         <button type="submit" class="btn btn-sm btn-danger">Delete</button>
                     </form>

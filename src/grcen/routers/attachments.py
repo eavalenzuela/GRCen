@@ -36,10 +36,92 @@ def _sanitize_filename(raw: str | None) -> str:
     return name[:200]
 
 
+def _display_name(raw: str | None) -> str:
+    """The attachment's human name; the column is VARCHAR(255)."""
+    return (raw or "uploaded_file")[:255]
+
+
+def _remove_quietly(path: str) -> None:
+    try:
+        os.remove(path)
+    except OSError:
+        pass
+
+
+def _reject_file_kind(data: AttachmentCreate) -> None:
+    """``kind=file`` rows are only ever created by the upload routes.
+
+    Accepting them from the JSON API let a caller point ``url_or_path`` at any
+    file on the server and then fetch it through the download route.
+    """
+    if data.kind == AttachmentKind.FILE:
+        raise HTTPException(
+            status_code=400,
+            detail="File attachments must be uploaded via the /upload endpoint",
+        )
+
+
+def _assert_in_upload_dir(path: str, *owner_parts: str) -> None:
+    """Refuse to serve anything outside the owning object's own upload folder.
+
+    Uploads are written to ``UPLOAD_DIR/<asset_id>/`` or
+    ``UPLOAD_DIR/relationships/<relationship_id>/``; a row pointing anywhere
+    else was not created by the upload routes.
+    """
+    root = os.path.realpath(os.path.join(settings.UPLOAD_DIR, *owner_parts))
+    real = os.path.realpath(path)
+    if not real.startswith(root + os.sep):
+        raise HTTPException(status_code=404, detail="File not found on disk")
+
+
+def _content_disposition(name: str) -> str:
+    """RFC 6266 attachment header that survives quotes, backslashes and non-ASCII."""
+    from urllib.parse import quote
+
+    cleaned = "".join(ch for ch in name if ch >= " " and ch != "\x7f") or "download"
+    ascii_fallback = cleaned.encode("ascii", "replace").decode("ascii")
+    ascii_fallback = ascii_fallback.replace("\\", "\\\\").replace('"', '\\"')
+    return f"attachment; filename=\"{ascii_fallback}\"; filename*=UTF-8''{quote(cleaned)}"
+
+
+# Leading bytes a file of the declared type must start with. Text-like types
+# are checked for valid UTF-8 without NUL bytes instead.
+_MAGIC: dict[str, tuple[bytes, ...]] = {
+    "application/pdf": (b"%PDF",),
+    "image/png": (b"\x89PNG\r\n\x1a\n",),
+    "image/jpeg": (b"\xff\xd8\xff",),
+    "image/gif": (b"GIF87a", b"GIF89a"),
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": (b"PK\x03\x04",),
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": (b"PK\x03\x04",),
+}
+_TEXT_TYPES = {"text/plain", "text/csv", "application/json", "application/xml"}
+
+
+def _check_content_matches_type(content: bytes, declared: str | None) -> None:
+    """The browser-supplied Content-Type is a claim; make the bytes back it up."""
+    if not declared:
+        return
+    if declared in _MAGIC:
+        if not any(content.startswith(sig) for sig in _MAGIC[declared]):
+            raise HTTPException(
+                status_code=415, detail="File content does not match its declared type"
+            )
+    elif declared in _TEXT_TYPES:
+        # Any text encoding is fine (exports from spreadsheets are often
+        # cp1252 or UTF-16); what must not pass as text is a binary blob.
+        has_wide_bom = content.startswith((b"\xff\xfe", b"\xfe\xff", b"\x00\x00\xfe\xff"))
+        if b"\x00" in content and not has_wide_bom:
+            raise HTTPException(
+                status_code=415, detail="File content does not match its declared type"
+            )
+
+
 async def _read_upload(pool: asyncpg.Pool, file: UploadFile) -> tuple[bytes, bool]:
     """Enforce the content-type allowlist + size limit and return (bytes, encrypted)."""
     allowed_types = {t.strip() for t in settings.ALLOWED_UPLOAD_TYPES.split(",")}
-    if file.content_type and file.content_type not in allowed_types:
+    if not file.content_type or file.content_type not in allowed_types:
+        # Fail closed: a part with no declared type would otherwise skip both
+        # the allowlist and the content check.
         raise HTTPException(status_code=415, detail="File type not allowed")
 
     max_bytes = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
@@ -57,6 +139,7 @@ async def _read_upload(pool: asyncpg.Pool, file: UploadFile) -> tuple[bytes, boo
             )
         chunks.append(chunk)
     content = b"".join(chunks)
+    _check_content_matches_type(content, file.content_type)
 
     file_encrypted = False
     if await encryption_config.is_scope_active(pool, "file_contents"):
@@ -94,6 +177,7 @@ async def create_attachment(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.CREATE)),
 ):
+    _reject_file_kind(data)
     att = await att_svc.create_attachment(
         pool, organization_id=user.organization_id, asset_id=asset_id,
         kind=data.kind, name=data.name, url_or_path=data.url_or_path,
@@ -124,15 +208,19 @@ async def upload_file(
     filepath = _write_upload(
         content, os.path.join(settings.UPLOAD_DIR, str(asset_id)), filename
     )
-    att = await att_svc.create_attachment(
-        pool,
-        organization_id=user.organization_id,
-        asset_id=asset_id,
-        kind=AttachmentKind.FILE,
-        name=file.filename or "uploaded_file",
-        url_or_path=filepath,
-        encrypted=encrypted,
-    )
+    try:
+        att = await att_svc.create_attachment(
+            pool,
+            organization_id=user.organization_id,
+            asset_id=asset_id,
+            kind=AttachmentKind.FILE,
+            name=_display_name(file.filename),
+            url_or_path=filepath,
+            encrypted=encrypted,
+        )
+    except Exception:
+        _remove_quietly(filepath)
+        raise
     await audit_svc.log_audit_event(
         pool,
         user_id=user.id,
@@ -159,6 +247,7 @@ async def download_file(
         raise HTTPException(status_code=404, detail="Attachment not found")
     if att.kind != AttachmentKind.FILE or not att.url_or_path:
         raise HTTPException(status_code=400, detail="Not a downloadable file")
+    _assert_in_upload_dir(att.url_or_path, str(asset_id))
     if not os.path.isfile(att.url_or_path):
         raise HTTPException(status_code=404, detail="File not found on disk")
 
@@ -177,7 +266,7 @@ async def download_file(
     return Response(
         content=data,
         media_type="application/octet-stream",
-        headers={"Content-Disposition": f'attachment; filename="{att.name}"'},
+        headers={"Content-Disposition": _content_disposition(att.name)},
     )
 
 
@@ -235,6 +324,7 @@ async def create_rel_attachment(
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.CREATE)),
 ):
+    _reject_file_kind(data)
     att = await att_svc.create_attachment(
         pool,
         organization_id=user.organization_id,
@@ -273,15 +363,19 @@ async def upload_rel_file(
     filename = f"{uuid_mod.uuid4()}_{safe_name}"
     owner_dir = os.path.join(settings.UPLOAD_DIR, "relationships", str(relationship_id))
     filepath = _write_upload(content, owner_dir, filename)
-    att = await att_svc.create_attachment(
-        pool,
-        organization_id=user.organization_id,
-        relationship_id=relationship_id,
-        kind=AttachmentKind.FILE,
-        name=file.filename or "uploaded_file",
-        url_or_path=filepath,
-        encrypted=encrypted,
-    )
+    try:
+        att = await att_svc.create_attachment(
+            pool,
+            organization_id=user.organization_id,
+            relationship_id=relationship_id,
+            kind=AttachmentKind.FILE,
+            name=_display_name(file.filename),
+            url_or_path=filepath,
+            encrypted=encrypted,
+        )
+    except Exception:
+        _remove_quietly(filepath)
+        raise
     await audit_svc.log_audit_event(
         pool,
         user_id=user.id,
@@ -308,6 +402,7 @@ async def download_rel_file(
         raise HTTPException(status_code=404, detail="Attachment not found")
     if att.kind != AttachmentKind.FILE or not att.url_or_path:
         raise HTTPException(status_code=400, detail="Not a downloadable file")
+    _assert_in_upload_dir(att.url_or_path, "relationships", str(relationship_id))
     if not os.path.isfile(att.url_or_path):
         raise HTTPException(status_code=404, detail="File not found on disk")
 
@@ -324,7 +419,7 @@ async def download_rel_file(
     return Response(
         content=data,
         media_type="application/octet-stream",
-        headers={"Content-Disposition": f'attachment; filename="{att.name}"'},
+        headers={"Content-Disposition": _content_disposition(att.name)},
     )
 
 

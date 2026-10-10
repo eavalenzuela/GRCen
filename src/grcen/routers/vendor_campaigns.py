@@ -13,12 +13,11 @@ import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from grcen.config import settings
 from grcen.models.asset import AssetType
 from grcen.models.user import User
-from grcen.permissions import Permission
-from grcen.routers._pages_shared import _csrf_check, templates
+from grcen.permissions import Permission, has_permission
 from grcen import tenancy
+from grcen.routers._pages_shared import _csrf_check, public_base_url, templates
 from grcen.routers.deps import get_db, require_permission
 from grcen.services import (
     alert_service as alert_svc,
@@ -41,8 +40,8 @@ def _flash(flash: str | None) -> dict | None:
     return {"ok": ok == "ok", "message": message or flash}
 
 
-def _portal_url(token: str) -> str:
-    return f"{settings.APP_BASE_URL.rstrip('/')}/vendor-portal/{token}"
+def _portal_url(request: Request, token: str) -> str:
+    return f"{public_base_url(request)}/vendor-portal/{token}"
 
 
 # --------------------------------------------------------------------------- #
@@ -106,7 +105,10 @@ async def campaign_detail(
         request, "vendor_campaigns/detail.html",
         context={"user": user, "campaign": campaign, "questions": questions,
                  "answered": answered, "total": total,
-                 "portal_url": _portal_url(campaign["access_token"]),
+                 # The capability URL lets anyone answer as the vendor, so only
+                 # users who can run the campaign get to see it.
+                 "portal_url": (_portal_url(request, campaign["access_token"])
+                                if has_permission(user.role, Permission.EDIT) else None),
                  "flash": _flash(request.query_params.get("flash")),
                  "notif_count": notif_count},
     )

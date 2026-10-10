@@ -37,7 +37,7 @@
         <div style="display:flex;gap:0.5rem;align-items:end;padding-bottom:0.1rem;">
             <button type="submit" class="btn btn-primary">Search</button>
             <a href="/assets" class="btn">Clear</a>
-            <button type="button" class="btn" onclick="toggleAdvanced()" id="advanced-toggle">Advanced</button>
+            <button type="button" class="btn" id="advanced-toggle" data-toggle="#advanced-filters" aria-controls="advanced-filters" aria-expanded="false">Advanced</button>
         </div>
     </div>
     <div id="advanced-filters" style="display:none;margin-top:0.75rem;">
@@ -165,7 +165,7 @@
 <table>
     <thead>
         <tr>
-            {% if bulk_enabled %}<th><input type="checkbox" id="bulk-select-all" onclick="document.querySelectorAll('.bulk-row-check').forEach(c => c.checked = this.checked)"></th>{% endif %}
+            {% if bulk_enabled %}<th><input type="checkbox" id="bulk-select-all" data-select-all=".bulk-row-check" aria-label="Select all rows"></th>{% endif %}
             {% for col in columns %}{{ sort_th(col) }}{% endfor %}
         </tr>
     </thead>
@@ -195,15 +195,13 @@
 {% endif %}
 
 <script nonce="{{ request.state.csp_nonce }}">
-function toggleAdvanced() {
-    var el = document.getElementById('advanced-filters');
-    el.style.display = el.style.display === 'none' ? '' : 'none';
-}
 // Auto-show advanced filters if any filter is active
 (function() {
     var hasFilter = {{ 'true' if (current_type or filter_status or filter_owner or filter_created_after or filter_created_before or filter_meta_key or filter_tag or filter_unlinked) else 'false' }};
     if (hasFilter) {
         document.getElementById('advanced-filters').style.display = '';
+        var btn = document.getElementById('advanced-toggle');
+        if (btn) btn.setAttribute('aria-expanded', 'true');
     }
 })();
 </script>

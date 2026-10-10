@@ -38,6 +38,8 @@ async def _resolve_bearer_token(request: Request, pool: asyncpg.Pool) -> tuple[s
     # caller's IP.
     from grcen.rate_limit import note_valid_token
     note_valid_token(raw_token)
+    request.state.token_name = token.name
+    request.state.via_oauth = bool(token.oauth_issued)
 
     return str(token.user_id), token.permissions
 

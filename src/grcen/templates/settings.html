@@ -64,7 +64,7 @@
     <p style="color:#6b7280;">Recovery codes remaining: {{ recovery_remaining }}.</p>
     {% endif %}
     <form method="post" action="/settings/mfa/disable"
-          onsubmit="return confirm('Turn off two-factor authentication on this account?');">
+          data-confirm="Turn off two-factor authentication on this account?">
         {% include "partials/csrf.html" %}
         <button type="submit" class="btn btn-danger">Disable MFA</button>
     </form>
@@ -89,7 +89,10 @@
             <input type="text" id="mfa_code" name="code" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" style="max-width:8rem;">
         </div>
         <button type="submit" class="btn btn-primary">Verify &amp; enable</button>
-        <a href="/settings/mfa/cancel" class="btn">Cancel</a>
+        </form>
+    <form method="post" action="/settings/mfa/cancel" style="display:inline-block; margin-top:0.5rem;">
+        {% include "partials/csrf.html" %}
+        <button type="submit" class="btn">Cancel</button>
     </form>
     {% else %}
     <p>Add a second factor to your sign-in: a 6-digit code from an authenticator app (Google Authenticator, 1Password, Authy, etc.).</p>

@@ -162,5 +162,6 @@ async def issue_token(
         permissions=list(row["permissions"] or []),
         expires_at=expires_at,
         is_service_account=True,
+        oauth_issued=True,
     )
     return raw_token, ttl

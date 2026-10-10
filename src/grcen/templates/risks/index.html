@@ -191,14 +191,14 @@
         <thead>
             <tr>
                 {% if has_perm(user.role, Permission.EDIT) and risks %}
-                <th><input type="checkbox" id="risk-select-all" onclick="document.querySelectorAll('.risk-row-check').forEach(c => c.checked = this.checked)"></th>
+                <th><input type="checkbox" id="risk-select-all" data-select-all=".risk-row-check" aria-label="Select all risks"></th>
                 {% endif %}
                 {% macro sort_link(field, label) %}
                 {% set new_order = "asc" if current_sort == field and current_order == "desc" else "desc" %}
                 <th><a href="/risk-management?sort={{ field }}&order={{ new_order }}{{ filter_params }}" class="sort-link">
                     {{ label }}
                     {% if current_sort == field %}
-                    <span class="sort-arrow">{{ '&#9650;' if current_order == 'asc' else '&#9660;' }}</span>
+                    <span class="sort-arrow">{{ '▲' if current_order == 'asc' else '▼' }}</span>
                     {% endif %}
                 </a></th>
                 {% endmacro %}
@@ -286,7 +286,7 @@
                 </select>
             </label>
             <button type="submit" class="btn btn-primary"
-                    onclick="return confirm('Apply to all selected risks?');">Apply</button>
+                    data-confirm="Apply to all selected risks?">Apply</button>
         </div>
     </fieldset>
     </form>

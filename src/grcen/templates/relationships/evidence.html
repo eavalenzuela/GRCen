@@ -43,7 +43,7 @@
                     {% if has_perm(user.role, Permission.DELETE) %}
                     <form method="post"
                           action="/relationships/{{ rel.id }}/evidence/{{ att.id }}/delete"
-                          onsubmit="return confirm('Delete this attachment?');">
+                          data-confirm="Delete this attachment?">
                         {% include "partials/csrf.html" %}
                         <button type="submit" class="btn btn-sm btn-danger">Delete</button>
                     </form>

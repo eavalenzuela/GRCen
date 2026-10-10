@@ -5,31 +5,45 @@
     <h1>Alerts</h1>
 </div>
 
+{% if has_perm(user.role, Permission.MANAGE_ALERTS) %}
+<details class="card" style="padding:1rem 1.5rem;" {% if show_form %}open{% endif %}>
+    <summary style="cursor:pointer; font-weight:600;">New alert</summary>
+    {% with form=form, errors=errors, asset_name=asset_name, action="/alerts", submit_label="Create alert" %}
+    {% include "alerts/_form.html" %}
+    {% endwith %}
+</details>
+{% endif %}
+
 {% if alerts %}
 <table>
     <thead>
-        <tr><th>Title</th><th>Asset</th><th>Schedule</th><th>Cron</th><th>Next Fire</th><th>Enabled</th><th></th></tr>
+        <tr><th>Title</th><th>Asset</th><th>Schedule</th><th>Next Fire (UTC)</th><th>Enabled</th><th></th></tr>
     </thead>
     <tbody>
         {% for alert in alerts %}
         <tr>
             <td>{{ alert.title }}</td>
-            <td><a href="/assets/{{ alert.asset_id }}">View Asset</a></td>
-            <td>{{ alert.schedule_type.value | title }}</td>
-            <td>{{ alert.cron_expression or '—' }}</td>
+            <td><a href="/assets/{{ alert.asset_id }}">{{ asset_names.get(alert.asset_id, 'View asset') }}</a></td>
+            <td>
+                {% if alert.schedule_type.value == 'recurring' %}Recurring{% if alert.cron_expression %} · <code>{{ alert.cron_expression }}</code>{% endif %}
+                {% else %}One-time{% endif %}
+            </td>
             <td>{{ alert.next_fire_at.strftime('%Y-%m-%d %H:%M') if alert.next_fire_at else '—' }}</td>
             <td>{{ 'Yes' if alert.enabled else 'No' }}</td>
             <td>
+                {% if has_perm(user.role, Permission.MANAGE_ALERTS) %}
+                <a class="btn btn-sm" href="/alerts/{{ alert.id }}/edit">Edit</a>
                 <button hx-delete="/api/alerts/{{ alert.id }}"
                         hx-confirm="Delete this alert?"
                         hx-target="closest tr" hx-swap="outerHTML"
                         class="btn btn-sm btn-danger">Delete</button>
+                {% endif %}
             </td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
 {% else %}
-<p>No alerts configured. Create alerts from an asset's detail page.</p>
+<p class="empty-state">No alerts yet.{% if has_perm(user.role, Permission.MANAGE_ALERTS) %} Use <strong>New alert</strong> above, or the <strong>Add alert</strong> link on any asset.{% endif %}</p>
 {% endif %}
 {% endblock %}

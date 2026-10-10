@@ -294,6 +294,17 @@ async def count_unread_notifications(
     )
 
 
+async def get_notification(
+    pool: asyncpg.Pool, notif_id: UUID, *, organization_id: UUID | None = None
+) -> Notification | None:
+    row = await pool.fetchrow(
+        """SELECT * FROM notifications WHERE id = $1
+           AND ($2::uuid IS NULL OR organization_id = $2)""",
+        notif_id, organization_id,
+    )
+    return Notification.from_row(row) if row else None
+
+
 async def mark_notification_read(
     pool: asyncpg.Pool, notif_id: UUID, *, organization_id: UUID | None = None
 ) -> bool:

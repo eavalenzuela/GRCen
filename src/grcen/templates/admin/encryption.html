@@ -49,7 +49,7 @@
         <label style="display:block; margin-bottom:0.75rem; cursor:pointer;">
             <input type="radio" name="profile" value="{{ pname }}"
                    {% if active_profile == pname %}checked{% endif %}
-                   onchange="onProfileChange()">
+                   data-call-change="onProfileChange">
             <strong>{{ profile.display_name }}</strong>
             &mdash; {{ profile.description }}
         </label>
@@ -58,7 +58,7 @@
         <label style="display:block; margin-bottom:0.75rem; cursor:pointer;">
             <input type="radio" name="profile" value=""
                    {% if not active_profile %}checked{% endif %}
-                   onchange="onProfileChange()">
+                   data-call-change="onProfileChange">
             <strong>Disabled</strong>
             &mdash; No encryption scopes active.
         </label>

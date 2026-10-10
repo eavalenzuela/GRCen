@@ -5,6 +5,70 @@ All notable changes to GRCen are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed — UI audit, phase 0: interactivity the CSP had silently broken
+
+A Playwright-driven audit of the seeded app (457 verified findings, see
+`ui_audit_findings.md`) found one root cause behind every severity-4 item:
+the nonce-only Content-Security-Policy blocks inline `on*=` handlers and
+`hx-on::`, so delete confirmations never fired and a dozen buttons were dead.
+
+- **Deletes ran with no confirmation** (assets, users, tags, tokens, OAuth
+  clients, questionnaires, webhooks, sessions, orgs, MFA, evidence, bulk
+  apply) and **dead controls** (Advanced filters, Save this search, select-all,
+  the Owner picker on the asset form, graph Link Mode, token Copy, encryption
+  profile radios, audit-settings toggle, tag chips). All inline handlers moved
+  to `static/js/app.js`, driven by `data-*` attributes; a test now forbids
+  inline handlers in templates.
+- **htmx actions that return 204 left stale rows** (Remove relationship,
+  Remove attachment, Delete alert, Mark read). 204 now swaps; Mark read returns
+  the re-rendered row and refreshes the nav badge via `HX-Trigger`.
+- **"Add URL attachment" always failed with a silent 422** (form-encoded post
+  to a JSON route) — the form now posts JSON through a small `json-enc`
+  extension; upload/URL forms reload on success and surface errors.
+- **The export page failed by default** (`status=` → 422 JSON); comma lists
+  with spaces or mixed case 500'd. Empty values mean "all"; bad values are 400.
+- **Alerts could not be created or edited from the UI** — `/alerts` has a form
+  (asset picker, one-time or cron schedule, validation that keeps your input)
+  and an edit page; asset pages link to it. A recurring alert is seeded with
+  its first cron occurrence (an alert with no `next_fire_at` never fires).
+- **Links were minted with `APP_BASE_URL`'s default `http://localhost:8000`**
+  (invites, calendar feed, vendor portal, email/webhook links): they now use
+  the request origin unless `APP_BASE_URL` is configured.
+- One-shot session flash messages (`flash()` + `#flash-region`) replace the
+  `?flash=` query parameter on the pages touched here.
+
+### Security — found by the same audit
+
+- The attachment API accepted `kind=file` with an arbitrary `url_or_path`,
+  which the download route then served: any authenticated user could read
+  server files. File kinds are upload-only and downloads are confined to
+  `UPLOAD_DIR`.
+- Uploads trusted the browser's `Content-Type`; the first bytes are now checked
+  against the declared type (PDF/PNG/JPEG/GIF/OOXML magic, UTF-8 for text
+  types). Filenames over 255 characters crashed with a 500 and left an orphan
+  file; they are truncated and the file is removed if the row insert fails.
+- A client-credentials OAuth access token could mint a never-expiring static
+  API token; `POST /api/tokens/` now refuses OAuth-issued bearers.
+- A bare `POST /settings/mfa/begin` on an enrolled account reset the enrolment
+  and silently turned enforced MFA off; it now refuses. A TOTP code is accepted
+  at most once (`user_totp.last_used_step`). `/logout` and
+  `/settings/mfa/cancel` are POST + CSRF instead of state-changing GETs.
+- Viewers could read the vendor-portal capability URL on a campaign page.
+- Review follow-ups on the above: the TOTP replay guard records the matched
+  code's own time step (the wall-clock step let a captured code replay for up
+  to 60s); the OAuth rule is enforced through a structural `api_tokens.oauth_issued`
+  flag on both the REST and HTML token routes; uploads with no declared type
+  are refused instead of skipping every check; downloads are confined to the
+  owning object's own upload folder; the relationship-evidence form also
+  refuses `kind=file`; `Content-Disposition` is RFC 6266-encoded; and
+  `public_base_url` honours `X-Forwarded-Proto`/`-Host` (gunicorn now runs
+  with `--forwarded-allow-ips`, default `*`, env `FORWARDED_ALLOW_IPS`).
+  Deliberately not recorded as "used": the enrolment code, so "confirm, then
+  sign in with the code you have" keeps working.
+
+Not changed on purpose: bulk import (`/api/imports/*/bulk`) still bypasses
+approval gating — an earlier product decision, now flagged in the register.
+
 ### Fixed — Adversarial review pass 2: concurrency & transaction boundaries
 
 A second review round, scoped to what happens when things run at the same

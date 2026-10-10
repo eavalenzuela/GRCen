@@ -1,7 +1,7 @@
 from uuid import UUID
 
 import asyncpg
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from grcen.models.user import User
 from grcen.permissions import ROLE_PERMISSIONS, Permission, has_permission
@@ -64,10 +64,18 @@ def _caller_has(user: User, perm: Permission) -> bool:
 
 @router.post("/", response_model=TokenCreatedResponse, status_code=201)
 async def create_token(
+    request: Request,
     data: TokenCreate,
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
+    if getattr(request.state, "via_oauth", False):
+        # A client-credentials access token is deliberately short-lived; letting
+        # it mint a static token would turn its TTL into "forever".
+        raise HTTPException(
+            status_code=403,
+            detail="OAuth access tokens cannot create API tokens",
+        )
     perms = _validate_permissions(data.permissions, user)
 
     if data.is_service_account and not _caller_has(user, Permission.MANAGE_USERS):

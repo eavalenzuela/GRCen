@@ -217,7 +217,7 @@ async def login_mfa_submit(
     return RedirectResponse("/", status_code=302)
 
 
-@router.get("/logout")
+@router.post("/logout")
 async def logout(request: Request, pool: asyncpg.Pool = Depends(get_db)):
     from grcen.services import session_service
 

@@ -13,4 +13,5 @@ exec gunicorn grcen.main:app \
     -k uvicorn.workers.UvicornWorker \
     -b "$BIND" \
     --workers "${GUNICORN_WORKERS:-2}" \
+    --forwarded-allow-ips "${FORWARDED_ALLOW_IPS:-*}" \
     $SSL_ARGS

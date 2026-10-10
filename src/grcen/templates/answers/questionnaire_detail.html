@@ -52,7 +52,7 @@
             <button type="submit" class="btn">Update</button>
         </form>
         <form method="post" action="/questionnaires/{{ questionnaire.id }}/delete"
-              onsubmit="return confirm('Delete this questionnaire and all its responses?');"
+              data-confirm="Delete this questionnaire and all its responses?"
               style="margin-top:0.75rem;">
             {% include "partials/csrf.html" %}
             <button type="submit" class="btn btn-danger">Delete questionnaire</button>

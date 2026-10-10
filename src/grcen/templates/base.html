@@ -6,6 +6,7 @@
     <title>{% block title %}GRCen{% endblock %}</title>
     <link rel="stylesheet" href="/static/css/style.css">
     <script src="/static/js/htmx.min.js"></script>
+    <script src="/static/js/app.js"></script>
 </head>
 <body {% block body_attrs %}{% endblock %}>
     {% if user %}
@@ -47,7 +48,7 @@
                 Notifications
                 <span id="notif-badge"
                       hx-get="/api/alerts/notifications/count"
-                      hx-trigger="load, every 60s"
+                      hx-trigger="load, every 60s, notif-changed from:body"
                       hx-swap="innerHTML"
                       hx-target="#notif-badge">
                     {% if notif_count %}({{ notif_count }}){% endif %}
@@ -55,7 +56,10 @@
             </a>
             <span class="nav-separator"></span>
             <a href="/settings">Settings</a>
-            <a href="/logout">Logout ({{ user.username }})</a>
+            <form method="post" action="/logout" class="nav-logout">
+                {% include "partials/csrf.html" %}
+                <button type="submit" class="link-button">Logout ({{ user.username }})</button>
+            </form>
         </div>
     </nav>
     {% if user.is_superadmin or has_perm(user.role, Permission.MANAGE_USERS) or has_perm(user.role, Permission.VIEW_AUDIT) %}
@@ -93,6 +97,13 @@
     {% endif %}
 
     <main class="container">
+        {% set _flashes = get_flashes(request) if request else [] %}
+        <div id="flash-region" {% if not _flashes %}hidden{% endif %}>
+            {% for f in _flashes %}
+            <div class="alert alert-{{ 'error' if f.level == 'error' else ('warning' if f.level == 'warning' else 'success') }}"
+                 role="{{ 'alert' if f.level == 'error' else 'status' }}">{{ f.message }}</div>
+            {% endfor %}
+        </div>
         {% block content %}{% endblock %}
     </main>
 

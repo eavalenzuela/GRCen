@@ -12,8 +12,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 
 from grcen import tenancy
-from grcen.config import settings
 from grcen.routers.deps import get_db
+from grcen.routers._pages_shared import public_base_url
 from grcen.services import calendar_service
 
 feed_router = APIRouter(tags=["calendar"])
@@ -40,7 +40,7 @@ async def calendar_feed(
     # scopes to the token owner's active org internally.
     with tenancy.system_context():
         ics = await calendar_service.feed_for_token(
-            pool, token, base_url=settings.APP_BASE_URL, mine=mine, alarm_days=alarm_days
+            pool, token, base_url=public_base_url(request), mine=mine, alarm_days=alarm_days
         )
     if ics is None:
         # Same 404 for unknown vs revoked tokens — no probing signal.

@@ -8,6 +8,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from grcen.models.user import User
 from grcen.permissions import Permission, has_permission
 from grcen.routers._pages_shared import (
+    public_base_url,
     _csrf_check,
     templates,
 )
@@ -92,11 +93,10 @@ async def user_settings(
         ok, _, message = flash.partition(":")
         flash_ctx = {"ok": ok == "ok", "message": message or flash}
 
-    from grcen.config import settings as app_settings
     from grcen.services import calendar_service
     calendar_token = await calendar_service.get_token(pool, user.id)
     calendar_url = (
-        f"{app_settings.APP_BASE_URL.rstrip('/')}/calendar/{calendar_token}/grcen.ics"
+        f"{public_base_url(request)}/calendar/{calendar_token}/grcen.ics"
         if calendar_token else None
     )
 
@@ -199,7 +199,21 @@ async def mfa_begin(
         return RedirectResponse(
             "/settings?flash=fail:MFA is managed by your SSO provider", status_code=302,
         )
-    secret, recovery_codes = await totp_service.begin_enrollment(pool, user.id)
+    existing = await totp_service.get_enrollment(pool, user.id)
+    if existing and existing["enabled"]:
+        # A stale "Set up MFA" click used to reset the enrolment and silently
+        # turn enforced MFA off. Disabling is its own explicit action.
+        return RedirectResponse(
+            "/settings?flash=fail:Two-factor authentication is already enabled.",
+            status_code=302,
+        )
+    started = await totp_service.begin_enrollment(pool, user.id)
+    if started is None:  # raced with a concurrent confirm — same answer
+        return RedirectResponse(
+            "/settings?flash=fail:Two-factor authentication is already enabled.",
+            status_code=302,
+        )
+    secret, recovery_codes = started
     request.session["mfa_pending"] = {
         "secret": secret,
         "recovery_codes": recovery_codes,
@@ -233,7 +247,7 @@ async def mfa_confirm(
     )
 
 
-@router.get("/settings/mfa/cancel")
+@router.post("/settings/mfa/cancel")
 async def mfa_cancel(
     request: Request,
     pool: asyncpg.Pool = Depends(get_db),
@@ -323,9 +337,18 @@ async def my_tokens_create(
         request.session["token_error"] = "At least one permission is required."
         return RedirectResponse("/tokens", status_code=302)
 
-    # Validate permissions against user's role
+    if getattr(request.state, "via_oauth", False):
+        # Same rule as POST /api/tokens/: a short-lived OAuth access token must
+        # not be able to mint a static one.
+        request.session["token_error"] = "OAuth access tokens cannot create API tokens."
+        return RedirectResponse("/tokens", status_code=302)
+
+    # Validate permissions against the user's role and, for token callers,
+    # the scope of the token they are using.
     role_perms = {p.value for p in ROLE_PERMISSIONS.get(user.role, set())}
-    invalid = [p for p in permissions if p not in role_perms]
+    token_perms = getattr(user, "token_permissions", None)
+    invalid = [p for p in permissions if p not in role_perms
+               or (token_perms is not None and p not in token_perms)]
     if invalid:
         request.session["token_error"] = f"Invalid permissions: {', '.join(invalid)}"
         return RedirectResponse("/tokens", status_code=302)

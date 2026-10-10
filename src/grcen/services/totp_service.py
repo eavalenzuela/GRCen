@@ -11,6 +11,7 @@ import hashlib
 import hmac as _hmac
 import io
 import secrets
+import time
 from uuid import UUID
 
 import asyncpg
@@ -73,6 +74,26 @@ def verify_totp(secret: str, code: str, valid_window: int = 1) -> bool:
     return pyotp.TOTP(secret).verify(code.strip(), valid_window=valid_window)
 
 
+def match_totp_step(secret: str, code: str, now: float | None = None) -> int | None:
+    """Return the 30-second counter the code was generated for, or None.
+
+    Accepts the same ±1 step window as ``verify_totp`` but tells the caller
+    *which* step matched, so the replay guard records the code's own step
+    rather than the wall clock (a code from step T is otherwise accepted again
+    at T+1).
+    """
+    if not code or not code.strip().isdigit():
+        return None
+    cleaned = code.strip()
+    now = time.time() if now is None else now
+    totp = pyotp.TOTP(secret)
+    base = int(now // 30)
+    for offset in (-1, 0, 1):
+        if _hmac.compare_digest(totp.at(int(now), offset), cleaned):
+            return base + offset
+    return None
+
+
 # ── persistence ──────────────────────────────────────────────────────────
 
 
@@ -97,7 +118,7 @@ async def is_enabled(pool: asyncpg.Pool, user_id: UUID) -> bool:
 
 async def begin_enrollment(
     pool: asyncpg.Pool, user_id: UUID
-) -> tuple[str, list[str]]:
+) -> tuple[str, list[str]] | None:
     """Create (or reset) a pending enrollment. Returns (secret, recovery_codes_plain).
 
     Recovery codes are returned as plaintext once, here, so the UI can display
@@ -107,18 +128,26 @@ async def begin_enrollment(
     recovery_plain = generate_recovery_codes()
     recovery_hashed = [_hash_code(c) for c in recovery_plain]
     stored_secret = await _maybe_encrypt_secret(pool, secret)
-    await pool.execute(
+    # The row is the arbiter: an enrolment that is already enabled is never
+    # reset here (that would silently switch enforced MFA off); callers get
+    # None and must send the user through the explicit "disable" action.
+    applied = await pool.fetchval(
         """INSERT INTO user_totp (user_id, secret, recovery_codes, enabled)
            VALUES ($1, $2, $3, false)
            ON CONFLICT (user_id) DO UPDATE SET
                secret = EXCLUDED.secret,
                recovery_codes = EXCLUDED.recovery_codes,
                enabled = false,
-               updated_at = now()""",
+               last_used_step = NULL,
+               updated_at = now()
+           WHERE user_totp.enabled = false
+           RETURNING 1""",
         user_id,
         stored_secret,
         recovery_hashed,
     )
+    if applied is None:
+        return None
     return secret, recovery_plain
 
 
@@ -129,8 +158,11 @@ async def confirm_enrollment(
     enrollment = await get_enrollment(pool, user_id)
     if not enrollment:
         return False
-    if not verify_totp(enrollment["secret"], code):
+    if match_totp_step(enrollment["secret"], code) is None:
         return False
+    # The enrolment code is deliberately *not* recorded as used: the login
+    # flow expects "confirm, then sign in with the code you have" to work, and
+    # the replay guard below only needs to cover codes accepted at login.
     await pool.execute(
         """UPDATE user_totp SET enabled = true, updated_at = now()
            WHERE user_id = $1""",
@@ -158,9 +190,20 @@ async def verify_login_code(
     if not cleaned:
         return False
 
-    # Try TOTP first.
-    if verify_totp(enrollment["secret"], cleaned):
-        return True
+    # Try TOTP first. A code is accepted at most once: the row records the
+    # time step of the last accepted code and refuses anything at or before it,
+    # so an intercepted code cannot be replayed within its validity window.
+    step = match_totp_step(enrollment["secret"], cleaned)
+    if step is not None:
+        claimed = await pool.fetchval(
+            """UPDATE user_totp
+                  SET last_used_step = $1, updated_at = now()
+                WHERE user_id = $2
+                  AND (last_used_step IS NULL OR last_used_step < $1)
+                RETURNING 1""",
+            step, user_id,
+        )
+        return claimed is not None
 
     # Recovery code — hash, compare constant-time against each stored hash.
     submitted_hash = _hash_code(cleaned.upper())

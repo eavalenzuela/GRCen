@@ -42,9 +42,9 @@
         <label for="owner_search" id="owner-label">
             {% if asset and asset.type.value == 'person' %}Manager{% else %}Owner{% endif %}
         </label>
-        <div style="position:relative;">
+        <div class="owner-picker" style="position:relative;">
             <input type="text" id="owner_search" placeholder="Search person or org unit..."
-                   hx-get="/api/owner-search" hx-trigger="keyup changed delay:300ms"
+                   hx-get="/api/owner-search" hx-trigger="input changed delay:300ms"
                    hx-target="#owner-results" hx-include="[name='q']"
                    autocomplete="off"
                    value="{{ asset.owner if asset and asset.owner else '' }}">
@@ -80,7 +80,7 @@
             {% for t in known_tags[:12] %}
             <button type="button" class="btn btn-xs"
                     style="padding:0 0.4rem; font-size:0.75rem; margin:0 0.15rem;"
-                    onclick="(function(i,v){var cur=i.value.trim();var parts=cur?cur.split(','):[];var names=parts.map(s=>s.trim());if(!names.includes(v)){names.push(v);}i.value=names.filter(Boolean).join(', ');})(document.getElementById('tags'),'{{ t.name }}');">{{ t.name }}</button>
+                    data-tag-chip="{{ t.name }}" data-target="#tags">{{ t.name }}</button>
             {% endfor %}
             {% if known_tags | length > 12 %}…{% endif %}
         </small>
@@ -173,12 +173,6 @@
 </form>
 
 <script nonce="{{ request.state.csp_nonce }}">
-function selectOwner(id, name) {
-    document.getElementById('owner_search').value = name;
-    document.getElementById('owner_id').value = id;
-    document.getElementById('owner-results').innerHTML = '';
-}
-
 // Sync the search text to the q hidden field for hx-include
 document.getElementById('owner_search').addEventListener('input', function() {
     document.getElementById('owner_q').value = this.value;

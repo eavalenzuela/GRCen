@@ -20,6 +20,8 @@ class ApiToken:
     # deps.get_current_user). Carrying it here lets callers scope writes to the
     # token's own tenant — `api_tokens` sits outside RLS, so nothing else will.
     organization_id: UUID | None = None
+    # True for access tokens minted by the OAuth client-credentials grant.
+    oauth_issued: bool = False
 
     @classmethod
     def from_row(cls, row) -> "ApiToken":
@@ -36,4 +38,5 @@ class ApiToken:
             revoked=row["revoked"],
             allowed_ips=list(row.get("allowed_ips") or []),
             organization_id=row.get("organization_id"),
+            oauth_issued=bool(row.get("oauth_issued") or False),
         )

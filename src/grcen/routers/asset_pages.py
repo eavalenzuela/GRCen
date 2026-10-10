@@ -795,10 +795,9 @@ async def owner_search(
         safe_name = escape(a.name, quote=True)
         # Use data attributes instead of inline JS to prevent XSS
         html += (
-            f'<div class="autocomplete-item" '
-            f'data-id="{a.id}" data-name="{safe_name}" '
-            f'onclick="selectOwner(this.dataset.id, this.dataset.name)">'
-            f"{safe_name} <small>({label})</small></div>"
+            f'<button type="button" class="autocomplete-item" data-pick-owner '
+            f'data-id="{a.id}" data-name="{safe_name}">'
+            f"{safe_name} <small>({label})</small></button>"
         )
     if not html:
         html = '<div class="autocomplete-item" style="color:var(--text-muted)">No results</div>'

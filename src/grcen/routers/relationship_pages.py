@@ -142,6 +142,10 @@ async def relationship_evidence_create(
         kind = AttachmentKind(raw_kind)
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Invalid attachment kind: {raw_kind!r}")
+    if kind == AttachmentKind.FILE:
+        # File rows are only ever created by the upload route; a caller-chosen
+        # path here would be served verbatim by the download route.
+        raise HTTPException(status_code=400, detail="Upload files with the file form")
     name = str(form.get("name", "")).strip()
     url_or_path = str(form.get("url_or_path", "")).strip()
     if not name or not url_or_path:

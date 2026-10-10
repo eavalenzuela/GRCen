@@ -713,6 +713,9 @@ EXCEPTION WHEN duplicate_column THEN NULL; END $$;
 CREATE INDEX IF NOT EXISTS idx_notifications_user
     ON notifications(user_id) WHERE user_id IS NOT NULL;
 
+-- Replay protection: the 30-second time step of the last accepted TOTP code.
+ALTER TABLE user_totp ADD COLUMN IF NOT EXISTS last_used_step BIGINT;
+
 -- Widen user_totp.secret so the encrypted-at-rest form fits.
 DO $$ BEGIN
     ALTER TABLE user_totp ALTER COLUMN secret TYPE TEXT;
@@ -810,7 +813,12 @@ EXCEPTION WHEN duplicate_column THEN NULL; END $$;
 -- IP allowlist on API tokens. Empty array = no restriction.
 DO $$ BEGIN
     ALTER TABLE api_tokens ADD COLUMN allowed_ips TEXT[] NOT NULL DEFAULT '{}';
-EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
+-- Client-credentials access tokens are short-lived by design; the flag lets
+-- the token routes refuse to let one mint a static token.
+ALTER TABLE api_tokens ADD COLUMN IF NOT EXISTS oauth_issued BOOLEAN NOT NULL DEFAULT false;
 
 -- risk_snapshots: switch to a (organization_id, snapshot_date) composite PK
 -- so each tenant has its own daily history.

@@ -11,6 +11,7 @@ from grcen.models.asset import AssetType
 from grcen.models.user import User
 from grcen.permissions import Permission, UserRole
 from grcen.routers._pages_shared import (
+    public_base_url,
     _USER_FIELDS,
     _csrf_check,
     templates,
@@ -852,7 +853,7 @@ async def admin_email_preview(
     from grcen.services import digest_service, email_service, organization_service
 
     org = await organization_service.get_by_id(pool, user.organization_id)
-    base_url = settings.APP_BASE_URL.rstrip("/")
+    base_url = public_base_url(request)
     if kind == "digest":
         sample_items = [
             {"title": "Annual policy review due", "asset_name": "Acceptable Use Policy",
@@ -1055,7 +1056,7 @@ async def admin_invitations(
             "invitations": invitations,
             "flash": _decode_flash(flash),
             "created_invitation": created,
-            "base_url": settings.APP_BASE_URL.rstrip("/"),
+            "base_url": public_base_url(request),
             "notif_count": notif_count,
         },
     )
@@ -1096,7 +1097,7 @@ async def admin_invitations_create(
     )
     # The raw token exists only in this link — shown once on the next render.
     request.session["created_invitation"] = {
-        "url": f"{settings.APP_BASE_URL.rstrip('/')}/invite/{raw_token}",
+        "url": f"{public_base_url(request)}/invite/{raw_token}",
     }
     return RedirectResponse("/admin/invitations", status_code=302)
 

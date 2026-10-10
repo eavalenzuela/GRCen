@@ -10,19 +10,7 @@
     </thead>
     <tbody>
         {% for notif in notifications %}
-        <tr class="{% if not notif.read %}unread{% endif %}">
-            <td>{{ notif.title }}</td>
-            <td>{{ notif.message or '—' }}</td>
-            <td>{{ notif.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
-            <td>{{ 'Read' if notif.read else 'Unread' }}</td>
-            <td>
-                {% if not notif.read %}
-                <button hx-post="/api/alerts/notifications/{{ notif.id }}/read"
-                        hx-target="closest tr" hx-swap="outerHTML"
-                        class="btn btn-sm">Mark Read</button>
-                {% endif %}
-            </td>
-        </tr>
+        {% include "alerts/_notification_row.html" %}
         {% endfor %}
     </tbody>
 </table>

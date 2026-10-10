@@ -23,7 +23,7 @@
                     <input type="checkbox" name="enabled_{{ cfg.entity_type }}"
                            id="enabled_{{ cfg.entity_type }}"
                            {% if cfg.enabled %}checked{% endif %}
-                           onchange="toggleFieldLevel('{{ cfg.entity_type }}')">
+                           data-call-change="toggleFieldLevel" data-entity="{{ cfg.entity_type }}">
                 </td>
                 <td>
                     <input type="checkbox" name="field_level_{{ cfg.entity_type }}"
@@ -39,7 +39,8 @@
 </form>
 
 <script nonce="{{ request.state.csp_nonce }}">
-function toggleFieldLevel(entityType) {
+function toggleFieldLevel(el) {
+    var entityType = el.dataset.entity;
     var enabled = document.getElementById('enabled_' + entityType);
     var fieldLevel = document.getElementById('field_level_' + entityType);
     if (!enabled.checked) {

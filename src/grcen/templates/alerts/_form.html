@@ -1,0 +1,65 @@
+{# Alert create/edit form. Expects: form (dict of current values), errors (dict),
+   asset_name (str or None), action (POST url), submit_label. #}
+<form method="post" action="{{ action }}" class="card alert-form">
+    {% include "partials/csrf.html" %}
+    {% if errors.get('_') %}<div class="alert alert-error" role="alert">{{ errors['_'] }}</div>{% endif %}
+
+    <div class="form-group">
+        <label for="alert_title">Title</label>
+        <input type="text" id="alert_title" name="title" required maxlength="255" value="{{ form.title or '' }}">
+        {% if errors.get('title') %}<small class="field-error">{{ errors['title'] }}</small>{% endif %}
+    </div>
+
+    <div class="form-group" data-asset-picker>
+        <label for="alert_asset_search">Asset</label>
+        <input type="text" id="alert_asset_search" placeholder="Search for an asset by name…" autocomplete="off"
+               value="{{ asset_name or '' }}" {% if form.asset_id and asset_name %}aria-describedby="alert_asset_hint"{% endif %}>
+        <input type="hidden" name="asset_id" value="{{ form.asset_id or '' }}">
+        <div class="autocomplete-results"></div>
+        <small id="alert_asset_hint">The alert fires for this asset and notifies its owner.</small>
+        {% if errors.get('asset_id') %}<small class="field-error">{{ errors['asset_id'] }}</small>{% endif %}
+    </div>
+
+    <div class="form-group">
+        <label for="alert_message">Message <small>(optional)</small></label>
+        <textarea id="alert_message" name="message" rows="3" maxlength="10000">{{ form.message or '' }}</textarea>
+    </div>
+
+    <fieldset class="form-group">
+        <legend>Schedule</legend>
+        <label class="form-check">
+            <input type="radio" name="schedule_type" value="once" {% if (form.schedule_type or 'once') == 'once' %}checked{% endif %}>
+            One-time, at a date and time
+        </label>
+        <label class="form-check">
+            <input type="radio" name="schedule_type" value="recurring" {% if form.schedule_type == 'recurring' %}checked{% endif %}>
+            Recurring, on a cron schedule
+        </label>
+        {% if errors.get('schedule_type') %}<small class="field-error">{{ errors['schedule_type'] }}</small>{% endif %}
+    </fieldset>
+
+    <div class="form-group">
+        <label for="alert_next_fire_at">Fire at <small>(UTC; required for one-time alerts)</small></label>
+        <input type="datetime-local" id="alert_next_fire_at" name="next_fire_at" value="{{ form.next_fire_at or '' }}">
+        {% if errors.get('next_fire_at') %}<small class="field-error">{{ errors['next_fire_at'] }}</small>{% endif %}
+    </div>
+
+    <div class="form-group">
+        <label for="alert_cron">Cron expression <small>(required for recurring alerts, e.g. <code>0 9 * * 1</code> = Mondays 09:00 UTC)</small></label>
+        <input type="text" id="alert_cron" name="cron_expression" maxlength="100" value="{{ form.cron_expression or '' }}"
+               placeholder="minute hour day-of-month month day-of-week">
+        {% if errors.get('cron_expression') %}<small class="field-error">{{ errors['cron_expression'] }}</small>{% endif %}
+    </div>
+
+    <div class="form-group">
+        <label class="form-check">
+            <input type="checkbox" name="enabled" value="1" {% if form.enabled is not defined or form.enabled %}checked{% endif %}>
+            Enabled
+        </label>
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">{{ submit_label }}</button>
+        <a href="/alerts" class="btn">Cancel</a>
+    </div>
+</form>

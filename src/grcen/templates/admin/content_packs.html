@@ -81,7 +81,7 @@
         </form>
         {% if entry.installed %}
         <form method="post" action="/admin/content-packs/install" style="display:inline;"
-              onsubmit="return confirm('Uninstall {{ pack.title }}? This removes its frameworks, requirements, controls and crosswalks from this org.');">
+              data-confirm="Uninstall {{ pack.title }}? This removes its frameworks, requirements, controls and crosswalks from this org.">
             {% include "partials/csrf.html" %}
             <input type="hidden" name="pack_id" value="{{ pack.id }}">
             <input type="hidden" name="action" value="uninstall">

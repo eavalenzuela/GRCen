@@ -17,7 +17,7 @@
 
 <div class="graph-controls">
     {% if has_perm(user.role, Permission.CREATE) %}
-    <button id="link-mode-btn" class="btn" onclick="toggleLinkMode()">Link Mode</button>
+    <button id="link-mode-btn" class="btn" data-call="toggleLinkMode">Link Mode</button>
     {% endif %}
     <span id="graph-status" class="graph-status"></span>
 </div>

@@ -47,7 +47,7 @@ bearer token — no long-lived static tokens to leak.</p>
                         <button type="submit" class="btn btn-sm">{{ 'Disable' if c.enabled else 'Enable' }}</button>
                     </form>
                     <form method="post" action="/admin/oauth-clients/{{ c.id }}/delete" style="display:inline;"
-                          onsubmit="return confirm('Delete this client? Existing issued tokens keep working until they expire.');">
+                          data-confirm="Delete this client? Existing issued tokens keep working until they expire.">
                         {% include "partials/csrf.html" %}
                         <button type="submit" class="btn btn-sm btn-danger">Delete</button>
                     </form>

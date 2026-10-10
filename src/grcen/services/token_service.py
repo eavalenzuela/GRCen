@@ -100,6 +100,7 @@ async def create_token(
     expires_at: datetime | None = None,
     is_service_account: bool = False,
     allowed_ips: list[str] | None = None,
+    oauth_issued: bool = False,
 ) -> tuple[ApiToken, str]:
     """Create a new API token. Returns (token_record, raw_token)."""
     if not is_service_account:
@@ -118,8 +119,9 @@ async def create_token(
 
     row = await pool.fetchrow(
         """INSERT INTO api_tokens (user_id, name, token_hash, permissions,
-                                   expires_at, is_service_account, organization_id, allowed_ips)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                                   expires_at, is_service_account, organization_id, allowed_ips,
+                                   oauth_issued)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
            RETURNING *""",
         user_id,
         name,
@@ -129,6 +131,7 @@ async def create_token(
         is_service_account,
         org_id,
         allowed_ips or [],
+        oauth_issued,
     )
     # Let the rate limiter — which runs before authentication and so can only
     # recognise tokens it has been told about — give this one its own budget

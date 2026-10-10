@@ -4,6 +4,7 @@ import asyncpg
 from fastapi import Request
 from fastapi.templating import Jinja2Templates
 
+from grcen.config import settings
 from grcen.custom_fields import CUSTOM_FIELDS, coerce_value
 from grcen.models.asset import AssetType
 from grcen.permissions import Permission, has_permission
@@ -92,6 +93,52 @@ templates.env.globals["Permission"] = Permission
 templates.env.globals["rel_label"] = _rel_direction_label
 templates.env.globals["review_status"] = review_status
 
+
+# --- One-shot flash messages -------------------------------------------------
+#
+# Page routes used to redirect with ``?flash=ok:...`` and render whatever text
+# arrived in the URL, so any link could paint an arbitrary success banner.
+# Messages now live in the server-side session until the next page render.
+
+_DEFAULT_BASE_URL = "http://localhost:8000"
+
+
+def flash(request: Request, level: str, message: str) -> None:
+    """Queue a message for the next rendered page. ``level`` is success|error|warning."""
+    queue = list(request.session.get("_flash") or [])
+    queue.append({"level": level, "message": message})
+    request.session["_flash"] = queue
+
+
+def get_flashes(request: Request) -> list[dict]:
+    """Pop and return queued messages (called once per page render by base.html)."""
+    try:
+        return list(request.session.pop("_flash", []) or [])
+    except AssertionError:  # no SessionMiddleware (e.g. error page before middleware)
+        return []
+
+
+templates.env.globals["get_flashes"] = get_flashes
+
+
+def public_base_url(request: Request) -> str:
+    """Base URL for links handed to humans (invites, feeds, vendor portals).
+
+    ``APP_BASE_URL`` wins when an operator set it (it is the only thing that is
+    right behind a reverse proxy that does not forward Host); otherwise the
+    URL the request actually arrived on, so a default deployment does not mint
+    ``http://localhost:8000`` links.
+    """
+    configured = (settings.APP_BASE_URL or "").rstrip("/")
+    if configured and configured != _DEFAULT_BASE_URL:
+        return configured
+    # Behind a TLS-terminating proxy the request itself arrives as http; the
+    # HTTPS-redirect middleware already trusts X-Forwarded-Proto, so do the same.
+    headers = request.headers
+    proto = headers.get("x-forwarded-proto", request.url.scheme).split(",")[0].strip() or "http"
+    host = headers.get("x-forwarded-host", headers.get("host", request.url.netloc)).split(",")[0].strip()
+    return f"{proto}://{host}"
+
 async def _csrf_check(request: Request):
     """Verify CSRF token on POST form submissions.
 
@@ -100,6 +147,10 @@ async def _csrf_check(request: Request):
     - The ``X-CSRF-Token`` header (useful for programmatic clients)
     """
     if request.method != "POST":
+        return
+    if request.url.path == "/logout" and not request.session.get("session_id"):
+        # A stale tab logging out of an already-ended session should land on
+        # the login page, not on a CSRF error.
         return
 
     expected = request.session.get("csrf_token", "")

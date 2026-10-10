@@ -1,8 +1,8 @@
 from uuid import UUID
 
 import asyncpg
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import HTMLResponse, Response
 
 from grcen.models.user import User
 from grcen.permissions import Permission
@@ -156,6 +156,7 @@ async def notification_count(
 
 @router.post("/notifications/{notif_id}/read", status_code=204)
 async def mark_read(
+    request: Request,
     notif_id: UUID,
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.VIEW)),
@@ -163,3 +164,15 @@ async def mark_read(
     ok = await alert_svc.mark_notification_read(pool, notif_id, organization_id=user.organization_id)
     if not ok:
         raise HTTPException(status_code=404, detail="Notification not found")
+    if request.headers.get("hx-request"):
+        # The notifications page swaps the row in place; hand it the
+        # re-rendered row and tell the nav badge to refresh.
+        from grcen.routers._pages_shared import templates
+
+        notif = await alert_svc.get_notification(pool, notif_id, organization_id=user.organization_id)
+        response = templates.TemplateResponse(
+            request, "alerts/_notification_row.html", context={"notif": notif, "user": user},
+        )
+        response.headers["HX-Trigger"] = "notif-changed"
+        return response
+    return Response(status_code=204, headers={"HX-Trigger": "notif-changed"})

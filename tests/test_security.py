@@ -385,7 +385,7 @@ async def test_attachment_delete_idor_blocked(auth_client, pool):
     # Create attachment on asset1
     att_resp = await auth_client.post(
         f"/api/assets/{asset1_id}/attachments/",
-        json={"name": "secret.pdf", "kind": "file"},
+        json={"name": "secret.pdf", "kind": "document"},
     )
     assert att_resp.status_code == 201
     att_id = att_resp.json()["id"]

@@ -1,5 +1,5 @@
 import asyncpg
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from grcen.models.asset import AssetStatus, AssetType
@@ -17,13 +17,36 @@ async def export(
     request: Request,
     format: str = "csv",
     types: str | None = None,
-    status: AssetStatus | None = None,
+    status: str | None = None,
     columns: str | None = None,
     pool: asyncpg.Pool = Depends(get_db),
     user: User = Depends(require_permission(Permission.EXPORT)),
 ):
-    asset_types = [AssetType(t) for t in types.split(",")] if types else None
-    cols = columns.split(",") if columns else None
+    # The /exports form sends empty strings for "all"; comma lists may carry
+    # spaces and mixed case. Bad values are a 400, not a 500.
+    if format not in ("csv", "json"):
+        raise HTTPException(status_code=400, detail="format must be csv or json")
+    status_filter: AssetStatus | None = None
+    if status and status.strip():
+        try:
+            status_filter = AssetStatus(status.strip().lower())
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Unknown status: {status}") from None
+    asset_types: list[AssetType] | None = None
+    if types and types.strip():
+        asset_types = []
+        for raw in types.split(","):
+            name = raw.strip().lower().replace(" ", "_")
+            if not name:
+                continue
+            try:
+                asset_types.append(AssetType(name))
+            except ValueError:
+                raise HTTPException(status_code=400, detail=f"Unknown asset type: {raw.strip()}") from None
+        if not asset_types:
+            asset_types = None
+    cols = [c.strip() for c in columns.split(",") if c.strip()] if columns and columns.strip() else None
+    status = status_filter
     content = await export_assets(
         pool, format=format, asset_types=asset_types, status=status,
         columns=cols, user=user, organization_id=user.organization_id,

@@ -44,7 +44,7 @@
                 {% if has_perm(user.role, Permission.DELETE) %}
                 <td>
                     <form method="post" action="/tags/{{ t.name | urlencode }}/delete"
-                          onsubmit="return confirm('Remove tag {{ t.name }} from all {{ t.asset_count }} assets?');">
+                          data-confirm="Remove tag {{ t.name }} from all {{ t.asset_count }} assets?">
                         {% include "partials/csrf.html" %}
                         <button type="submit" class="btn btn-sm btn-danger">Delete</button>
                     </form>

@@ -20,7 +20,7 @@
                     </a>
                     {% if s.user_id == user.id or user.is_admin %}
                     <button type="button" class="btn btn-xs btn-danger"
-                            onclick="(async function(id,el){if(!confirm('Delete saved search?'))return;const r=await fetch('/api/saved-searches/'+id,{method:'DELETE',credentials:'same-origin'});if(r.ok){el.closest('li').remove();}else{alert('Failed to delete');}})('{{ s.id }}', this)"
+                            data-action="delete-search" data-id="{{ s.id }}" aria-label="Delete saved search {{ s.name }}"
                             style="font-size:0.75rem;">✕</button>
                     {% endif %}
                 </li>
@@ -31,7 +31,7 @@
     {% endif %}
 
     <button type="button" class="btn btn-sm"
-            onclick="(async function(){const name=prompt('Name this search');if(!name)return;const shared=confirm('Make this search visible to everyone?\\nOK = shared, Cancel = just for me');const r=await fetch('/api/saved-searches/',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,path:'{{ current_path }}',query_string:'{{ current_query }}',shared:shared})});if(r.ok){location.reload();}else{alert('Failed to save');}})()">
+            data-action="save-search" data-path="{{ current_path }}" data-query="{{ current_query }}">
         Save this search
     </button>
 </div>

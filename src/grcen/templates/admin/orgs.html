@@ -26,7 +26,7 @@
             <td>
                 {% if o.slug != 'default' %}
                 <form method="post" action="/admin/orgs/{{ o.id }}/delete" style="display:inline;"
-                      onsubmit="return confirm('Delete {{ o.slug }} and all its data? This cannot be undone.');">
+                      data-confirm="Delete {{ o.slug }} and all its data? This cannot be undone.">
                     {% include "partials/csrf.html" %}
                     <button type="submit" class="btn btn-danger">Delete</button>
                 </form>
