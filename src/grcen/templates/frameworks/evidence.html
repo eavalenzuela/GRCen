@@ -1,33 +1,36 @@
 {% extends "base.html" %}
+{% from "macros.html" import badge, empty_state %}
 {% block title %}Evidence Freshness - GRCen{% endblock %}
 
 {% block content %}
-<h1>Evidence Freshness</h1>
-<p>Attachments with a validity window that are aging (expiring within 30 days) or
-   already expired. Stale evidence stops counting as proof for the controls it
-   backs (see each framework's coverage), so refresh these before an audit.</p>
+<div class="page-header">
+    <h1>Evidence Freshness</h1>
+    <p class="page-intro">Attachments with a validity window that are aging (expiring within 30 days) or
+       already expired. Stale evidence stops counting as proof for the controls it
+       backs (see each framework's coverage), so refresh these before an audit.</p>
+</div>
 
 {% if not stale %}
-<div class="card"><p style="color:#166534;">No aging or expired evidence. ✓</p></div>
+{{ empty_state('No aging or expired evidence. ✓') }}
 {% else %}
 <table class="table">
     <thead>
-        <tr><th>Status</th><th>Evidence</th><th>On asset</th><th>Valid until</th></tr>
+        <tr><th>Status</th><th>Evidence</th><th>On asset</th><th class="date">Valid until</th></tr>
     </thead>
     <tbody>
     {% for e in stale %}
         <tr>
             <td>
                 {% if e.status == 'expired' %}
-                <span style="color:#991b1b;">● expired</span>
+                {{ badge('expired') }}
                 {% else %}
-                <span style="color:#b45309;">● aging</span>
+                {{ badge(e.status, 'warning') }}
                 {% endif %}
             </td>
             <td>{{ e.name }}</td>
             <td><a href="/assets/{{ e.asset_id }}">{{ e.asset_name }}</a>
-                <small style="color:#6b7280;">({{ e.asset_type }})</small></td>
-            <td><small>{{ e.valid_until.strftime('%Y-%m-%d') if e.valid_until else '—' }}</small></td>
+                <small class="text-muted">({{ e.asset_type }})</small></td>
+            <td class="date">{{ e.valid_until.strftime('%Y-%m-%d') if e.valid_until else '—' }}</td>
         </tr>
     {% endfor %}
     </tbody>

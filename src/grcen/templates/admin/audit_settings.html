@@ -2,8 +2,12 @@
 {% block title %}Audit Settings - GRCen{% endblock %}
 
 {% block content %}
-<h1>Audit Settings</h1>
-<p><a href="/admin/audit">&larr; Back to Audit Log</a></p>
+<div class="breadcrumb"><span><a href="/admin/audit">Audit Log</a></span><span>Settings</span></div>
+<div class="page-header">
+    <h1>Audit Settings</h1>
+    <p class="page-intro">Choose which entity types write audit events, and whether each
+       event records a field-level diff of the change.</p>
+</div>
 
 <form method="post" action="/admin/audit/settings">
     {% include "partials/csrf.html" %}
@@ -22,20 +26,24 @@
                 <td>
                     <input type="checkbox" name="enabled_{{ cfg.entity_type }}"
                            id="enabled_{{ cfg.entity_type }}"
+                           aria-label="Audit events enabled for {{ cfg.entity_type | replace('_', ' ') }}"
                            {% if cfg.enabled %}checked{% endif %}
                            data-call-change="toggleFieldLevel" data-entity="{{ cfg.entity_type }}">
                 </td>
                 <td>
                     <input type="checkbox" name="field_level_{{ cfg.entity_type }}"
                            id="field_level_{{ cfg.entity_type }}"
+                           aria-label="Field-level diffs for {{ cfg.entity_type | replace('_', ' ') }}"
                            {% if cfg.field_level %}checked{% endif %}
-                           {% if not cfg.enabled %}disabled style="opacity:0.4;"{% endif %}>
+                           {% if not cfg.enabled %}disabled{% endif %}>
                 </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
-    <button type="submit" class="btn" style="margin-top:1rem;">Save Settings</button>
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Save Settings</button>
+    </div>
 </form>
 
 <script nonce="{{ request.state.csp_nonce }}">
@@ -46,10 +54,8 @@ function toggleFieldLevel(el) {
     if (!enabled.checked) {
         fieldLevel.disabled = true;
         fieldLevel.checked = false;
-        fieldLevel.style.opacity = '0.4';
     } else {
         fieldLevel.disabled = false;
-        fieldLevel.style.opacity = '1';
     }
 }
 </script>

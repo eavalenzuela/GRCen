@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros.html" import empty_state %}
 {% block title %}Notifications - GRCen{% endblock %}
 {% block content %}
 <h1>Notifications</h1>
@@ -6,7 +7,7 @@
 {% if notifications %}
 <table>
     <thead>
-        <tr><th>Title</th><th>Message</th><th>Time</th><th>Status</th><th></th></tr>
+        <tr><th>Title</th><th>Message</th><th class="date">Time</th><th>Status</th><th></th></tr>
     </thead>
     <tbody>
         {% for notif in notifications %}
@@ -15,6 +16,6 @@
     </tbody>
 </table>
 {% else %}
-<p>No notifications.</p>
+{{ empty_state("No notifications.") }}
 {% endif %}
 {% endblock %}

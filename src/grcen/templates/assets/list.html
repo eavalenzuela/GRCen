@@ -1,9 +1,10 @@
 {% extends "base.html" %}
+{% from "macros.html" import badge, pagination %}
 {% block title %}{{ register.plural if register else 'Assets' }} - GRCen{% endblock %}
 {% block content %}
 <div class="page-header">
     <h1>{{ register.plural if register else 'Assets' }}</h1>
-    <div>
+    <div class="actions">
         {% if has_perm(user.role, Permission.EXPORT) %}
         <a href="/assets/export?{{ request.url.query }}&format=csv" class="btn">CSV</a>
         <a href="/assets/export?{{ request.url.query }}&format=json" class="btn">JSON</a>
@@ -28,23 +29,23 @@
 
 {% include "partials/saved_searches.html" %}
 
-<form method="get" action="/assets" class="card" style="margin-bottom:1.5rem;">
-    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:end;">
-        <div class="form-group" style="margin-bottom:0;flex:2;min-width:200px;">
-            <label>Search</label>
-            <input type="text" name="q" value="{{ filter_q }}" placeholder="Name, description, owner, fields, or relationship notes...">
+<form method="get" action="/assets" class="card mb-3">
+    <div class="form-inline">
+        <div class="form-group form-group--inline flex-1">
+            <label for="filter-q">Search</label>
+            <input type="text" id="filter-q" name="q" value="{{ filter_q }}" placeholder="Name, description, owner, fields, or relationship notes...">
         </div>
-        <div style="display:flex;gap:0.5rem;align-items:end;padding-bottom:0.1rem;">
+        <div class="btn-group">
             <button type="submit" class="btn btn-primary">Search</button>
             <a href="/assets" class="btn">Clear</a>
             <button type="button" class="btn" id="advanced-toggle" data-toggle="#advanced-filters" aria-controls="advanced-filters" aria-expanded="false">Advanced</button>
         </div>
     </div>
-    <div id="advanced-filters" style="display:none;margin-top:0.75rem;">
-        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:end;">
-            <div class="form-group" style="margin-bottom:0;min-width:140px;">
-                <label>Type</label>
-                <select name="type">
+    <div id="advanced-filters" class="mt-1" style="display:none">
+        <div class="form-inline">
+            <div class="form-group form-group--inline">
+                <label for="filter-type">Type</label>
+                <select id="filter-type" name="type">
                     <option value="">All Types</option>
                     {% for t in asset_types %}
                     <option value="{{ t.value }}" {% if current_type and current_type.value == t.value %}selected{% endif %}>
@@ -53,46 +54,46 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="form-group" style="margin-bottom:0;min-width:120px;">
-                <label>Status</label>
-                <select name="status">
+            <div class="form-group form-group--inline">
+                <label for="filter-status">Status</label>
+                <select id="filter-status" name="status">
                     <option value="">All</option>
                     {% for s in statuses %}
                     <option value="{{ s }}" {% if filter_status == s %}selected{% endif %}>{{ s | title }}</option>
                     {% endfor %}
                 </select>
             </div>
-            <div class="form-group" style="margin-bottom:0;min-width:140px;">
-                <label>{{ 'Manager' if current_type and current_type.value == 'person' else 'Owner' }}</label>
-                <input type="text" name="owner" value="{{ filter_owner }}" placeholder="{{ 'Manager' if current_type and current_type.value == 'person' else 'Owner' }}...">
+            <div class="form-group form-group--inline">
+                <label for="filter-owner">{{ 'Manager' if current_type and current_type.value == 'person' else 'Owner' }}</label>
+                <input type="text" id="filter-owner" name="owner" value="{{ filter_owner }}" placeholder="{{ 'Manager' if current_type and current_type.value == 'person' else 'Owner' }}...">
             </div>
         </div>
-        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:end;margin-top:0.5rem;">
-            <div class="form-group" style="margin-bottom:0;min-width:140px;">
-                <label>Created after</label>
-                <input type="date" name="created_after" value="{{ filter_created_after }}">
+        <div class="form-inline mt-1">
+            <div class="form-group form-group--inline">
+                <label for="filter-created-after">Created after</label>
+                <input type="date" id="filter-created-after" name="created_after" value="{{ filter_created_after }}">
             </div>
-            <div class="form-group" style="margin-bottom:0;min-width:140px;">
-                <label>Created before</label>
-                <input type="date" name="created_before" value="{{ filter_created_before }}">
+            <div class="form-group form-group--inline">
+                <label for="filter-created-before">Created before</label>
+                <input type="date" id="filter-created-before" name="created_before" value="{{ filter_created_before }}">
             </div>
-            <div class="form-group" style="margin-bottom:0;min-width:140px;">
-                <label>Metadata field</label>
-                <input type="text" name="meta_key" value="{{ filter_meta_key }}" placeholder="e.g. likelihood">
+            <div class="form-group form-group--inline">
+                <label for="filter-meta-key">Metadata field</label>
+                <input type="text" id="filter-meta-key" name="meta_key" value="{{ filter_meta_key }}" placeholder="e.g. likelihood">
             </div>
-            <div class="form-group" style="margin-bottom:0;min-width:140px;">
-                <label>Metadata value</label>
-                <input type="text" name="meta_value" value="{{ filter_meta_value }}" placeholder="e.g. critical">
+            <div class="form-group form-group--inline">
+                <label for="filter-meta-value">Metadata value</label>
+                <input type="text" id="filter-meta-value" name="meta_value" value="{{ filter_meta_value }}" placeholder="e.g. critical">
             </div>
-            <div class="form-group" style="margin-bottom:0;min-width:160px;">
-                <label>Tag</label>
-                <input type="text" name="tag" value="{{ filter_tag }}" list="all-tags" placeholder="e.g. SOC2">
+            <div class="form-group form-group--inline">
+                <label for="filter-tag">Tag</label>
+                <input type="text" id="filter-tag" name="tag" value="{{ filter_tag }}" list="all-tags" placeholder="e.g. SOC2">
                 <datalist id="all-tags">
                     {% for t in all_tags %}<option value="{{ t.name }}"></option>{% endfor %}
                 </datalist>
             </div>
-            <div class="form-group" style="margin-bottom:0;min-width:160px;align-self:end;">
-                <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;">
+            <div class="form-group form-group--inline">
+                <label class="form-check mb-0">
                     <input type="checkbox" name="unlinked" value="on" {% if filter_unlinked %}checked{% endif %}>
                     Unlinked only
                 </label>
@@ -100,15 +101,15 @@
         </div>
     </div>
     {% if filter_tag %}
-    <div style="margin-bottom:0.5rem;">
-        Filtering by tag: <span class="badge">{{ filter_tag }}</span>
-        <a href="/assets" style="margin-left:0.5rem; font-size:0.85rem;">Clear</a>
+    <div class="mb-1">
+        Filtering by tag: <span class="tag">{{ filter_tag }}</span>
+        <a href="/assets" class="btn btn-link btn-sm">Clear</a>
     </div>
     {% endif %}
     {% if filter_unlinked %}
-    <div style="margin-bottom:0.5rem;">
-        Showing only <span class="badge">unlinked</span> assets (no relationships)
-        <a href="/assets" style="margin-left:0.5rem; font-size:0.85rem;">Clear</a>
+    <div class="mb-1">
+        Showing only {{ badge('unlinked', 'outline') }} assets (no relationships)
+        <a href="/assets" class="btn btn-link btn-sm">Clear</a>
     </div>
     {% endif %}
     {# Persist sort + column mode in form submission #}
@@ -117,18 +118,20 @@
     {% if columns_mode and columns_mode != 'all' %}<input type="hidden" name="columns" value="{{ columns_mode }}">{% endif %}
 </form>
 
-<p style="margin-bottom:0.75rem;color:var(--text-muted);font-size:0.875rem;">
+<p class="row-count mb-1">
     {{ total }} asset{{ 's' if total != 1 else '' }} found
     {% if pages > 1 %} (page {{ page }} of {{ pages }}){% endif %}
 </p>
 
+{% set DATE_KINDS = ['created_at', 'updated_at', 'next_review'] %}
 {% macro sort_th(col) %}
+{% set cls = 'date' if col.kind in DATE_KINDS else '' %}
 {% if col.sortable %}
-{% set new_order = 'desc' if sort == col.sort_key and order == 'asc' else 'asc' %}
-{% set arrow = '▲' if sort == col.sort_key and order == 'asc' else ('▼' if sort == col.sort_key and order == 'desc' else '') %}
-<th><a href="/assets?sort={{ col.sort_key }}&order={{ new_order }}{{ filter_params | replace('&sort=' ~ sort, '') | replace('&order=' ~ order, '') }}" style="text-decoration:none;color:inherit;">{{ col.label }} {{ arrow }}</a></th>
+{% set is_active = sort == col.sort_key %}
+{% set new_order = 'desc' if is_active and order == 'asc' else 'asc' %}
+<th{% if cls %} class="{{ cls }}"{% endif %}{% if is_active %} aria-sort="{{ 'ascending' if order == 'asc' else 'descending' }}"{% endif %}><a class="sort-link" href="/assets?sort={{ col.sort_key }}&order={{ new_order }}{{ filter_params | replace('&sort=' ~ sort, '') | replace('&order=' ~ order, '') }}">{{ col.label }}{% if is_active %}<span class="sort-arrow" aria-hidden="true">{{ '▲' if order == 'asc' else '▼' }}</span>{% endif %}</a></th>
 {% else %}
-<th>{{ col.label }}</th>
+<th{% if cls %} class="{{ cls }}"{% endif %}>{{ col.label }}</th>
 {% endif %}
 {% endmacro %}
 
@@ -138,20 +141,20 @@
 {% elif col.kind == 'type' %}
 <td><a href="/assets?type={{ asset.type.value }}">{{ asset.type.value | replace('_', ' ') | title }}</a></td>
 {% elif col.kind == 'status' %}
-<td><span class="badge badge-{{ asset.status.value }}">{{ asset.status.value | title }}</span></td>
+<td>{{ badge(asset.status.value) }}</td>
 {% elif col.kind == 'owner' %}
 <td>{% if asset.owner_id %}<a href="/assets/{{ asset.owner_id }}">{{ asset.owner or '—' }}</a>{% else %}{{ asset.owner or '—' }}{% endif %}</td>
 {% elif col.kind == 'created_at' %}
-<td>{{ asset.created_at.strftime('%Y-%m-%d') if asset.created_at else '—' }}</td>
+<td class="date">{{ asset.created_at.strftime('%Y-%m-%d') if asset.created_at else '—' }}</td>
 {% elif col.kind == 'updated_at' %}
-<td>{{ asset.updated_at.strftime('%Y-%m-%d') if asset.updated_at else '—' }}</td>
+<td class="date">{{ asset.updated_at.strftime('%Y-%m-%d') if asset.updated_at else '—' }}</td>
 {% elif col.kind == 'meta' %}
 {% set val = asset.metadata_.get(col.meta_name) if asset.metadata_ else None %}
 <td>{% if val is none or val == '' %}—{% elif col.field_type == 'boolean' %}{{ "Yes" if val else "No" }}{% elif col.field_type == 'enum' %}{{ val | replace('_', ' ') | title }}{% else %}{{ val }}{% endif %}</td>
 {% elif col.kind == 'next_review' %}
 {% set val = asset.metadata_.get(col.meta_name) if asset.metadata_ else None %}
 {% set rs = review_status(val) %}
-<td>{% if not val %}—{% else %}{{ val }}{% if rs == 'overdue' %} <span class="badge review-overdue">Overdue</span>{% elif rs == 'due_soon' %} <span class="badge review-due-soon">Due soon</span>{% endif %}{% endif %}</td>
+<td class="date">{% if not val %}—{% else %}{{ val }}{% if rs == 'overdue' %} {{ badge('Overdue', 'danger') }}{% elif rs == 'due_soon' %} {{ badge('Due soon', 'warning') }}{% endif %}{% endif %}</td>
 {% else %}
 <td>—</td>
 {% endif %}
@@ -162,6 +165,7 @@
 <form method="post" action="/assets/bulk-update?{{ current_query }}">
 {% include "partials/csrf.html" %}
 {% endif %}
+<div class="table-wrap">
 <table>
     <thead>
         <tr>
@@ -172,27 +176,21 @@
     <tbody>
         {% for asset in assets %}
         <tr>
-            {% if bulk_enabled %}<td><input type="checkbox" class="bulk-row-check" name="asset_ids" value="{{ asset.id }}"></td>{% endif %}
+            {% if bulk_enabled %}<td><input type="checkbox" class="bulk-row-check" name="asset_ids" value="{{ asset.id }}" aria-label="Select {{ asset.name }}"></td>{% endif %}
             {% for col in columns %}{{ render_cell(col, asset) }}{% endfor %}
         </tr>
         {% else %}
-        <tr><td colspan="{{ columns|length + (1 if bulk_enabled else 0) }}">No assets found matching your filters.</td></tr>
+        <tr><td colspan="{{ columns|length + (1 if bulk_enabled else 0) }}" class="text-muted text-center">No assets found matching your filters.</td></tr>
         {% endfor %}
     </tbody>
 </table>
+</div>
 {% if bulk_enabled %}
 {% include "partials/bulk_actions.html" %}
 </form>
 {% endif %}
 
-{% if pages > 1 %}
-<div class="pagination">
-    {% for p in range(1, pages + 1) %}
-    <a href="/assets?page={{ p }}{{ filter_params }}"
-       class="{% if p == page %}active{% endif %}">{{ p }}</a>
-    {% endfor %}
-</div>
-{% endif %}
+{{ pagination(page, pages, '/assets', filter_params | trim('&'), total, 25) }}
 
 <script nonce="{{ request.state.csp_nonce }}">
 // Auto-show advanced filters if any filter is active

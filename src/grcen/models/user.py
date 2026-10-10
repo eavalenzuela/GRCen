@@ -30,6 +30,11 @@ class User:
     # caller is a session user, whose scope is their role alone. An empty list
     # is a real, and maximally restrictive, token scope.
     token_permissions: list[str] | None = None
+    # Display data for the navigation user menu, filled per request by
+    # deps.get_current_user (not columns): the active org's name and the
+    # user's memberships [{id, name, slug, role}].
+    org_name: str | None = None
+    memberships: list | None = None
 
     @property
     def is_admin(self) -> bool:

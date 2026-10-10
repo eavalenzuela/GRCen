@@ -5,6 +5,29 @@ All notable changes to GRCen are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed — UI audit, phase 1: design tokens, shared components, template cleanup
+
+- `static/css/style.css` is reorganised around tokens (tone colours, a type
+  scale, spacing, control heights) and components: button hierarchy, forms
+  with `.form-check` (checkboxes no longer stretch to full width) and visible
+  `:focus-visible` rings, tables (`.date`/`.num`/`.actions-cell`, `.table-wrap`,
+  sticky headers), tone-based `.badge-*`/`.alert-*`, `.tabs`, `.empty-state`,
+  `.page-header` with a wrapping intro, pagination, KPI tiles, utilities
+  (`text-muted`, `mt-*`, `flex-between`, …), print rules and a mobile pass
+  (16px inputs, 44px touch targets).
+- `templates/macros.html`: `badge`, `empty_state`, `field_error`, `sort_th`
+  (literal arrows, `aria-sort`), `pagination` (Prev/Next, windowed, summary),
+  `flash_banner`.
+- Inline `style=""` attributes in the templates went from 520 to 28; the
+  hand-rolled flash banners, coloured status spans and ad-hoc empty messages
+  now use the shared classes and macros; card titles are proper `<h2>`s;
+  wide tables scroll instead of overflowing the page.
+- Groundwork for the navigation rewrite: `get_current_user` attaches the
+  active organisation name and memberships (60s per-process cache),
+  `POST /switch-org` returns to the page it was made from (`next`), the
+  notification badge is a numeric pill, `app.js` handles `<details>` menus,
+  and a favicon is served.
+
 ### Fixed — UI audit, phase 0: interactivity the CSP had silently broken
 
 A Playwright-driven audit of the seeded app (457 verified findings, see

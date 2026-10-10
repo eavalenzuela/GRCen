@@ -1,16 +1,17 @@
 {% extends "base.html" %}
+{% from "macros.html" import flash_banner, badge %}
 {% block title %}Sensitive Fields - GRCen{% endblock %}
 
 {% block content %}
-<h1>Sensitive Field Overrides</h1>
-<p>Custom fields marked sensitive are masked for users without
-   <code>VIEW_PII</code>. Code defaults can be overridden per-organization
-   without a deployment — choose <em>Inherit</em> to fall back to the code
-   default.</p>
+<div class="page-header">
+    <h1>Sensitive Field Overrides</h1>
+    <p class="page-intro">Custom fields marked sensitive are masked for users without
+       <code>VIEW_PII</code>. Code defaults can be overridden per-organization
+       without a deployment — choose <em>Inherit</em> to fall back to the code
+       default.</p>
+</div>
 
-{% if flash %}
-<div class="callout" style="background:{{ '#e0f2fe' if flash.ok else '#fee2e2' }};padding:0.75rem;margin:0 0 1rem 0;">{{ flash.message }}</div>
-{% endif %}
+{{ flash_banner(flash) }}
 
 <form method="post" action="/admin/sensitive-fields">
     {% include "partials/csrf.html" %}
@@ -29,17 +30,11 @@
             <tr>
                 <td>{{ r.asset_type | replace('_', ' ') | title }}</td>
                 <td><code>{{ r.field_name }}</code> &mdash; {{ r.label }}</td>
-                <td>{{ 'sensitive' if r.code_default else 'public' }}</td>
-                <td>
-                    {% if r.effective %}
-                    <span style="color:#b91c1c;font-weight:600;">sensitive</span>
-                    {% else %}
-                    public
-                    {% endif %}
-                </td>
+                <td>{{ badge('sensitive', 'danger') if r.code_default else badge('public', 'neutral') }}</td>
+                <td>{{ badge('sensitive', 'danger') if r.effective else badge('public', 'neutral') }}</td>
                 <td>
                     {% set choice = 'sensitive' if r.override is true else ('public' if r.override is false else 'inherit') %}
-                    <select name="{{ r.asset_type }}.{{ r.field_name }}">
+                    <select name="{{ r.asset_type }}.{{ r.field_name }}" aria-label="Override for {{ r.asset_type }} {{ r.field_name }}">
                         <option value="inherit" {% if choice == 'inherit' %}selected{% endif %}>Inherit</option>
                         <option value="sensitive" {% if choice == 'sensitive' %}selected{% endif %}>Sensitive</option>
                         <option value="public" {% if choice == 'public' %}selected{% endif %}>Public</option>
@@ -49,6 +44,8 @@
         {% endfor %}
         </tbody>
     </table>
-    <button type="submit" class="btn btn-primary" style="margin-top:1rem;">Save</button>
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Save</button>
+    </div>
 </form>
 {% endblock %}

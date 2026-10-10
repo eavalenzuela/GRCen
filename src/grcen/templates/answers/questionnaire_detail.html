@@ -1,29 +1,33 @@
 {% extends "base.html" %}
+{% from "macros.html" import badge, empty_state %}
 {% block title %}{{ questionnaire.name }} - GRCen{% endblock %}
 
 {% block content %}
-<div style="display:flex;justify-content:space-between;align-items:center;">
+<div class="breadcrumb">
+    <span><a href="/questionnaires">Incoming Questionnaires</a></span><span>{{ questionnaire.name }}</span>
+</div>
+<div class="page-header">
     <h1>{{ questionnaire.name }}</h1>
-    <div style="display:flex;gap:0.5rem;">
+    <div class="actions">
         {% if has_perm(user.role, Permission.EXPORT) %}
         <a href="/questionnaires/{{ questionnaire.id }}/export.csv" class="btn">Export CSV</a>
         <a href="/questionnaires/{{ questionnaire.id }}/export.pdf" class="btn">Export PDF</a>
         {% endif %}
-        <a href="/questionnaires" class="btn">← All Questionnaires</a>
+        <a href="/questionnaires" class="btn btn-link">← All Questionnaires</a>
     </div>
+    <p class="page-intro text-muted">
+        {% if questionnaire.source %}From <strong>{{ questionnaire.source }}</strong> · {% endif %}
+        Status: {{ badge(questionnaire.status) }}
+        {% if questionnaire.due_date %} · Due {{ questionnaire.due_date }}{% endif %}
+    </p>
 </div>
-<p style="color:#6b7280;">
-    {% if questionnaire.source %}From <strong>{{ questionnaire.source }}</strong> · {% endif %}
-    Status: {{ questionnaire.status | replace('_', ' ') | title }}
-    {% if questionnaire.due_date %} · Due {{ questionnaire.due_date }}{% endif %}
-</p>
 
 {% set can_edit = has_perm(user.role, Permission.EDIT) %}
 
 {% if can_edit %}
-<div style="display:flex;gap:1rem;flex-wrap:wrap;">
-    <div class="card" style="flex:1;min-width:280px;">
-        <h3>Import questions (CSV)</h3>
+<div class="grid">
+    <div class="card">
+        <h2>Import questions (CSV)</h2>
         <form method="post" action="/questionnaires/{{ questionnaire.id }}/import" enctype="multipart/form-data">
             {% include "partials/csrf.html" %}
             <div class="form-group">
@@ -32,38 +36,41 @@
             </div>
             <div class="form-group">
                 <label for="column">Question column (0-based)</label>
-                <input type="number" id="column" name="column" value="0" min="0" style="width:5rem;">
+                <input class="w-xs" type="number" id="column" name="column" value="0" min="0">
             </div>
-            <label><input type="checkbox" name="has_header" value="on"> First row is a header</label>
-            <div style="margin-top:0.5rem;">
+            <label class="form-check"><input type="checkbox" name="has_header" value="on"> First row is a header</label>
+            <div class="form-actions">
                 <button type="submit" class="btn btn-primary">Import</button>
             </div>
         </form>
     </div>
-    <div class="card" style="flex:1;min-width:280px;">
-        <h3>Status</h3>
+    <div class="card">
+        <h2>Status</h2>
         <form method="post" action="/questionnaires/{{ questionnaire.id }}/status">
             {% include "partials/csrf.html" %}
-            <select name="status">
-                {% for s in statuses %}
-                <option value="{{ s }}" {% if s == questionnaire.status %}selected{% endif %}>{{ s | replace('_', ' ') | title }}</option>
-                {% endfor %}
-            </select>
-            <button type="submit" class="btn">Update</button>
+            <div class="form-row">
+                <label for="status" class="form-label mb-0">Status</label>
+                <select id="status" name="status">
+                    {% for s in statuses %}
+                    <option value="{{ s }}" {% if s == questionnaire.status %}selected{% endif %}>{{ s | replace('_', ' ') | title }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-primary">Update</button>
+            </div>
         </form>
         <form method="post" action="/questionnaires/{{ questionnaire.id }}/delete"
               data-confirm="Delete this questionnaire and all its responses?"
-              style="margin-top:0.75rem;">
+              class="mt-2">
             {% include "partials/csrf.html" %}
-            <button type="submit" class="btn btn-danger">Delete questionnaire</button>
+            <button type="submit" class="btn btn-outline-danger">Delete questionnaire</button>
         </form>
     </div>
 </div>
 {% endif %}
 
-<h2 style="margin-top:1.5rem;">Questions ({{ responses | length }})</h2>
+<h2 class="mt-3">Questions ({{ responses | length }})</h2>
 {% if not responses %}
-<p style="color:#6b7280;">No questions yet — import a CSV above.</p>
+{{ empty_state("No questions yet — import a CSV above." if can_edit else "No questions yet.") }}
 {% else %}
 <table class="table">
     <thead>
@@ -77,16 +84,16 @@
                 {% if can_edit %}
                 <form method="post" action="/questionnaires/{{ questionnaire.id }}/responses/{{ r.id }}">
                     {% include "partials/csrf.html" %}
-                    <select name="answer_asset_id" style="width:100%;margin-bottom:0.35rem;">
+                    <select name="answer_asset_id" class="mb-1" aria-label="Map to a library answer">
                         <option value="">— Map to a library answer (auto-fills) —</option>
                         {% for a in library %}
                         <option value="{{ a.id }}" {% if r.answer_asset_id == a.id %}selected{% endif %}>{{ a.question | truncate(70) }}</option>
                         {% endfor %}
                     </select>
-                    <textarea name="filled_answer" rows="2" style="width:100%;"
+                    <textarea class="w-100" name="filled_answer" rows="2" aria-label="Answer"
                               placeholder="…or type an answer directly">{{ r.filled_answer }}</textarea>
-                    <div style="margin-top:0.35rem;">
-                        <label style="font-size:0.8rem;"><input type="checkbox" name="mark_reviewed" value="on" {% if r.status == 'reviewed' %}checked{% endif %}> Reviewed</label>
+                    <div class="flex mt-1">
+                        <label class="form-check mb-0 text-sm"><input type="checkbox" name="mark_reviewed" value="on" {% if r.status == 'reviewed' %}checked{% endif %}> Reviewed</label>
                         <button type="submit" class="btn btn-xs">Save</button>
                     </div>
                 </form>
@@ -95,9 +102,9 @@
                 {% endif %}
             </td>
             <td>
-                {% if r.status == 'reviewed' %}<span style="color:#15803d;">✓ Reviewed</span>
-                {% elif r.status == 'filled' %}<span style="color:#2563eb;">Filled</span>
-                {% else %}<span style="color:#b45309;">Unanswered</span>{% endif %}
+                {% if r.status == 'reviewed' %}{{ badge('Reviewed', 'success') }}
+                {% elif r.status == 'filled' %}{{ badge('Filled', 'info') }}
+                {% else %}{{ badge('Unanswered', 'warning') }}{% endif %}
             </td>
         </tr>
     {% endfor %}

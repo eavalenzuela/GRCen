@@ -131,7 +131,46 @@ async def get_current_user(
     # Set after the active-org overlay so RLS scopes to the org the user is
     # actually acting in, not their home org.
     tenancy.set_tenant(user.organization_id)
+    await _attach_nav_context(pool, user)
     return user
+
+
+# The navigation shows the active organisation and a switcher. Both change
+# rarely, so they are cached per process for a short time (every worker
+# converges within the TTL; see CLAUDE.md "Concurrency").
+_NAV_CACHE_TTL = 60.0
+_org_name_cache: dict[UUID, tuple[str, float]] = {}
+_memberships_cache: dict[UUID, tuple[list, float]] = {}
+
+
+async def _attach_nav_context(pool: asyncpg.Pool, user: User) -> None:
+    import time
+
+    from grcen.services import organization_service
+
+    now = time.monotonic()
+    cached = _org_name_cache.get(user.organization_id)
+    if cached is None or cached[1] < now:
+        org = await organization_service.get_by_id(pool, user.organization_id)
+        name = org.name if org else None
+        _org_name_cache[user.organization_id] = (name, now + _NAV_CACHE_TTL)
+        cached = _org_name_cache[user.organization_id]
+    user.org_name = cached[0]
+
+    mem = _memberships_cache.get(user.id)
+    if mem is None or mem[1] < now:
+        rows = await organization_service.list_memberships(pool, user.id)
+        _memberships_cache[user.id] = (rows, now + _NAV_CACHE_TTL)
+        mem = _memberships_cache[user.id]
+    user.memberships = mem[0]
+
+
+def invalidate_nav_cache(user_id: UUID | None = None, org_id: UUID | None = None) -> None:
+    """Call after a membership or org-name change so this worker refreshes early."""
+    if user_id is not None:
+        _memberships_cache.pop(user_id, None)
+    if org_id is not None:
+        _org_name_cache.pop(org_id, None)
 
 
 async def get_current_user_or_none(

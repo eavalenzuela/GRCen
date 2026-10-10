@@ -1,6 +1,6 @@
 # GRCen UI Improvement Plan
 
-_Status: Phase 0 shipped (see CHANGELOG). Phases 1–5 pending._
+_Status: Phase 0 and Phase 1 shipped (see CHANGELOG). Phase 2 (navigation shell) is next: its data plumbing (org name/memberships on the user, `switch-org?next`, numeric badge, menu JS, favicon) is in place; `base.html` still has the flat 22-link nav and 20-link admin bar. 28 inline styles remain in templates, each with a CSS class now available in style.css section 8._
 
 ## Context
 

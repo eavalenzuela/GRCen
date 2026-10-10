@@ -144,9 +144,27 @@
     var target = $(el.getAttribute('data-toggle'));
     if (!target) return;
     var hidden = getComputedStyle(target).display === 'none';
-    target.style.display = hidden ? '' : 'none';
+    // data-display names the display value to restore when a stylesheet
+    // rule (e.g. the mobile nav) hides the element by default.
+    target.style.display = hidden ? (target.getAttribute('data-display') || '') : 'none';
+    if (hidden && getComputedStyle(target).display === 'none') target.style.display = 'block';
     el.setAttribute('aria-expanded', hidden ? 'true' : 'false');
   }
+
+  // ---- navigation menus (<details class="nav-menu">) ----------------------------
+  document.addEventListener('toggle', function (e) {
+    var d = e.target;
+    if (!d.matches || !d.matches('details.nav-menu') || !d.open) return;
+    $all('details.nav-menu[open]').forEach(function (other) { if (other !== d) other.open = false; });
+  }, true);
+  document.addEventListener('click', function (e) {
+    if (e.target.closest('details.nav-menu')) return;
+    $all('details.nav-menu[open]').forEach(function (d) { d.open = false; });
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    $all('details.nav-menu[open]').forEach(function (d) { d.open = false; var s = d.querySelector('summary'); if (s) s.focus(); });
+  });
 
   function copy(el) {
     var src = $(el.getAttribute('data-copy'));

@@ -1,84 +1,78 @@
 {% extends "base.html" %}
+{% from "macros.html" import badge, empty_state, flash_banner %}
 {% block title %}{{ detail.framework.name }} - GRCen{% endblock %}
 
 {% block content %}
 <div class="page-header">
     <h1>{{ detail.framework.name }}</h1>
-    <p>
-        <a href="/frameworks">← All Frameworks</a>
-        &nbsp; | &nbsp;
-        <a href="/assets/{{ detail.framework.id }}">View as asset</a>
-        &nbsp; | &nbsp;
+    <div class="actions">
+        <a href="/frameworks" class="btn btn-link">← All Frameworks</a>
+        <a href="/assets/{{ detail.framework.id }}" class="btn btn-link">View as asset</a>
         <a href="/frameworks/{{ detail.framework.id }}/soa" class="btn btn-sm">SoA</a>
-        &nbsp; | &nbsp;
         <a href="/frameworks/{{ detail.framework.id }}/report.pdf" class="btn btn-sm">Download PDF</a>
         {% if has_perm(user.role, Permission.EXPORT) %}
-        &nbsp; | &nbsp;
         <a href="/frameworks/{{ detail.framework.id }}/evidence-package.zip" class="btn btn-sm"
            title="ZIP: SoA, control library, per-run test ledger, audit trail, and evidence files">Evidence Package</a>
         {% endif %}
         {% if ai_mapping_enabled and has_perm(user.role, Permission.EDIT) and detail.open_gap_count %}
-        &nbsp; | &nbsp;
-        <form method="post" action="/frameworks/{{ detail.framework.id }}/ai-suggest-mappings" style="display:inline;">
+        <form class="inline" method="post" action="/frameworks/{{ detail.framework.id }}/ai-suggest-mappings">
             {% include "partials/csrf.html" %}
             <button type="submit" class="btn btn-sm" title="Ask Claude to propose control mappings for open gaps. Each lands in the approval queue.">✨ Suggest mappings (AI)</button>
         </form>
         {% endif %}
-    </p>
+    </div>
 </div>
 
-{% if flash %}
-<div class="alert" style="padding:0.5rem 0.9rem;border-radius:6px;margin-bottom:1rem;
-     background:{% if flash.ok %}#dcfce7;color:#166534;{% else %}#fee2e2;color:#991b1b;{% endif %}">{{ flash.message }}</div>
-{% endif %}
+{{ flash_banner(flash) }}
 
 <div class="card">
-    <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:1rem;">
-        <div>
-            <small>Version</small>
+    <div class="detail-grid mb-0">
+        <div class="detail-field">
+            <strong>Version</strong>
             <div>{{ detail.framework.metadata.get('version', '—') }}</div>
         </div>
-        <div>
-            <small>Governing Body</small>
+        <div class="detail-field">
+            <strong>Governing Body</strong>
             <div>{{ detail.framework.metadata.get('governing_body', '—') }}</div>
         </div>
-        <div>
-            <small>Status</small>
-            <div>{{ detail.framework.metadata.get('certification_status', '—') }}</div>
+        <div class="detail-field">
+            <strong>Status</strong>
+            {% set cs = detail.framework.metadata.get('certification_status') %}
+            <div>{% if cs %}{{ badge(cs) }}{% else %}—{% endif %}</div>
         </div>
-        <div>
-            <small>Coverage</small>
-            <div style="font-weight:600;">
+        <div class="detail-field">
+            <strong>Coverage</strong>
+            <div class="fw-semibold">
                 {{ detail.coverage_percent }}% ({{ detail.satisfied_count }}/{{ detail.applicable_count }})
-                {% if detail.not_applicable_count %}<small style="color:#6b7280;">· {{ detail.not_applicable_count }} N/A</small>{% endif %}
+                {% if detail.not_applicable_count %}<small class="text-muted">· {{ detail.not_applicable_count }} N/A</small>{% endif %}
             </div>
             {% if detail.borrowed_count %}
-            <small style="color:#1d4ed8;" title="Direct coverage plus gaps covered by an equivalent, satisfied requirement in another framework">
+            <small class="text-primary" title="Direct coverage plus gaps covered by an equivalent, satisfied requirement in another framework">
                 ↔ {{ detail.effective_coverage_percent }}% incl. {{ detail.borrowed_count }} via crosswalk
             </small><br>
             {% endif %}
             {% if detail.weak_count %}
-            <small style="color:#b45309;" title="Coverage weighted by satisfying-control effectiveness; failing controls count for less">
+            <small class="text-warning" title="Coverage weighted by satisfying-control effectiveness; failing controls count for less">
                 ⚠ {{ detail.health_adjusted_coverage_percent }}% health-adjusted ({{ detail.weak_count }} weak)
             </small>
             {% endif %}
             {% if detail.stale_evidence_count %}
-            <br><small style="color:#b45309;" title="Requirements whose satisfying control evidence is aging or expired">
+            <br><small class="text-warning" title="Requirements whose satisfying control evidence is aging or expired">
                 🕔 {{ detail.evidence_freshness_percent }}% evidence fresh ({{ detail.stale_evidence_count }} stale)
             </small>
             {% endif %}
         </div>
     </div>
     {% if detail.framework.description %}
-    <p style="margin-top:1rem; color:#374151;">{{ detail.framework.description }}</p>
+    <p class="mt-2 mb-0 text-secondary">{{ detail.framework.description }}</p>
     {% endif %}
 </div>
 
 {% if timeline and timeline | length > 1 %}
-<div class="card" style="margin-top:1.5rem;">
-    <h3 style="margin-top:0;">Coverage over time
-        <small style="color:#6b7280;font-weight:normal;">— {{ timeline | length }} snapshots</small>
-    </h3>
+<div class="card mt-3">
+    <h2 class="mt-0">Coverage over time
+        <small class="text-muted fw-normal">— {{ timeline | length }} snapshots</small>
+    </h2>
     {% set w = 640 %}{% set h = 120 %}{% set n = timeline | length %}
     <svg width="100%" viewBox="0 0 {{ w }} {{ h }}" style="max-width:{{ w }}px;">
         <line x1="0" y1="{{ h }}" x2="{{ w }}" y2="{{ h }}" stroke="#e5e7eb"/>
@@ -88,52 +82,54 @@
         <polyline fill="none" stroke="#9ca3af" stroke-width="1" stroke-dasharray="3,2"
             points="{% for p in timeline %}{{ (loop.index0 / (n - 1) * w) | round(1) }},{{ (h - (p.coverage_pct / 100 * h)) | round(1) }} {% endfor %}"/>
     </svg>
-    <small style="color:#6b7280;">
-        <span style="color:#2563eb;">— effective</span> ·
-        <span style="color:#9ca3af;">-- direct</span> ·
+    <small class="text-muted">
+        <span class="text-primary">— effective</span> ·
+        <span class="text-faint">-- direct</span> ·
         {{ timeline[0].snapshot_date }} → {{ timeline[-1].snapshot_date }}
     </small>
 </div>
 {% endif %}
 
-<div class="card" style="margin-top:1.5rem;">
-    <div style="display:flex;justify-content:space-between;align-items:center;">
-        <h3 style="margin:0;">Requirements
-            <span style="color:#6b7280; font-weight:normal; font-size:0.9rem;">
-                &nbsp;— {{ detail.open_gap_count }} gap{{ 's' if detail.open_gap_count != 1 else '' }}
+<div class="card mt-3">
+    <div class="flex-between mb-2">
+        <h2 class="m-0">Requirements
+            <small class="text-muted fw-normal">
+                — {{ detail.open_gap_count }} gap{{ 's' if detail.open_gap_count != 1 else '' }}
                 {% if detail.borrowed_count %}
                 · {{ detail.borrowed_count }} covered via crosswalk
                 {% endif %}
                 {% if detail.crosswalk_count %}
                 · {{ detail.crosswalk_count }} cross-framework map{{ 's' if detail.crosswalk_count != 1 else '' }}
                 {% endif %}
-            </span>
-        </h3>
+            </small>
+        </h2>
         {% if has_perm(user.role, Permission.EXPORT) %}
-        <a href="/frameworks/{{ detail.framework.id }}/gap-report.csv" class="btn">Gap CSV</a>
-        <a href="/frameworks/{{ detail.framework.id }}/gap-report.pdf" class="btn">Gap PDF</a>
+        <div class="btn-group">
+            <a href="/frameworks/{{ detail.framework.id }}/gap-report.csv" class="btn">Gap CSV</a>
+            <a href="/frameworks/{{ detail.framework.id }}/gap-report.pdf" class="btn">Gap PDF</a>
+        </div>
         {% endif %}
     </div>
     {% if detail.requirements %}
     <table class="table">
         <thead>
-            <tr><th>Status</th><th>Requirement</th><th>Satisfied by</th><th>Cross-framework</th><th>Last audited</th></tr>
+            <tr><th>Status</th><th>Requirement</th><th>Satisfied by</th><th>Cross-framework</th><th class="date">Last audited</th></tr>
         </thead>
         <tbody>
         {% for req in detail.requirements %}
             <tr>
                 <td>
                     {% if req.graded == 'satisfied_weak' %}
-                    <span style="color:#b45309;" title="Satisfied only by a weak / ineffective / untested control">⚠ weak</span>
+                    {{ badge('weak', title='Satisfied only by a weak / ineffective / untested control') }}
                     {% elif req.satisfied %}
-                    <span style="color:#166534;">✓ satisfied</span>
+                    {{ badge('satisfied') }}
                     {% elif req.coverage == 'covered_via_crosswalk' %}
-                    <span style="color:#1d4ed8;" title="Covered by an equivalent, satisfied requirement in another framework">↔ via crosswalk</span>
+                    {{ badge('via crosswalk', title='Covered by an equivalent, satisfied requirement in another framework') }}
                     {% else %}
-                    <span style="color:#991b1b;">gap</span>
+                    {{ badge('gap') }}
                     {% endif %}
                     {% if req.stale_evidence %}
-                    <br><small style="color:#b45309;" title="Satisfying control's evidence is {{ req.evidence_status }}">🕔 evidence {{ req.evidence_status }}</small>
+                    <br><small class="text-warning" title="Satisfying control's evidence is {{ req.evidence_status }}">🕔 evidence {{ req.evidence_status }}</small>
                     {% endif %}
                 </td>
                 <td><a href="/assets/{{ req.id }}">{{ req.name }}</a></td>
@@ -141,15 +137,15 @@
                     {% if req.satisfiers %}
                     {% for s in req.satisfiers %}
                         <a href="/assets/{{ s.id }}">{{ s.name }}</a>
-                        <small style="color:#6b7280;">({{ s.type }}, {{ s.via }})</small>{% if not loop.last %},{% endif %}
+                        <small class="text-muted">({{ s.type }}, {{ s.via }})</small>{% if not loop.last %},{% endif %}
                     {% endfor %}
                     {% elif req.borrowed_from %}
                     {% for b in req.borrowed_from %}
-                        <small style="color:#1d4ed8;">↔ <a href="/assets/{{ b.id }}">{{ b.code }}</a></small>
-                        <small style="color:#6b7280;">({{ b.framework }}, satisfied)</small>{% if not loop.last %}<br>{% endif %}
+                        <small class="text-primary">↔ <a href="/assets/{{ b.id }}">{{ b.code }}</a></small>
+                        <small class="text-muted">({{ b.framework }}, satisfied)</small>{% if not loop.last %}<br>{% endif %}
                     {% endfor %}
                     {% else %}
-                    <span style="color:#6b7280;">—</span>
+                    <span class="text-muted">—</span>
                     {% endif %}
                 </td>
                 <td>
@@ -157,18 +153,18 @@
                     {% for x in req.crosswalks %}
                         <a href="/assets/{{ x.id }}"
                            title="{{ x.relationship }} — {{ x.name }}">{{ x.code }}</a>
-                        <small style="color:#6b7280;">({{ x.framework }})</small>{% if not loop.last %}<br>{% endif %}
+                        <small class="text-muted">({{ x.framework }})</small>{% if not loop.last %}<br>{% endif %}
                     {% endfor %}
                     {% else %}
-                    <small style="color:#9ca3af;">—</small>
+                    <small class="text-faint">—</small>
                     {% endif %}
                 </td>
-                <td>
+                <td class="date">
                     {% set ts = last_audited.get(req.id) %}
                     {% if ts %}
-                    <small style="color:#374151;">{{ ts.strftime('%Y-%m-%d') }}</small>
+                    <small class="text-secondary">{{ ts.strftime('%Y-%m-%d') }}</small>
                     {% else %}
-                    <small style="color:#6b7280;">never</small>
+                    <small class="text-muted">never</small>
                     {% endif %}
                 </td>
             </tr>
@@ -176,50 +172,48 @@
         </tbody>
     </table>
     {% else %}
-    <p style="color:#6b7280;">No requirements linked. Add <code>parent_of</code> relationships from the framework to its requirements.</p>
+    {{ empty_state('No requirements linked. Add <code>parent_of</code> relationships from the framework to its requirements.' | safe) }}
     {% endif %}
 </div>
 
-<div style="display:grid; grid-template-columns: 1fr 1fr; gap:1.5rem; margin-top:1.5rem;">
+<div class="grid">
     <div class="card">
-        <h3>Audits</h3>
+        <h2 class="mt-0">Audits</h2>
         {% if detail.audits %}
-        <ul style="list-style:none; padding:0;">
+        <ul class="list-plain">
         {% for a in detail.audits %}
-            <li style="padding:0.25rem 0;">
+            <li class="mb-1">
                 <a href="/assets/{{ a.id }}">{{ a.name }}</a>
-                <small style="color:#6b7280;">({{ a.status }})</small>
+                {{ badge(a.status) }}
                 {% set af = audit_findings.get(a.id | string) if audit_findings else None %}
                 {% if af and af.total %}
-                <small style="color:{{ '#b45309' if af.open else '#166534' }};">— {{ af.open }} open / {{ af.total }} findings</small>
+                <small class="{{ 'text-warning' if af.open else 'text-success' }}">— {{ af.open }} open / {{ af.total }} findings</small>
                 {% endif %}
             </li>
         {% endfor %}
         </ul>
         {% else %}
-        <p style="color:#6b7280;">No audits linked via <code>certifies</code>.</p>
+        <p class="text-muted">No audits linked via <code>certifies</code>.</p>
         {% endif %}
     </div>
     <div class="card">
-        <h3>Certified Vendors</h3>
+        <h2 class="mt-0">Certified Vendors</h2>
         {% if detail.vendors %}
-        <ul style="list-style:none; padding:0;">
+        <ul class="list-plain">
         {% for v in detail.vendors %}
-            <li style="padding:0.25rem 0;"><a href="/assets/{{ v.id }}">{{ v.name }}</a></li>
+            <li class="mb-1"><a href="/assets/{{ v.id }}">{{ v.name }}</a></li>
         {% endfor %}
         </ul>
         {% else %}
-        <p style="color:#6b7280;">No vendors linked via <code>certified_by</code>.</p>
+        <p class="text-muted">No vendors linked via <code>certified_by</code>.</p>
         {% endif %}
     </div>
 </div>
 
-<div class="card" style="margin-top:1.5rem;">
-    <h3>In-Scope Assets
-        <span style="color:#6b7280; font-weight:normal; font-size:0.9rem;">
-            &nbsp;— {{ detail.in_scope_assets | length }}
-        </span>
-    </h3>
+<div class="card">
+    <h2 class="mt-0">In-Scope Assets
+        <small class="text-muted fw-normal">— {{ detail.in_scope_assets | length }}</small>
+    </h2>
     {% if detail.in_scope_assets %}
     <table class="table">
         <thead><tr><th>Type</th><th>Asset</th><th>Status</th></tr></thead>
@@ -228,13 +222,13 @@
             <tr>
                 <td>{{ a.type }}</td>
                 <td><a href="/assets/{{ a.id }}">{{ a.name }}</a></td>
-                <td>{{ a.status }}</td>
+                <td>{{ badge(a.status) }}</td>
             </tr>
         {% endfor %}
         </tbody>
     </table>
     {% else %}
-    <p style="color:#6b7280;">No assets are linked to any requirement in this framework yet.</p>
+    {{ empty_state('No assets are linked to any requirement in this framework yet.') }}
     {% endif %}
 </div>
 {% endblock %}

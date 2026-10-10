@@ -6,26 +6,24 @@
     <h1>SSO Settings</h1>
 </div>
 
-<div class="tab-bar" style="display:flex; gap:0; margin-bottom:1.5rem; border-bottom:2px solid #e5e7eb;">
-    <a href="/admin/oidc-settings" class="tab"
-       style="padding:0.5rem 1.25rem; color:#6b7280; text-decoration:none;">OIDC</a>
-    <a href="/admin/saml-settings" class="tab active"
-       style="padding:0.5rem 1.25rem; font-weight:600; border-bottom:2px solid #2563eb; margin-bottom:-2px; color:#2563eb; text-decoration:none;">SAML 2.0</a>
-</div>
+<nav class="tabs" aria-label="SSO protocol">
+    <a href="/admin/oidc-settings" class="tab">OIDC</a>
+    <a href="/admin/saml-settings" class="tab active" aria-current="page">SAML 2.0</a>
+</nav>
 
 {% if saml.enabled %}
-<div class="alert" style="background:#dcfce7; color:#166534; border:1px solid #bbf7d0;">
+<div class="alert alert-success" role="status">
     SAML SSO is <strong>enabled</strong>. The login page shows a "Sign in with {{ saml.display_name }}" button.
 </div>
 {% else %}
-<div class="alert" style="background:#fef3c7; color:#92400e; border:1px solid #fde68a;">
+<div class="alert alert-warning" role="status">
     SAML SSO is <strong>disabled</strong>. Fill in the IdP Entity ID, SSO URL, and X.509 Certificate to enable it.
 </div>
 {% endif %}
 
 {% if saml.enabled %}
-<div class="card" style="margin-bottom:1.5rem;">
-    <h3>SP Metadata</h3>
+<div class="card mb-3">
+    <h2>SP Metadata</h2>
     <p>Provide this URL to your Identity Provider to register GRCen as a Service Provider:</p>
     <pre style="background:#f3f4f6; padding:0.75rem; border-radius:4px; overflow-x:auto;"><a href="/auth/saml/metadata">/auth/saml/metadata</a></pre>
 </div>
@@ -34,7 +32,7 @@
 <form method="post" action="/admin/saml-settings" class="card">
     {% include "partials/csrf.html" %}
 
-    <h3>Identity Provider (IdP)</h3>
+    <h2 class="mt-0">Identity Provider (IdP)</h2>
     <div class="form-group">
         <label for="idp_entity_id">IdP Entity ID</label>
         <input type="text" id="idp_entity_id" name="idp_entity_id" value="{{ saml.idp_entity_id }}"
@@ -58,7 +56,7 @@
         <small>PEM-encoded certificate (without BEGIN/END lines) for verifying IdP signatures.</small>
     </div>
 
-    <h3 style="margin-top:2rem;">Service Provider (SP)</h3>
+    <h2 class="mt-4">Service Provider (SP)</h2>
     <div class="form-group">
         <label for="sp_entity_id">SP Entity ID (optional)</label>
         <input type="text" id="sp_entity_id" name="sp_entity_id" value="{{ saml.sp_entity_id }}"
@@ -78,7 +76,7 @@
         <small>PEM-encoded private key. Leave as-is to keep the existing key. Encrypted at rest when SSO Secrets scope is active.</small>
     </div>
 
-    <h3 style="margin-top:2rem;">Options</h3>
+    <h2 class="mt-4">Options</h2>
     <div class="form-group">
         <label for="name_id_format">NameID Format</label>
         <select id="name_id_format" name="name_id_format">
@@ -103,21 +101,21 @@
         <small>Shown as "Sign in with ..."</small>
     </div>
     <div class="form-group">
-        <label>
+        <label class="form-check">
             <input type="checkbox" name="want_assertions_signed" value="true"
                    {% if saml.assertions_signed %}checked{% endif %}>
             Require signed assertions
         </label>
     </div>
     <div class="form-group">
-        <label>
+        <label class="form-check">
             <input type="checkbox" name="want_name_id_encrypted" value="true"
                    {% if saml.name_id_encrypted %}checked{% endif %}>
             Require encrypted NameID
         </label>
     </div>
 
-    <h3 style="margin-top:2rem;">Role Mapping</h3>
+    <h2 class="mt-4">Role Mapping</h2>
     <div class="form-group">
         <label for="role_attribute">Role Attribute Name</label>
         <input type="text" id="role_attribute" name="role_attribute" value="{{ saml.role_attribute }}"

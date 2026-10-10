@@ -1,24 +1,18 @@
 {% extends "base.html" %}
+{% from "macros.html" import flash_banner %}
 {% block title %}ITSM / Ticketing - GRCen{% endblock %}
 
 {% block content %}
 <div class="page-header">
     <h1>ITSM / Ticketing Integration</h1>
-</div>
-
-{% if flash %}
-<div class="alert" style="background:{% if flash.ok %}#dcfce7; color:#166534; border:1px solid #bbf7d0{% else %}#fee2e2; color:#991b1b; border:1px solid #fecaca{% endif %};">
-    {{ flash.message }}
-</div>
-{% endif %}
-
-<div class="card">
-    <p style="color:#6b7280;">
+    <p class="page-intro">
         Push a finding to your ticketing system (Jira / ServiceNow / a generic JSON endpoint)
         from its detail page or <code>POST /api/findings/{id}/ticket</code>. Ticket status flows
         back via <code>POST /api/sync/tickets</code> (a <code>sync</code>-scoped token).
     </p>
 </div>
+
+{{ flash_banner(flash) }}
 
 <form method="post" action="/admin/itsm-settings" class="card">
     {% include "partials/csrf.html" %}
@@ -58,7 +52,7 @@
                placeholder="Leave as ******** to keep current">
     </div>
     <div class="form-group">
-        <label><input type="checkbox" name="enabled" {% if itsm.enabled == 'true' %}checked{% endif %}> Enabled</label>
+        <label class="form-check"><input type="checkbox" name="enabled" {% if itsm.enabled == 'true' %}checked{% endif %}> Enabled</label>
     </div>
     <div class="form-actions">
         <button type="submit" class="btn btn-primary">Save</button>

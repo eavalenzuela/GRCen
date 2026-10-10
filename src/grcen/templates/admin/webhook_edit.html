@@ -2,6 +2,9 @@
 {% block title %}Edit Webhook - GRCen{% endblock %}
 
 {% block content %}
+<nav class="breadcrumb" aria-label="Breadcrumb">
+    <span><a href="/admin/webhooks">Webhooks</a></span><span>{{ hook.name }}</span>
+</nav>
 <div class="page-header">
     <h1>Edit Webhook</h1>
 </div>
@@ -37,11 +40,11 @@
         </select>
     </div>
     <div class="form-group">
-        <label><input type="checkbox" name="enabled" {% if hook.enabled %}checked{% endif %}> Enabled</label>
+        <label class="form-check"><input type="checkbox" name="enabled" {% if hook.enabled %}checked{% endif %}> Enabled</label>
     </div>
     <div class="form-actions">
         <button type="submit" class="btn btn-primary">Save</button>
-        <a href="/admin/webhooks" class="btn">Cancel</a>
+        <a href="/admin/webhooks" class="btn btn-link">Cancel</a>
     </div>
 </form>
 {% endblock %}

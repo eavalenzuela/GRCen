@@ -1,36 +1,35 @@
 {% extends "base.html" %}
+{% from "macros.html" import empty_state, flash_banner %}
 {% block title %}Data Access Log - GRCen{% endblock %}
 
 {% block content %}
 <div class="page-header">
     <h1>Data Access Log</h1>
-    <small style="color:#6b7280;">Views, exports, and downloads. Writes are in the separate <a href="/admin/audit">Audit Log</a>.</small>
+    <p class="page-intro">Views, exports, and downloads. Writes are in the separate <a href="/admin/audit">Audit Log</a>.</p>
 </div>
 
-{% if flash %}
-<div class="callout" style="background:{{ '#e0f2fe' if flash.ok else '#fee2e2' }};padding:0.75rem;margin:0 0 1rem 0;">{{ flash.message }}</div>
-{% endif %}
+{{ flash_banner(flash) }}
 
-<div class="card" style="margin-bottom:1rem;">
-    <div style="display:flex;gap:1rem;align-items:end;flex-wrap:wrap;">
-        <form method="post" action="/admin/access-log/retention" style="display:flex;gap:0.5rem;align-items:end;">
+<div class="card mb-2">
+    <div class="form-inline">
+        <form method="post" action="/admin/access-log/retention" class="form-inline">
             {% include "partials/csrf.html" %}
-            <div class="form-group" style="margin-bottom:0;">
+            <div class="form-group mb-0">
                 <label>Retention (days, blank = forever)
-                    <input type="number" name="retention_days" min="1" max="3650"
-                           value="{{ retention_days if retention_days else '' }}" style="width:8rem;">
+                    <input class="w-sm" type="number" name="retention_days" min="1" max="3650"
+                           value="{{ retention_days if retention_days else '' }}">
                 </label>
             </div>
             <button type="submit" class="btn">Save retention</button>
         </form>
-        <span style="color:#6b7280;">|</span>
+        <span class="text-muted">|</span>
         <a href="/admin/access-log/export.csv?{{ request.url.query }}" class="btn">Export filtered as CSV</a>
     </div>
 </div>
 
 <form method="get" action="/admin/access-log" class="card">
-    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:end;">
-        <div class="form-group" style="margin-bottom:0;">
+    <div class="form-inline">
+        <div class="form-group mb-0">
             <label>User</label>
             <select name="user_id">
                 <option value="">All</option>
@@ -39,7 +38,7 @@
                 {% endfor %}
             </select>
         </div>
-        <div class="form-group" style="margin-bottom:0;">
+        <div class="form-group mb-0">
             <label>Entity type</label>
             <select name="entity_type">
                 <option value="">All</option>
@@ -48,7 +47,7 @@
                 {% endfor %}
             </select>
         </div>
-        <div class="form-group" style="margin-bottom:0;">
+        <div class="form-group mb-0">
             <label>Action</label>
             <select name="action">
                 <option value="">All</option>
@@ -62,16 +61,16 @@
     </div>
 </form>
 
-<div class="card" style="margin-top:1.5rem;">
+<div class="card mt-3">
     {% if entries %}
     <table class="table">
         <thead>
-            <tr><th>When (UTC)</th><th>User</th><th>Action</th><th>Entity</th><th>Target</th><th>IP</th></tr>
+            <tr><th class="date">When (UTC)</th><th>User</th><th>Action</th><th>Entity</th><th>Target</th><th>IP</th></tr>
         </thead>
         <tbody>
         {% for e in entries %}
             <tr>
-                <td>{{ e.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                <td class="date">{{ e.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
                 <td>{{ e.username }}</td>
                 <td>{{ e.action }}</td>
                 <td>{{ e.entity_type }}</td>
@@ -82,13 +81,13 @@
                     {{ e.entity_name or '—' }}
                     {% endif %}
                 </td>
-                <td>{{ e.ip_address or '—' }}</td>
+                <td class="mono">{{ e.ip_address or '—' }}</td>
             </tr>
         {% endfor %}
         </tbody>
     </table>
     {% else %}
-    <p style="color:#6b7280;">No access events match these filters yet.</p>
+    {{ empty_state('No access events match these filters yet.') }}
     {% endif %}
 </div>
 {% endblock %}

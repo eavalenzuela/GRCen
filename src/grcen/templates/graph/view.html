@@ -4,11 +4,11 @@
 {% block content %}
 <div class="page-header">
     <h1>Graph: {{ asset.name }}</h1>
-    <a href="/assets/{{ asset.id }}" class="btn">Back to Asset</a>
+    <div class="actions"><a href="/assets/{{ asset.id }}" class="btn btn-link">← Back to Asset</a></div>
 </div>
 
 <div class="graph-controls">
-    <label>Depth:</label>
+    <label for="depth-select">Depth:</label>
     <select id="depth-select">
         <option value="1" selected>1</option>
         <option value="2">2</option>
@@ -20,7 +20,7 @@
     <span id="graph-status" class="graph-status"></span>
 </div>
 
-<p class="muted" style="font-size:0.85rem;">
+<p class="text-muted text-sm">
     Tap a node to select it, then Expand to pull in its neighbours without
     leaving the page (or double-tap a node). Toggle a legend entry to hide that type.
 </p>
@@ -30,7 +30,7 @@
 <div id="graph-link-form" class="graph-link-form" style="display:none;"></div>
 <datalist id="rel-type-suggestions"></datalist>
 
-<div id="cy" style="width:100%; height:600px; border:1px solid #ddd; border-radius:8px;"></div>
+<div id="cy" style="width:100%; height:600px; border:1px solid var(--border); border-radius:var(--radius);"></div>
 {% endblock %}
 
 {% block scripts %}

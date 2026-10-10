@@ -42,7 +42,7 @@
         <label for="owner_search" id="owner-label">
             {% if asset and asset.type.value == 'person' %}Manager{% else %}Owner{% endif %}
         </label>
-        <div class="owner-picker" style="position:relative;">
+        <div class="owner-picker">
             <input type="text" id="owner_search" placeholder="Search person or org unit..."
                    hx-get="/api/owner-search" hx-trigger="input changed delay:300ms"
                    hx-target="#owner-results" hx-include="[name='q']"
@@ -54,7 +54,7 @@
                    value="{{ asset.owner_id if asset and asset.owner_id else '' }}">
         </div>
         {% if asset and asset.owner %}
-        <small style="color:var(--text-muted);">Current: {{ asset.owner }}</small>
+        <small class="text-muted">Current: {{ asset.owner }}</small>
         {% endif %}
     </div>
 
@@ -75,14 +75,15 @@
                value="{{ (asset.tags or []) | join(', ') if asset else '' }}"
                placeholder="e.g. SOC2, GDPR, critical-path">
         {% if known_tags %}
-        <small style="color:#6b7280;">
+        <small class="text-muted">
             Existing:
+            <span class="btn-group">
             {% for t in known_tags[:12] %}
             <button type="button" class="btn btn-xs"
-                    style="padding:0 0.4rem; font-size:0.75rem; margin:0 0.15rem;"
                     data-tag-chip="{{ t.name }}" data-target="#tags">{{ t.name }}</button>
             {% endfor %}
             {% if known_tags | length > 12 %}…{% endif %}
+            </span>
         </small>
         {% endif %}
     </div>

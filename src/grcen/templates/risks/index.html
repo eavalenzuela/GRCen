@@ -1,11 +1,11 @@
 {% extends "base.html" %}
+{% from "macros.html" import badge %}
 {% block title %}Risk Management - GRCen{% endblock %}
 {% block content %}
 <h1>Risk Management</h1>
 
 {% if appetite_out or appetite_near %}
-<div class="alert" style="padding:0.6rem 0.9rem;border-radius:6px;margin-bottom:1rem;
-     background:{% if appetite_out %}#fee2e2;color:#991b1b;{% else %}#fef3c7;color:#92400e;{% endif %}">
+<div class="alert {{ 'alert-error' if appetite_out else 'alert-warning' }}" role="{{ 'alert' if appetite_out else 'status' }}">
     <strong>{{ appetite_out }}</strong> risk{{ 's' if appetite_out != 1 else '' }} out of appetite
     · {{ appetite_near }} near.
     {% if has_perm(user.role, Permission.MANAGE_USERS) %}<a href="/admin/risk-appetite">Manage appetite →</a>{% endif %}
@@ -19,11 +19,11 @@
     {% if trend.deltas and trend.deltas.get(key) is not none %}
         {% set d = trend.deltas[key] %}
         {% if d > 0 %}
-            <span title="Since {{ trend.prior.snapshot_date }}" style="color:{% if reverse %}#166534{% else %}#991b1b{% endif %};font-size:0.85rem;">▲ {{ d }}</span>
+            <span title="Since {{ trend.prior.snapshot_date }}" class="text-sm {{ 'text-success' if reverse else 'text-danger' }}">▲ {{ d }}</span>
         {% elif d < 0 %}
-            <span title="Since {{ trend.prior.snapshot_date }}" style="color:{% if reverse %}#991b1b{% else %}#166534{% endif %};font-size:0.85rem;">▼ {{ d|abs }}</span>
+            <span title="Since {{ trend.prior.snapshot_date }}" class="text-sm {{ 'text-danger' if reverse else 'text-success' }}">▼ {{ d|abs }}</span>
         {% else %}
-            <span title="Unchanged since {{ trend.prior.snapshot_date }}" style="color:#6b7280;font-size:0.85rem;">—</span>
+            <span title="Unchanged since {{ trend.prior.snapshot_date }}" class="text-sm text-muted">—</span>
         {% endif %}
     {% endif %}
 {% endmacro %}
@@ -139,7 +139,7 @@
                 <input type="text" name="owner" id="f-owner" value="{{ filter_owner }}" placeholder="Search by name...">
             </div>
             <div class="form-group">
-                <label>
+                <label class="form-check">
                     <input type="checkbox" name="overdue" value="1" {% if filter_overdue %}checked{% endif %}>
                     Overdue reviews only
                 </label>
@@ -174,7 +174,7 @@
     {% if filter_overdue %}
     <span class="badge">Overdue</span>
     {% endif %}
-    <a href="/risk-management" class="btn" style="margin-left:0.5rem;font-size:0.8rem;">Clear all</a>
+    <a href="/risk-management" class="btn btn-sm">Clear all</a>
 </div>
 {% endif %}
 
@@ -187,6 +187,7 @@
         {% include "partials/csrf.html" %}
     {% endif %}
 
+    <div class="table-wrap">
     <table>
         <thead>
             <tr>
@@ -195,7 +196,7 @@
                 {% endif %}
                 {% macro sort_link(field, label) %}
                 {% set new_order = "asc" if current_sort == field and current_order == "desc" else "desc" %}
-                <th><a href="/risk-management?sort={{ field }}&order={{ new_order }}{{ filter_params }}" class="sort-link">
+                <th{% if field == 'score' %} class="num"{% endif %}><a href="/risk-management?sort={{ field }}&order={{ new_order }}{{ filter_params }}" class="sort-link">
                     {{ label }}
                     {% if current_sort == field %}
                     <span class="sort-arrow">{{ '▲' if current_order == 'asc' else '▼' }}</span>
@@ -211,7 +212,7 @@
                 <th>Effectiveness</th>
                 <th title="Aggregate effectiveness of controls linked via mitigated_by">Controls</th>
                 {{ sort_link("owner", "Owner") }}
-                <th>Review</th>
+                <th class="date">Review</th>
             </tr>
         </thead>
         <tbody>
@@ -221,27 +222,27 @@
                 <td><input type="checkbox" class="risk-row-check" name="risk_ids" value="{{ risk.id }}"></td>
                 {% endif %}
                 <td><a href="/assets/{{ risk.id }}">{{ risk.name }}</a></td>
-                <td><span class="badge risk-{{ risk.color }}">{{ risk.score }}</span></td>
+                <td class="num"><span class="badge risk-{{ risk.color }}">{{ risk.score }}</span></td>
                 <td>{{ risk.likelihood | replace('_', ' ') | title if risk.likelihood else '-' }}</td>
                 <td>{{ risk.impact | replace('_', ' ') | title if risk.impact else '-' }}</td>
                 <td>{{ risk.risk_category | replace('_', ' ') | title if risk.risk_category else '-' }}</td>
                 <td>{{ risk.treatment | replace('_', ' ') | title if risk.treatment else '-' }}</td>
-                <td>{{ risk.control_effectiveness | replace('_', ' ') | title if risk.control_effectiveness else '-' }}</td>
+                <td>{% if risk.control_effectiveness %}{{ badge(risk.control_effectiveness) }}{% else %}-{% endif %}</td>
                 <td>
                     {% set cr = risk.control_rollup %}
                     {% if cr.control_count %}
                     <span title="{{ cr.control_count }} control{{ 's' if cr.control_count != 1 }} tracked, avg score {{ cr.score }}">
                         {{ cr.effectiveness_label | title }}
-                        <small style="color:#6b7280;">({{ cr.control_count }})</small>
+                        <small class="text-muted">({{ cr.control_count }})</small>
                     </span>
                     {% elif cr.mitigator_count %}
-                    <small style="color:#6b7280;" title="{{ cr.mitigator_count }} non-control mitigator(s) linked">{{ cr.mitigator_count }} mitigator{{ 's' if cr.mitigator_count != 1 }}</small>
+                    <small class="text-muted" title="{{ cr.mitigator_count }} non-control mitigator(s) linked">{{ cr.mitigator_count }} mitigator{{ 's' if cr.mitigator_count != 1 }}</small>
                     {% else %}
-                    <small style="color:#991b1b;">—</small>
+                    <small class="text-danger">—</small>
                     {% endif %}
                 </td>
                 <td>{{ risk.owner or '-' }}</td>
-                <td>
+                <td class="date">
                     {% if risk.is_overdue %}
                     <span class="badge review-overdue">Overdue</span>
                     {% elif risk.review_date %}
@@ -253,15 +254,16 @@
             </tr>
             {% endfor %}
             {% if not risks %}
-            <tr><td colspan="11" style="text-align:center;color:var(--text-muted);">No risks match the current filters.</td></tr>
+            <tr><td colspan="11" class="text-center text-muted">No risks match the current filters.</td></tr>
             {% endif %}
         </tbody>
     </table>
+    </div>
 
     {% if has_perm(user.role, Permission.EDIT) and risks %}
-    <fieldset style="margin-top:1rem; border:1px solid #e5e7eb; padding:0.75rem; border-radius:6px;">
-        <legend style="padding:0 0.5rem; font-weight:600;">Bulk Apply to Selected</legend>
-        <div style="display:flex; gap:0.75rem; flex-wrap:wrap; align-items:center;">
+    <fieldset class="card card-compact mb-0">
+        <legend class="fw-semibold">Bulk Apply to Selected</legend>
+        <div class="flex">
             <label>
                 Treatment
                 <select name="treatment">

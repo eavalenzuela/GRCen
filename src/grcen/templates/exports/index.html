@@ -6,22 +6,22 @@
 <div class="card">
     <form id="export-form" method="get" action="/api/exports/assets">
         <div class="form-group">
-            <label>Format</label>
-            <select name="format">
+            <label for="export-format">Format</label>
+            <select name="format" id="export-format">
                 <option value="csv">CSV</option>
                 <option value="json">JSON</option>
             </select>
         </div>
 
         <div class="form-group">
-            <label>Asset Types (comma-separated, or leave blank for all)</label>
-            <input type="text" name="types" placeholder="e.g. person,system,risk">
+            <label for="export-types">Asset Types (comma-separated, or leave blank for all)</label>
+            <input type="text" name="types" id="export-types" placeholder="e.g. person,system,risk">
             <small>Available: {% for t in asset_types %}{{ t.value }}{% if not loop.last %}, {% endif %}{% endfor %}</small>
         </div>
 
         <div class="form-group">
-            <label>Status Filter</label>
-            <select name="status">
+            <label for="export-status">Status Filter</label>
+            <select name="status" id="export-status">
                 <option value="">All</option>
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
@@ -31,11 +31,13 @@
         </div>
 
         <div class="form-group">
-            <label>Columns (comma-separated, or leave blank for all)</label>
-            <input type="text" name="columns" placeholder="e.g. id,name,type,status">
+            <label for="export-columns">Columns (comma-separated, or leave blank for all)</label>
+            <input type="text" name="columns" id="export-columns" placeholder="e.g. id,name,type,status">
         </div>
 
-        <button type="submit" class="btn btn-primary">Download Export</button>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Download Export</button>
+        </div>
     </form>
 </div>
 {% endblock %}

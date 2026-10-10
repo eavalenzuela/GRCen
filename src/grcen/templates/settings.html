@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros.html" import badge, flash_banner %}
 {% block title %}My Settings - GRCen{% endblock %}
 
 {% block content %}
@@ -7,61 +8,56 @@
 </div>
 
 {% if saved %}
-<div class="alert" style="background:#dcfce7; color:#166534; border:1px solid #bbf7d0;">
+<div class="alert alert-success" role="status">
     Preferences saved.
 </div>
 {% endif %}
 
-{% if flash %}
-<div class="alert" style="background:{% if flash.ok %}#dcfce7; color:#166534; border:1px solid #bbf7d0{% else %}#fee2e2; color:#991b1b; border:1px solid #fecaca{% endif %};">
-    {{ flash.message }}
-</div>
-{% endif %}
+{{ flash_banner(flash) }}
 
 <div class="card">
-    <h3>Account</h3>
+    <h2>Account</h2>
     <p><strong>Username:</strong> {{ user.username }}</p>
     <p><strong>Email:</strong> {{ user.email or '(not set — ask an admin to configure one so you can receive email notifications)' }}</p>
     <p><strong>Role:</strong> {{ user.role.value | title }}</p>
 </div>
 
-<form method="post" action="/settings" class="card" style="margin-top:1.5rem;">
+<form method="post" action="/settings" class="card mt-3">
     {% include "partials/csrf.html" %}
-    <h3>Notifications</h3>
+    <h2>Notifications</h2>
     <div class="form-group">
-        <label>
+        <label class="form-check">
             <input type="checkbox" name="email_notifications_enabled"
                    {% if user.email_notifications_enabled %}checked{% endif %}
                    {% if not user.email %}disabled{% endif %}>
             Send me an email when an alert fires for an asset I own
         </label>
         {% if not user.email %}
-        <small style="color:#92400e;">An email address must be set on your account before you can enable this.</small>
+        <small class="text-warning">An email address must be set on your account before you can enable this.</small>
         {% elif not smtp_enabled %}
-        <small style="color:#92400e;">SMTP is not currently configured, so no emails will be sent even if this is on.</small>
+        <small class="text-warning">SMTP is not currently configured, so no emails will be sent even if this is on.</small>
         {% endif %}
     </div>
     <div class="form-group">
-        <label>Delivery mode
-            <select name="email_notification_mode">
-                <option value="immediate" {% if user.email_notification_mode == 'immediate' %}selected{% endif %}>Immediate (one email per alert)</option>
-                <option value="digest" {% if user.email_notification_mode == 'digest' %}selected{% endif %}>Hourly digest (one batched email per hour)</option>
-            </select>
-        </label>
+        <label for="email_notification_mode">Delivery mode</label>
+        <select id="email_notification_mode" name="email_notification_mode">
+            <option value="immediate" {% if user.email_notification_mode == 'immediate' %}selected{% endif %}>Immediate (one email per alert)</option>
+            <option value="digest" {% if user.email_notification_mode == 'digest' %}selected{% endif %}>Hourly digest (one batched email per hour)</option>
+        </select>
     </div>
     <div class="form-actions">
         <button type="submit" class="btn btn-primary">Save Preferences</button>
     </div>
 </form>
 
-<div class="card" style="margin-top:1.5rem;">
-    <h3>Two-Factor Authentication (TOTP)</h3>
+<div class="card mt-3">
+    <h2>Two-Factor Authentication (TOTP)</h2>
     {% if user.is_sso %}
-    <p style="color:#6b7280;">This account signs in via SSO, so MFA is enforced by your identity provider.</p>
+    <p class="text-muted">This account signs in via SSO, so MFA is enforced by your identity provider.</p>
     {% elif mfa_enabled %}
-    <p><strong>✓ Enabled.</strong> Codes from your authenticator app are required on login.</p>
+    <p>{{ badge('enabled') }} Codes from your authenticator app are required on login.</p>
     {% if recovery_remaining is not none %}
-    <p style="color:#6b7280;">Recovery codes remaining: {{ recovery_remaining }}.</p>
+    <p class="text-muted">Recovery codes remaining: {{ recovery_remaining }}.</p>
     {% endif %}
     <form method="post" action="/settings/mfa/disable"
           data-confirm="Turn off two-factor authentication on this account?">
@@ -70,29 +66,29 @@
     </form>
     {% elif mfa_pending %}
     <p>Scan the QR code with your authenticator app, then enter a 6-digit code to finish enrolling.</p>
-    <div style="text-align:center;">
+    <div class="text-center">
         <img src="data:image/png;base64,{{ mfa_pending.qr_b64 }}" alt="TOTP QR" style="max-width:220px;">
     </div>
-    <p style="text-align:center; font-family:monospace;">Secret: <code>{{ mfa_pending.secret }}</code></p>
+    <p class="text-center">Secret: <code class="mono break-all">{{ mfa_pending.secret }}</code></p>
     {% if mfa_pending.recovery_codes %}
-    <div class="alert" style="background:#fef3c7; color:#92400e; border:1px solid #fde68a;">
+    <div class="alert alert-warning" role="status">
         <strong>Save these recovery codes now.</strong> They will not be shown again.
-        <ul style="font-family:monospace; margin:0.5rem 0 0 1rem;">
+        <ul class="list-tight mono mt-1">
             {% for c in mfa_pending.recovery_codes %}<li>{{ c }}</li>{% endfor %}
         </ul>
     </div>
     {% endif %}
-    <form method="post" action="/settings/mfa/confirm" style="margin-top:1rem;">
+    <form class="mt-2" method="post" action="/settings/mfa/confirm">
         {% include "partials/csrf.html" %}
         <div class="form-group">
             <label for="mfa_code">Authenticator code</label>
-            <input type="text" id="mfa_code" name="code" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" style="max-width:8rem;">
+            <input type="text" id="mfa_code" name="code" class="w-sm" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code">
         </div>
         <button type="submit" class="btn btn-primary">Verify &amp; enable</button>
-        </form>
-    <form method="post" action="/settings/mfa/cancel" style="display:inline-block; margin-top:0.5rem;">
+    </form>
+    <form class="inline" method="post" action="/settings/mfa/cancel">
         {% include "partials/csrf.html" %}
-        <button type="submit" class="btn">Cancel</button>
+        <button type="submit" class="btn mt-1">Cancel</button>
     </form>
     {% else %}
     <p>Add a second factor to your sign-in: a 6-digit code from an authenticator app (Google Authenticator, 1Password, Authy, etc.).</p>
@@ -104,87 +100,91 @@
 </div>
 
 {% if memberships and memberships|length > 1 %}
-<div class="card" style="margin-top:1.5rem;">
-    <h3>Switch organization</h3>
-    <p style="color:#6b7280;">You belong to {{ memberships|length }} organizations. The active one is shown in bold.</p>
-    <form method="post" action="/switch-org">
+<div class="card mt-3">
+    <h2>Switch organization</h2>
+    <p class="text-muted">You belong to {{ memberships|length }} organizations. The active one is shown in bold.</p>
+    <form method="post" action="/switch-org" class="form-row">
         {% include "partials/csrf.html" %}
-        <select name="organization_id">
+        <select name="organization_id" aria-label="Organization">
             {% for m in memberships %}
             <option value="{{ m.id }}" {% if m.id == user.organization_id %}selected{% endif %}>
                 {{ m.name }} ({{ m.role }})
             </option>
             {% endfor %}
         </select>
-        <button type="submit" class="btn">Switch</button>
+        <button type="submit" class="btn btn-primary">Switch</button>
     </form>
 </div>
 {% endif %}
 
-<div class="card" style="margin-top:1.5rem;">
-    <h3>Review calendar feed (iCal)</h3>
-    <p style="color:#6b7280;">Subscribe your calendar app (Outlook, Google Calendar, Thunderbird)
+<div class="card mt-3">
+    <h2>Review calendar feed (iCal)</h2>
+    <p class="text-muted">Subscribe your calendar app (Outlook, Google Calendar, Thunderbird)
        to upcoming review and due dates. Anyone with the URL can read the feed —
        treat it like a password, and regenerate it if it leaks.</p>
     {% if calendar_url %}
-    <p><code style="word-break:break-all;">{{ calendar_url }}</code></p>
-    <p style="color:#6b7280; font-size:0.9em;">
+    <p><code class="break-all">{{ calendar_url }}</code></p>
+    <p class="text-muted text-sm">
         Options (append to the URL): <code>?scope=mine</code> — only assets you own;
         <code>?alarm=14</code> — reminder 14 days before (default 7; <code>?alarm=0</code> to
         turn reminders off). Combine with <code>&amp;</code>.
     </p>
-    <form method="post" action="/settings/calendar/enable" style="display:inline;">
-        {% include "partials/csrf.html" %}
-        <button type="submit" class="btn">Regenerate URL</button>
-    </form>
-    <form method="post" action="/settings/calendar/disable" style="display:inline;">
-        {% include "partials/csrf.html" %}
-        <button type="submit" class="btn btn-danger">Disable feed</button>
-    </form>
+    <div class="btn-group">
+        <form class="inline" method="post" action="/settings/calendar/enable">
+            {% include "partials/csrf.html" %}
+            <button type="submit" class="btn">Regenerate URL</button>
+        </form>
+        <form class="inline" method="post" action="/settings/calendar/disable">
+            {% include "partials/csrf.html" %}
+            <button type="submit" class="btn btn-danger">Disable feed</button>
+        </form>
+    </div>
     {% else %}
     <form method="post" action="/settings/calendar/enable">
         {% include "partials/csrf.html" %}
-        <button type="submit" class="btn">Generate feed URL</button>
+        <button type="submit" class="btn btn-primary">Generate feed URL</button>
     </form>
     {% endif %}
 </div>
 
-<div class="card" style="margin-top:1.5rem;">
-    <h3>Active sessions</h3>
-    <p style="color:#6b7280;">Each browser sign-in creates a session. Revoke any you don't recognize.</p>
+<div class="card mt-3">
+    <h2>Active sessions</h2>
+    <p class="text-muted">Each browser sign-in creates a session. Revoke any you don't recognize.</p>
     {% if sessions %}
     <table class="table">
         <thead>
             <tr>
-                <th>Started</th>
-                <th>Last active</th>
+                <th class="date">Started</th>
+                <th class="date">Last active</th>
                 <th>User agent</th>
-                <th></th>
+                <th class="actions-cell"></th>
             </tr>
         </thead>
         <tbody>
         {% for s in sessions %}
             <tr>
-                <td>{{ s.created_at.strftime('%Y-%m-%d %H:%M UTC') }}</td>
-                <td>{{ s.last_active.strftime('%Y-%m-%d %H:%M UTC') }}</td>
-                <td style="font-size:0.85em;color:#6b7280;">
+                <td class="date">{{ s.created_at.strftime('%Y-%m-%d %H:%M UTC') }}</td>
+                <td class="date">{{ s.last_active.strftime('%Y-%m-%d %H:%M UTC') }}</td>
+                <td class="text-muted text-sm">
                     {{ (s.user_agent or '')[:80] }}
                     {% if s.session_id == current_session_id %}
                     <strong>(this session)</strong>
                     {% endif %}
                 </td>
-                <td>
-                    <form method="post" action="/settings/sessions/{{ s.session_id }}/revoke" style="display:inline;">
-                        {% include "partials/csrf.html" %}
-                        <button type="submit" class="btn">Revoke</button>
-                    </form>
+                <td class="actions-cell">
+                    <div class="btn-group">
+                        <form class="inline" method="post" action="/settings/sessions/{{ s.session_id }}/revoke">
+                            {% include "partials/csrf.html" %}
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Revoke</button>
+                        </form>
+                    </div>
                 </td>
             </tr>
         {% endfor %}
         </tbody>
     </table>
     {% else %}
-    <p>No active sessions.</p>
+    <p class="text-muted">No active sessions.</p>
     {% endif %}
 </div>
 {% endblock %}

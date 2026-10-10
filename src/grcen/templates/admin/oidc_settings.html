@@ -6,26 +6,24 @@
     <h1>SSO Settings</h1>
 </div>
 
-<div class="tab-bar" style="display:flex; gap:0; margin-bottom:1.5rem; border-bottom:2px solid #e5e7eb;">
-    <a href="/admin/oidc-settings" class="tab active"
-       style="padding:0.5rem 1.25rem; font-weight:600; border-bottom:2px solid #2563eb; margin-bottom:-2px; color:#2563eb; text-decoration:none;">OIDC</a>
-    <a href="/admin/saml-settings" class="tab"
-       style="padding:0.5rem 1.25rem; color:#6b7280; text-decoration:none;">SAML 2.0</a>
-</div>
+<nav class="tabs" aria-label="SSO protocol">
+    <a href="/admin/oidc-settings" class="tab active" aria-current="page">OIDC</a>
+    <a href="/admin/saml-settings" class="tab">SAML 2.0</a>
+</nav>
 
 {% if oidc.enabled %}
-<div class="alert" style="background:#dcfce7; color:#166534; border:1px solid #bbf7d0;">
+<div class="alert alert-success" role="status">
     SSO is <strong>enabled</strong>. The login page shows a "Sign in with {{ oidc.display_name }}" button.
 </div>
 {% else %}
-<div class="alert" style="background:#fef3c7; color:#92400e; border:1px solid #fde68a;">
+<div class="alert alert-warning" role="status">
     SSO is <strong>disabled</strong>. Fill in the Issuer URL, Client ID, and Client Secret to enable it.
 </div>
 {% endif %}
 
 <form method="post" action="/admin/oidc-settings" class="card">
     {% include "partials/csrf.html" %}
-    <h3>Provider</h3>
+    <h2 class="mt-0">Provider</h2>
     <div class="form-group">
         <label for="issuer_url">Issuer URL</label>
         <input type="url" id="issuer_url" name="issuer_url" value="{{ oidc.issuer_url }}"
@@ -53,7 +51,7 @@
         <small>Shown as "Sign in with ..."</small>
     </div>
 
-    <h3 style="margin-top:2rem;">Role Mapping</h3>
+    <h2 class="mt-4">Role Mapping</h2>
     <div class="form-group">
         <label for="role_claim">Role Claim Path</label>
         <input type="text" id="role_claim" name="role_claim" value="{{ oidc.role_claim }}"

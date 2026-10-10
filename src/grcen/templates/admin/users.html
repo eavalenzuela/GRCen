@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros.html" import badge, empty_state %}
 {% block title %}User Management - GRCen{% endblock %}
 {% block content %}
 <div class="page-header">
@@ -10,15 +11,17 @@
     </div>
 </div>
 
-<table>
+{% if users %}
+<div class="table-wrap">
+<table class="table">
     <thead>
         <tr>
             <th>Username</th>
             <th>Role</th>
             <th>Auth</th>
             <th>Active</th>
-            <th>Created</th>
-            <th>Updated</th>
+            <th class="date">Created</th>
+            <th class="date">Updated</th>
             <th></th>
         </tr>
     </thead>
@@ -26,29 +29,35 @@
         {% for u in users %}
         <tr>
             <td>{{ u.username }}{% if u.email %} <small>({{ u.email }})</small>{% endif %}</td>
-            <td><span class="badge">{{ u.role.value | title }}</span></td>
+            <td>{{ badge(u.role.value, 'outline') }}</td>
             <td>{{ "SSO" if u.is_sso else "Local" }}</td>
-            <td>{{ "Yes" if u.is_active else "No" }}</td>
-            <td>{{ u.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
-            <td>{{ u.updated_at.strftime('%Y-%m-%d %H:%M') }}</td>
-            <td>
-                <a href="/admin/users/{{ u.id }}/edit" class="btn btn-sm">Edit</a>
-                {% if u.id != user.id %}
-                <form method="post" action="/admin/users/{{ u.id }}/toggle-active" style="display:inline">
-                    {% include "partials/csrf.html" %}
-                    <button type="submit" class="btn btn-sm">
-                        {{ "Deactivate" if u.is_active else "Activate" }}
-                    </button>
-                </form>
-                <form method="post" action="/admin/users/{{ u.id }}/delete" style="display:inline"
-                      data-confirm="Delete user {{ u.username }}?">
-                    {% include "partials/csrf.html" %}
-                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
-                </form>
-                {% endif %}
+            <td>{{ badge('active' if u.is_active else 'inactive') }}</td>
+            <td class="date">{{ u.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+            <td class="date">{{ u.updated_at.strftime('%Y-%m-%d %H:%M') }}</td>
+            <td class="actions-cell">
+                <div class="btn-group">
+                    <a href="/admin/users/{{ u.id }}/edit" class="btn btn-sm">Edit</a>
+                    {% if u.id != user.id %}
+                    <form class="inline" method="post" action="/admin/users/{{ u.id }}/toggle-active">
+                        {% include "partials/csrf.html" %}
+                        <button type="submit" class="btn btn-sm">
+                            {{ "Deactivate" if u.is_active else "Activate" }}
+                        </button>
+                    </form>
+                    <form class="inline" method="post" action="/admin/users/{{ u.id }}/delete"
+                          data-confirm="Delete user {{ u.username }}?">
+                        {% include "partials/csrf.html" %}
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                    </form>
+                    {% endif %}
+                </div>
             </td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
+</div>
+{% else %}
+{{ empty_state("No users in this organization yet.", "/admin/users/new", "New User") }}
+{% endif %}
 {% endblock %}

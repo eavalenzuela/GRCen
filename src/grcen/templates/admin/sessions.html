@@ -1,22 +1,23 @@
 {% extends "base.html" %}
+{% from "macros.html" import flash_banner, empty_state %}
 {% block title %}Active Sessions - GRCen{% endblock %}
 
 {% block content %}
-<h1>Active Sessions</h1>
-<p>Every active session in this organization. Revoking signs the user out
-   of that browser at their next request.</p>
+<div class="page-header">
+    <h1>Active Sessions</h1>
+    <p class="page-intro">Every active session in this organization. Revoking signs the user out
+       of that browser at their next request.</p>
+</div>
 
-{% if flash %}
-<div class="callout" style="background:{{ '#e0f2fe' if flash.ok else '#fee2e2' }};padding:0.75rem;margin:0 0 1rem 0;">{{ flash.message }}</div>
-{% endif %}
+{{ flash_banner(flash) }}
 
 {% if sessions %}
 <table class="table">
     <thead>
         <tr>
             <th>User</th>
-            <th>Started</th>
-            <th>Last active</th>
+            <th class="date">Started</th>
+            <th class="date">Last active</th>
             <th>User agent</th>
             <th></th>
         </tr>
@@ -25,21 +26,23 @@
     {% for s in sessions %}
         <tr>
             <td>{{ s.username }}</td>
-            <td>{{ s.created_at.strftime('%Y-%m-%d %H:%M UTC') }}</td>
-            <td>{{ s.last_active.strftime('%Y-%m-%d %H:%M UTC') }}</td>
-            <td style="font-size:0.85em;color:#6b7280;">{{ (s.user_agent or '')[:80] }}</td>
-            <td>
-                <form method="post" action="/admin/sessions/{{ s.session_id }}/revoke" style="display:inline;"
-                      data-confirm="Revoke this session?">
-                    {% include "partials/csrf.html" %}
-                    <button type="submit" class="btn btn-danger">Revoke</button>
-                </form>
+            <td class="date">{{ s.created_at.strftime('%Y-%m-%d %H:%M UTC') }}</td>
+            <td class="date">{{ s.last_active.strftime('%Y-%m-%d %H:%M UTC') }}</td>
+            <td class="text-muted text-sm">{{ (s.user_agent or '')[:80] }}</td>
+            <td class="actions-cell">
+                <div class="btn-group">
+                    <form class="inline" method="post" action="/admin/sessions/{{ s.session_id }}/revoke"
+                          data-confirm="Revoke this session?">
+                        {% include "partials/csrf.html" %}
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Revoke</button>
+                    </form>
+                </div>
             </td>
         </tr>
     {% endfor %}
     </tbody>
 </table>
 {% else %}
-<p>No active sessions.</p>
+{{ empty_state("No active sessions.") }}
 {% endif %}
 {% endblock %}

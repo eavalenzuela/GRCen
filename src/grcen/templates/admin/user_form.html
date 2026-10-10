@@ -1,15 +1,16 @@
 {% extends "base.html" %}
 {% block title %}{{ "Edit User" if edit_user else "New User" }} - GRCen{% endblock %}
 {% block content %}
+<div class="breadcrumb"><span><a href="/admin/users">Users</a></span><span>{{ "Edit User" if edit_user else "New User" }}</span></div>
 <div class="page-header">
     <h1>{{ "Edit User" if edit_user else "New User" }}</h1>
 </div>
 
 {% if error %}
-<div class="alert alert-danger">{{ error }}</div>
+<div class="alert alert-error" role="alert">{{ error }}</div>
 {% endif %}
 
-<form method="post" action="{{ '/admin/users/' ~ edit_user.id ~ '/edit' if edit_user else '/admin/users/new' }}">
+<form method="post" action="{{ '/admin/users/' ~ edit_user.id ~ '/edit' if edit_user else '/admin/users/new' }}" class="card">
     {% include "partials/csrf.html" %}
     <div class="form-group">
         <label for="username">Username</label>
@@ -23,8 +24,8 @@
 
     {% if edit_user and edit_user.is_sso %}
     <div class="form-group">
-        <label>Password</label>
-        <input type="text" disabled value="Managed by SSO provider" style="opacity:0.6">
+        <label for="password_sso">Password</label>
+        <input type="text" id="password_sso" class="text-muted" disabled value="Managed by SSO provider">
     </div>
     {% else %}
     <div class="form-group">

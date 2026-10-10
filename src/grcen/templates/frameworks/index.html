@@ -1,10 +1,11 @@
 {% extends "base.html" %}
+{% from "macros.html" import badge, empty_state %}
 {% block title %}Frameworks - GRCen{% endblock %}
 
 {% macro covspark(values) %}
     {% if values and values | length > 1 %}
     {% set w = 60 %}{% set h = 16 %}{% set n = values | length %}
-    <svg width="{{ w }}" height="{{ h }}" style="vertical-align:middle;" viewBox="0 0 {{ w }} {{ h }}" preserveAspectRatio="none">
+    <svg class="va-middle" width="{{ w }}" height="{{ h }}" viewBox="0 0 {{ w }} {{ h }}" preserveAspectRatio="none">
         <polyline fill="none" stroke="#2563eb" stroke-width="1.5"
             points="{% for v in values %}{{ (loop.index0 / (n - 1) * w) | round(1) }},{{ (h - (v / 100 * h)) | round(1) }} {% endfor %}" />
     </svg>
@@ -17,19 +18,15 @@
 </div>
 
 {% if drift %}
-<div class="alert" style="padding:0.6rem 0.9rem;border-radius:6px;margin-bottom:1rem;background:#fee2e2;color:#991b1b;">
+<div class="alert alert-error" role="alert">
     <strong>Coverage drift:</strong>
     {% for d in drift %}{{ d.framework_name }} {{ d.from_pct }}%→{{ d.to_pct }}%{% if not loop.last %}; {% endif %}{% endfor %}
 </div>
 {% endif %}
 
 {% if not frameworks %}
-<div class="card">
-    <p style="color:#6b7280;">
-        No frameworks yet. Create an asset of type <code>framework</code> and link requirements to it with
-        <code>parent_of</code> relationships to see them here.
-    </p>
-</div>
+{{ empty_state('No frameworks yet. Create an asset of type <code>framework</code> and link requirements to it with <code>parent_of</code> relationships to see them here.' | safe,
+               cta_href='/assets/new?type=framework', cta_label='Create framework') }}
 {% else %}
 <div class="card">
     <table class="table">
@@ -38,7 +35,7 @@
                 <th>Framework</th>
                 <th>Certification</th>
                 <th style="width:35%;">Coverage</th>
-                <th style="text-align:right;">Requirements</th>
+                <th class="num">Requirements</th>
             </tr>
         </thead>
         <tbody>
@@ -47,16 +44,12 @@
                 <td>
                     <a href="/frameworks/{{ fw.id }}">{{ fw.name }}</a>
                     {% if fw.metadata.get('version') %}
-                    <span style="color:#6b7280;"> — {{ fw.metadata.version }}</span>
+                    <span class="text-muted"> — {{ fw.metadata.version }}</span>
                     {% endif %}
                 </td>
                 <td>
                     {% set cs = fw.metadata.get('certification_status') %}
-                    {% if cs == 'certified' %}<span style="color:#166534;">certified</span>
-                    {% elif cs == 'in_progress' %}<span style="color:#92400e;">in progress</span>
-                    {% elif cs == 'not_started' %}<span style="color:#991b1b;">not started</span>
-                    {% elif cs %}{{ cs }}
-                    {% else %}—{% endif %}
+                    {% if cs %}{{ badge(cs) }}{% else %}<span class="text-faint">—</span>{% endif %}
                 </td>
                 <td>
                     <div style="background:#e5e7eb; border-radius:4px; height:10px; position:relative; overflow:hidden;">
@@ -69,20 +62,20 @@
                     </div>
                     <small>{{ fw.coverage_percent }}% ({{ fw.satisfied_count }}/{{ fw.requirement_count }})
                         {% if fw.borrowed_count %}
-                        <span style="color:#1d4ed8;">· ↔ {{ fw.effective_coverage_percent }}% incl. {{ fw.borrowed_count }} via crosswalk</span>
+                        <span class="text-primary">· ↔ {{ fw.effective_coverage_percent }}% incl. {{ fw.borrowed_count }} via crosswalk</span>
                         {% endif %}
                         {% if fw.weak_count %}
-                        <span style="color:#b45309;" title="Coverage weighted by control effectiveness">· ⚠ {{ fw.health_adjusted_coverage_percent }}% health-adj ({{ fw.weak_count }} weak)</span>
+                        <span class="text-warning" title="Coverage weighted by control effectiveness">· ⚠ {{ fw.health_adjusted_coverage_percent }}% health-adj ({{ fw.weak_count }} weak)</span>
                         {% endif %}
                         {% set t = trends.get(fw.id | string) if trends else None %}
                         {% if t and t.delta is not none and t.delta != 0 %}
-                        <span style="color:{{ '#16a34a' if t.delta > 0 else '#dc2626' }};"
+                        <span class="{{ 'text-success' if t.delta > 0 else 'text-danger' }}"
                               title="vs. last snapshot">{{ '▲' if t.delta > 0 else '▼' }}{{ t.delta | abs }}%</span>
                         {% endif %}
                     </small>
                     {% if t and t.sparkline %}<div>{{ covspark(t.sparkline) }}</div>{% endif %}
                 </td>
-                <td style="text-align:right;">{{ fw.requirement_count }}</td>
+                <td class="num">{{ fw.requirement_count }}</td>
             </tr>
         {% endfor %}
         </tbody>
@@ -90,33 +83,34 @@
 </div>
 
 {% if matrix and matrix.total %}
-<div class="card" style="margin-top:1.5rem;">
-    <h3 style="margin-top:0;">Cross-framework crosswalks
-        <small style="color:#6b7280; font-weight:normal;">— {{ matrix.total }} equivalence/overlap mappings</small>
-    </h3>
-    <p style="color:#6b7280; font-size:0.85rem; margin-top:0;">
+<div class="card mt-3">
+    <h2 class="mt-0">Cross-framework crosswalks
+        <small class="text-muted fw-normal">— {{ matrix.total }} equivalence/overlap mappings</small>
+    </h2>
+    <p class="text-muted text-sm mt-0">
         How many requirements each pair of frameworks cross-maps (all relationship types).
         The <em>equivalent</em> subset is what lets a satisfied requirement lend coverage to
         its gap counterpart in another framework.
     </p>
+    <div class="table-wrap">
     <table class="table">
         <thead>
             <tr>
                 <th></th>
-                {% for c in matrix.frameworks %}<th style="text-align:center;">{{ c.name }}</th>{% endfor %}
+                {% for c in matrix.frameworks %}<th class="text-center">{{ c.name }}</th>{% endfor %}
             </tr>
         </thead>
         <tbody>
         {% for rfw in matrix.frameworks %}
             <tr>
-                <th style="text-align:left;">{{ rfw.name }}</th>
+                <th scope="row">{{ rfw.name }}</th>
                 {% for cfw in matrix.frameworks %}
                     {% if rfw.id == cfw.id %}
-                    <td style="text-align:center; color:#d1d5db;">—</td>
+                    <td class="text-center text-faint">—</td>
                     {% else %}
                     {% set n = matrix.matrix[rfw.id].get(cfw.id, 0) %}
-                    <td style="text-align:center;">
-                        {% if n %}<b>{{ n }}</b>{% else %}<span style="color:#d1d5db;">0</span>{% endif %}
+                    <td class="text-center">
+                        {% if n %}<b>{{ n }}</b>{% else %}<span class="text-faint">0</span>{% endif %}
                     </td>
                     {% endif %}
                 {% endfor %}
@@ -124,6 +118,7 @@
         {% endfor %}
         </tbody>
     </table>
+    </div>
 </div>
 {% endif %}
 {% endif %}

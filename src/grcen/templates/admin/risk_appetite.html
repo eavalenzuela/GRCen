@@ -1,22 +1,19 @@
 {% extends "base.html" %}
+{% from "macros.html" import flash_banner %}
 {% block title %}Risk Appetite - GRCen{% endblock %}
 
 {% block content %}
 <div class="page-header">
     <h1>Risk Appetite</h1>
-    <p style="color:#374151;">Define the residual risk score (1–25) the org will hold.
-    A risk above <strong>max</strong> is <span style="color:#991b1b;">out of appetite</span>;
-    above <strong>warn</strong> it is <span style="color:#b45309;">near</span>. The
+    <p class="page-intro">Define the residual risk score (1–25) the org will hold.
+    A risk above <strong>max</strong> is <span class="text-danger">out of appetite</span>;
+    above <strong>warn</strong> it is <span class="text-warning">near</span>. The
     <code>(default)</code> band applies to risks without a category-specific band.</p>
 </div>
 
-{% if flash %}
-<div class="alert" style="padding:0.6rem 0.9rem;border-radius:6px;margin-bottom:1rem;
-     background:{% if flash.ok %}#dcfce7;color:#166534;{% else %}#fee2e2;color:#991b1b;{% endif %}">{{ flash.message }}</div>
-{% endif %}
+{{ flash_banner(flash) }}
 
-<div class="alert" style="padding:0.6rem 0.9rem;border-radius:6px;margin-bottom:1rem;
-     background:{% if summary.out %}#fee2e2;color:#991b1b;{% else %}#dcfce7;color:#166534;{% endif %}">
+<div class="alert alert-{{ 'error' if summary.out else 'success' }}" role="status">
     <strong>{{ summary.out }}</strong> risk{{ 's' if summary.out != 1 else '' }} out of appetite
     · {{ summary.near }} near.
     {% if summary.out_risks %}
@@ -25,25 +22,27 @@
 </div>
 
 <div class="card">
-    <h3>Current bands</h3>
+    <h2>Current bands</h2>
     <table class="table">
-        <thead><tr><th>Category</th><th>Warn &gt;</th><th>Max &gt;</th><th></th></tr></thead>
+        <thead><tr><th>Category</th><th class="num">Warn &gt;</th><th class="num">Max &gt;</th><th></th></tr></thead>
         <tbody>
         {% if not appetite %}
-        <tr><td colspan="4" style="color:#6b7280;">No bands set — risks aren't evaluated yet.</td></tr>
+        <tr><td class="text-muted" colspan="4">No bands set — risks aren't evaluated yet.</td></tr>
         {% endif %}
         {% for cat, band in appetite.items() %}
         <tr>
             <td>{{ cat or '(default)' }}</td>
-            <td>{{ band.warn_score }}</td>
-            <td>{{ band.max_score }}</td>
-            <td>
-                <form method="post" action="/admin/risk-appetite" style="display:inline;">
-                    {% include "partials/csrf.html" %}
-                    <input type="hidden" name="action" value="delete">
-                    <input type="hidden" name="risk_category" value="{{ cat }}">
-                    <button type="submit" class="btn btn-sm" style="color:#991b1b;">Remove</button>
-                </form>
+            <td class="num">{{ band.warn_score }}</td>
+            <td class="num">{{ band.max_score }}</td>
+            <td class="actions-cell">
+                <div class="btn-group">
+                    <form class="inline" method="post" action="/admin/risk-appetite">
+                        {% include "partials/csrf.html" %}
+                        <input type="hidden" name="action" value="delete">
+                        <input type="hidden" name="risk_category" value="{{ cat }}">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                    </form>
+                </div>
             </td>
         </tr>
         {% endfor %}
@@ -53,17 +52,23 @@
 
 <form method="post" action="/admin/risk-appetite" class="card">
     {% include "partials/csrf.html" %}
-    <h3>Set a band</h3>
-    <div style="display:flex;gap:1rem;align-items:end;flex-wrap:wrap;">
-        <div>
-            <label>Category</label><br>
-            <select name="risk_category">
+    <h2>Set a band</h2>
+    <div class="form-inline">
+        <div class="form-group">
+            <label for="risk_category">Category</label>
+            <select id="risk_category" name="risk_category">
                 <option value="">(default)</option>
                 {% for c in categories %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
             </select>
         </div>
-        <div><label>Warn &gt;</label><br><input type="number" name="warn_score" min="1" max="25" value="6" style="width:5rem;"></div>
-        <div><label>Max &gt;</label><br><input type="number" name="max_score" min="1" max="25" value="12" style="width:5rem;"></div>
+        <div class="form-group">
+            <label for="warn_score">Warn &gt;</label>
+            <input class="w-xs" type="number" id="warn_score" name="warn_score" min="1" max="25" value="6">
+        </div>
+        <div class="form-group">
+            <label for="max_score">Max &gt;</label>
+            <input class="w-xs" type="number" id="max_score" name="max_score" min="1" max="25" value="12">
+        </div>
         <button type="submit" class="btn btn-primary">Save band</button>
     </div>
 </form>

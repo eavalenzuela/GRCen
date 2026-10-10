@@ -150,7 +150,7 @@ async def notification_count(
 ):
     count = await alert_svc.count_unread_notifications(pool, organization_id=user.organization_id, user_id=user.id)
     if count:
-        return HTMLResponse(f"({count})")
+        return HTMLResponse(str(count))
     return HTMLResponse("")
 
 

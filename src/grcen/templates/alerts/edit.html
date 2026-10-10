@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-header">
     <h1>Edit alert</h1>
-    <div class="actions"><a href="/alerts" class="btn">← All alerts</a></div>
+    <div class="actions"><a href="/alerts" class="btn btn-link">← All alerts</a></div>
 </div>
 {% with form=form, errors=errors, asset_name=asset_name, action="/alerts/" ~ alert_id ~ "/edit", submit_label="Save changes" %}
 {% include "alerts/_form.html" %}

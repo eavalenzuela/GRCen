@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}GRCen{% endblock %}</title>
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="/static/css/style.css">
     <script src="/static/js/htmx.min.js"></script>
     <script src="/static/js/app.js"></script>
@@ -46,13 +47,12 @@
             <a href="/my-work">My Work</a>
             <a href="/notifications" class="notif-link">
                 Notifications
-                <span id="notif-badge"
+                <span id="notif-badge" class="badge badge-primary nav-count"
+                      aria-label="unread notifications"
                       hx-get="/api/alerts/notifications/count"
                       hx-trigger="load, every 60s, notif-changed from:body"
                       hx-swap="innerHTML"
-                      hx-target="#notif-badge">
-                    {% if notif_count %}({{ notif_count }}){% endif %}
-                </span>
+                      hx-target="#notif-badge">{% if notif_count %}{{ notif_count }}{% endif %}</span>
             </a>
             <span class="nav-separator"></span>
             <a href="/settings">Settings</a>

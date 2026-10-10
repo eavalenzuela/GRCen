@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros.html" import badge, empty_state, flash_banner %}
 {% block title %}Control Library - GRCen{% endblock %}
 
 {% macro spark(results) %}
@@ -7,30 +8,29 @@
 {% endmacro %}
 
 {% block content %}
-<div style="display:flex;justify-content:space-between;align-items:center;">
+<div class="page-header">
     <h1>Control Library</h1>
     {% if has_perm(user.role, Permission.EXPORT) %}
-    <a href="/controls/export.csv" class="btn btn-sm">Export CSV</a>
+    <div class="actions">
+        <a href="/controls/export.csv" class="btn btn-sm">Export CSV</a>
+    </div>
     {% endif %}
+    <p class="page-intro">Every control asset, the requirements it covers, and its test history — the
+       inverse of the per-framework gap view. Recording a test result rolls the
+       control's <em>effectiveness</em> and <em>next test due</em> forward.</p>
 </div>
-<p>Every control asset, the requirements it covers, and its test history — the
-   inverse of the per-framework gap view. Recording a test result rolls the
-   control's <em>effectiveness</em> and <em>next test due</em> forward.</p>
 
-{% if flash %}
-<div class="alert" style="padding:0.6rem 0.9rem;border-radius:6px;margin-bottom:1rem;
-     background:{% if flash.ok %}#dcfce7;color:#166534;{% else %}#fee2e2;color:#991b1b;{% endif %}">{{ flash.message }}</div>
-{% endif %}
+{{ flash_banner(flash) }}
 
 {% if overdue_count %}
-<div class="alert" style="padding:0.6rem 0.9rem;border-radius:6px;margin-bottom:1rem;background:#fef3c7;color:#92400e;">
+<div class="alert alert-warning" role="status">
     <strong>{{ overdue_count }}</strong> control{{ 's' if overdue_count != 1 else '' }}
     overdue for testing (past due date or never tested).
 </div>
 {% endif %}
 
 {% if not controls %}
-<p>No controls defined yet.</p>
+{{ empty_state('No controls defined yet.', cta_href='/assets/new?type=control', cta_label='Create control') }}
 {% else %}
 <table class="table">
     <thead>
@@ -49,48 +49,48 @@
             <td>
                 <a href="/assets/{{ c.id }}">{{ c.name }}</a>
                 {% if c.metadata.effectiveness %}
-                <small style="color:#6b7280;">({{ c.metadata.effectiveness | replace('_', ' ') }})</small>
+                {{ badge(c.metadata.effectiveness) }}
                 {% endif %}
             </td>
             <td>
                 {% if c.requirements %}
-                <ul style="margin:0;padding-left:1.25rem;">
+                <ul class="list-tight">
                 {% for r in c.requirements %}
                     <li><a href="/assets/{{ r.id }}">{{ r.name }}</a></li>
                 {% endfor %}
                 </ul>
                 {% else %}
-                <em style="color:#b91c1c;">none</em>
+                <em class="text-danger">none</em>
                 {% endif %}
             </td>
             <td>
                 {% set frameworks = c.requirements | map(attribute='framework_name') | reject('none') | unique | list %}
-                {% if frameworks %}{{ frameworks | join(', ') }}{% else %}<em style="color:#6b7280;">—</em>{% endif %}
+                {% if frameworks %}{{ frameworks | join(', ') }}{% else %}<em class="text-muted">—</em>{% endif %}
             </td>
-            <td style="white-space:nowrap;">
+            <td class="nowrap">
                 {{ spark(sparklines.get(c.id | string, [])) }}
                 <div>
-                    <small style="color:#6b7280;">tested {{ c.metadata.get('last_tested', 'never') }}</small>
+                    <small class="text-muted">tested {{ c.metadata.get('last_tested', 'never') }}</small>
                 </div>
                 <div>
                     {% set nd = c.metadata.get('next_test_due') %}
                     {% if is_overdue %}
-                    <small style="color:#b91c1c;">⚠ due {{ nd or '—' }}</small>
+                    <small class="text-danger">⚠ due {{ nd or '—' }}</small>
                     {% elif nd %}
-                    <small style="color:#6b7280;">due {{ nd }}</small>
+                    <small class="text-muted">due {{ nd }}</small>
                     {% endif %}
                 </div>
             </td>
-            <td>
+            <td class="actions-cell">
                 {% if has_perm(user.role, Permission.EDIT) %}
-                <form method="post" action="/controls/{{ c.id }}/test" style="display:flex;gap:0.25rem;align-items:center;">
+                <form method="post" action="/controls/{{ c.id }}/test" class="flex">
                     {% include "partials/csrf.html" %}
-                    <select name="result" style="padding:0.2rem;">
+                    <select name="result" class="w-auto" aria-label="Test result">
                         <option value="pass">pass</option>
                         <option value="partial">partial</option>
                         <option value="fail">fail</option>
                     </select>
-                    <button type="submit" class="btn btn-sm">Record</button>
+                    <button type="submit" class="btn btn-sm btn-primary">Record</button>
                 </form>
                 {% endif %}
             </td>

@@ -49,7 +49,13 @@ async def switch_organization(
     if not is_member and not user.is_superadmin:
         return RedirectResponse("/settings?flash=fail:You are not a member of that org", status_code=302)
     request.session["active_org_id"] = str(target_uuid)
-    return RedirectResponse("/?", status_code=302)
+    from grcen.routers.deps import invalidate_nav_cache
+    invalidate_nav_cache(user_id=user.id)
+    # Stay on the page the switch was made from when it is a safe local path.
+    nxt = str(form.get("next", "")).strip()
+    if not nxt.startswith("/") or nxt.startswith("//"):
+        nxt = "/"
+    return RedirectResponse(nxt, status_code=302)
 
 
 @router.get("/settings", response_class=HTMLResponse)

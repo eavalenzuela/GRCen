@@ -1,5 +1,6 @@
 {# Alert create/edit form. Expects: form (dict of current values), errors (dict),
    asset_name (str or None), action (POST url), submit_label. #}
+{% from "macros.html" import field_error %}
 <form method="post" action="{{ action }}" class="card alert-form">
     {% include "partials/csrf.html" %}
     {% if errors.get('_') %}<div class="alert alert-error" role="alert">{{ errors['_'] }}</div>{% endif %}
@@ -7,7 +8,7 @@
     <div class="form-group">
         <label for="alert_title">Title</label>
         <input type="text" id="alert_title" name="title" required maxlength="255" value="{{ form.title or '' }}">
-        {% if errors.get('title') %}<small class="field-error">{{ errors['title'] }}</small>{% endif %}
+        {{ field_error(errors, 'title') }}
     </div>
 
     <div class="form-group" data-asset-picker>
@@ -17,7 +18,7 @@
         <input type="hidden" name="asset_id" value="{{ form.asset_id or '' }}">
         <div class="autocomplete-results"></div>
         <small id="alert_asset_hint">The alert fires for this asset and notifies its owner.</small>
-        {% if errors.get('asset_id') %}<small class="field-error">{{ errors['asset_id'] }}</small>{% endif %}
+        {{ field_error(errors, 'asset_id') }}
     </div>
 
     <div class="form-group">
@@ -35,20 +36,20 @@
             <input type="radio" name="schedule_type" value="recurring" {% if form.schedule_type == 'recurring' %}checked{% endif %}>
             Recurring, on a cron schedule
         </label>
-        {% if errors.get('schedule_type') %}<small class="field-error">{{ errors['schedule_type'] }}</small>{% endif %}
+        {{ field_error(errors, 'schedule_type') }}
     </fieldset>
 
     <div class="form-group">
         <label for="alert_next_fire_at">Fire at <small>(UTC; required for one-time alerts)</small></label>
         <input type="datetime-local" id="alert_next_fire_at" name="next_fire_at" value="{{ form.next_fire_at or '' }}">
-        {% if errors.get('next_fire_at') %}<small class="field-error">{{ errors['next_fire_at'] }}</small>{% endif %}
+        {{ field_error(errors, 'next_fire_at') }}
     </div>
 
     <div class="form-group">
         <label for="alert_cron">Cron expression <small>(required for recurring alerts, e.g. <code>0 9 * * 1</code> = Mondays 09:00 UTC)</small></label>
         <input type="text" id="alert_cron" name="cron_expression" maxlength="100" value="{{ form.cron_expression or '' }}"
                placeholder="minute hour day-of-month month day-of-week">
-        {% if errors.get('cron_expression') %}<small class="field-error">{{ errors['cron_expression'] }}</small>{% endif %}
+        {{ field_error(errors, 'cron_expression') }}
     </div>
 
     <div class="form-group">

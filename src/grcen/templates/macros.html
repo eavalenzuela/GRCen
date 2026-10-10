@@ -1,0 +1,76 @@
+{# Shared UI macros. Import with:  {% from "macros.html" import badge, empty_state, field_error, sort_th, pagination, flash_banner %}
+
+   badge(text, tone)        → <span class="badge badge-<tone>">text</span>; tone ∈ success|warning|danger|high|info|neutral|primary|outline.
+                              With no tone the text is mapped by STATUS_TONES (active→success, draft→warning, …).
+   empty_state(message, cta_href=None, cta_label=None, heading=None)
+   field_error(errors, name)  → inline error for a form field (errors is a dict).
+   sort_th(label, col, current_sort, current_order, base, params, cls='')
+                              → sortable <th> with aria-sort; `base` is the path, `params` the other query params (string, no leading &).
+   pagination(page, pages, base, params, total=None, page_size=None)
+                              → <nav> with Prev/Next, a windowed page list and an "x–y of N" summary.
+   flash_banner(flash)       → renders a legacy {ok, message} dict as an .alert (transitional; new code uses flash()).
+#}
+
+{% set STATUS_TONES = {
+    'active': 'success', 'enabled': 'success', 'pass': 'success', 'passed': 'success', 'satisfied': 'success',
+    'approved': 'success', 'accepted': 'success', 'installed': 'success', 'effective': 'success', 'current': 'success',
+    'on_track': 'success', 'completed': 'success', 'closed': 'neutral', 'remediated': 'success', 'certified': 'success',
+    'draft': 'warning', 'pending': 'warning', 'pending_approval': 'warning', 'in_progress': 'warning', 'partial': 'warning',
+    'due_soon': 'warning', 'needs_review': 'warning', 'weak': 'warning', 'sent': 'info', 'submitted': 'info',
+    'inactive': 'danger', 'disabled': 'danger', 'fail': 'danger', 'failed': 'danger', 'rejected': 'danger', 'gap': 'danger',
+    'overdue': 'danger', 'revoked': 'danger', 'expired': 'danger', 'open': 'danger', 'not_started': 'danger', 'critical': 'danger',
+    'archived': 'neutral', 'withdrawn': 'neutral', 'unknown': 'neutral', 'never': 'neutral', 'not_applicable': 'neutral',
+    'high': 'high', 'medium': 'warning', 'low': 'success', 'via_crosswalk': 'info', 'covered_via_crosswalk': 'info',
+} %}
+
+{% macro badge(text, tone=None, title=None) -%}
+{%- set key = (text or '') | string | lower | replace(' ', '_') -%}
+{%- set t = tone or STATUS_TONES.get(key, 'neutral') -%}
+<span class="badge badge-{{ t }}"{% if title %} title="{{ title }}"{% endif %}>{{ (text or '—') | string | replace('_', ' ') | capitalize }}</span>
+{%- endmacro %}
+
+{% macro empty_state(message, cta_href=None, cta_label=None, heading=None) -%}
+<div class="empty-state">
+    {% if heading %}<p><strong>{{ heading }}</strong></p>{% endif %}
+    <p>{{ message }}</p>
+    {% if cta_href and cta_label %}<a class="btn btn-primary" href="{{ cta_href }}">{{ cta_label }}</a>{% endif %}
+</div>
+{%- endmacro %}
+
+{% macro field_error(errors, name) -%}
+{%- if errors and errors.get(name) %}<small class="field-error" id="err-{{ name }}">{{ errors[name] }}</small>{% endif -%}
+{%- endmacro %}
+
+{% macro sort_th(label, col, current_sort, current_order, base, params='', cls='') -%}
+{%- set active = (current_sort == col) -%}
+{%- set next_order = 'desc' if (active and current_order == 'asc') else 'asc' -%}
+<th class="{{ cls }}"{% if active %} aria-sort="{{ 'ascending' if current_order == 'asc' else 'descending' }}"{% endif %}>
+    <a class="sort-link" href="{{ base }}?sort={{ col }}&order={{ next_order }}{% if params %}&{{ params }}{% endif %}">{{ label }}{% if active %}<span class="sort-arrow" aria-hidden="true">{{ '▲' if current_order == 'asc' else '▼' }}</span>{% endif %}</a>
+</th>
+{%- endmacro %}
+
+{% macro pagination(page, pages, base, params='', total=None, page_size=None) -%}
+{%- if pages and pages > 1 -%}
+{%- set q = ('&' ~ params) if params else '' -%}
+<nav class="pagination" aria-label="Pagination">
+    {% if page > 1 %}<a href="{{ base }}?page={{ page - 1 }}{{ q }}" rel="prev" aria-label="Previous page">‹ Prev</a>{% else %}<span class="text-faint" aria-disabled="true">‹ Prev</span>{% endif %}
+    {% set window = 2 %}
+    {% set shown = [] %}
+    {% for p in range(1, pages + 1) %}
+        {% if p == 1 or p == pages or (p >= page - window and p <= page + window) %}
+            {% if shown and p - shown[-1] > 1 %}<span class="text-faint" aria-hidden="true">…</span>{% endif %}
+            {% if p == page %}<span aria-current="page" class="active">{{ p }}</span>{% else %}<a href="{{ base }}?page={{ p }}{{ q }}" aria-label="Page {{ p }}">{{ p }}</a>{% endif %}
+            {% set _ = shown.append(p) %}
+        {% endif %}
+    {% endfor %}
+    {% if page < pages %}<a href="{{ base }}?page={{ page + 1 }}{{ q }}" rel="next" aria-label="Next page">Next ›</a>{% else %}<span class="text-faint" aria-disabled="true">Next ›</span>{% endif %}
+    {% if total is not none and page_size %}
+    <span class="pagination-summary">{{ ((page - 1) * page_size) + 1 }}–{{ [page * page_size, total] | min }} of {{ total }}</span>
+    {% endif %}
+</nav>
+{%- endif -%}
+{%- endmacro %}
+
+{% macro flash_banner(flash) -%}
+{%- if flash %}<div class="alert alert-{{ 'success' if flash.ok else 'error' }}" role="{{ 'status' if flash.ok else 'alert' }}">{{ flash.message }}</div>{% endif -%}
+{%- endmacro %}

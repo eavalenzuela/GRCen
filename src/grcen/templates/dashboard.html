@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros.html" import badge %}
 {% block title %}Dashboard - GRCen{% endblock %}
 {% block content %}
 <h1>Dashboard</h1>
@@ -26,7 +27,7 @@
             {% endfor %}
         </ul>
         {% else %}
-        <p>No alerts configured.</p>
+        <p class="text-muted">No alerts configured.</p>
         {% endif %}
     </div>
     <div class="card">
@@ -38,7 +39,7 @@
         <p><span class="badge review-due-soon">{{ review_counts.due_soon }} due soon</span></p>
         {% endif %}
         {% if review_counts.overdue == 0 and review_counts.due_soon == 0 %}
-        <p>All reviews on track.</p>
+        <p class="text-muted">All reviews on track.</p>
         {% endif %}
         <a href="/reviews" class="btn">View All</a>
     </div>
@@ -47,9 +48,9 @@
         <h2>Answer Library</h2>
         {% if answers_needs_review and answers_needs_review > 0 %}
         <p><span class="badge review-overdue">{{ answers_needs_review }} need review</span></p>
-        <p style="color:#6b7280;font-size:0.85rem;">A substantiating asset changed or is missing.</p>
+        <p class="text-muted text-sm">A substantiating asset changed or is missing.</p>
         {% else %}
-        <p>All answers current.</p>
+        <p class="text-muted">All answers current.</p>
         {% endif %}
         <a href="/answers" class="btn">View Answers</a>
     </div>
@@ -98,11 +99,12 @@
 
 {% if top_risks %}
 <h2>Top Risks</h2>
+<div class="table-wrap">
 <table>
     <thead>
         <tr>
             <th>Risk</th>
-            <th>Score</th>
+            <th class="num">Score</th>
             <th>Likelihood</th>
             <th>Impact</th>
             <th>Category</th>
@@ -114,7 +116,7 @@
         {% for risk in top_risks %}
         <tr>
             <td><a href="/assets/{{ risk.id }}">{{ risk.name }}</a></td>
-            <td><span class="badge risk-{{ risk.color }}">{{ risk.score }}</span></td>
+            <td class="num"><span class="badge risk-{{ risk.color }}">{{ risk.score }}</span></td>
             <td>{{ risk.likelihood | replace('_', ' ') | title }}</td>
             <td>{{ risk.impact | replace('_', ' ') | title }}</td>
             <td>{{ risk.risk_category | replace('_', ' ') | title if risk.risk_category else '-' }}</td>
@@ -124,6 +126,7 @@
         {% endfor %}
     </tbody>
 </table>
+</div>
 {% endif %}
 
 <h2>Recent Assets</h2>
@@ -136,7 +139,7 @@
         <tr>
             <td><a href="/assets/{{ asset.id }}">{{ asset.name }}</a></td>
             <td>{{ asset.type.value | replace('_', ' ') | title }}</td>
-            <td>{{ asset.status.value | title }}</td>
+            <td>{{ badge(asset.status.value) }}</td>
             <td>{{ asset.owner or '—' }}</td>
         </tr>
         {% endfor %}

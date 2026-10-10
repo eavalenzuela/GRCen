@@ -1,28 +1,29 @@
 {% extends "base.html" %}
+{% from "macros.html" import badge, empty_state %}
 {% block title %}Answer Library - GRCen{% endblock %}
 
 {% block content %}
-<div style="display:flex;justify-content:space-between;align-items:center;">
+<div class="page-header">
     <h1>Answer Library</h1>
-    <div style="display:flex;gap:0.5rem;">
+    <div class="actions">
         <a href="/questionnaires" class="btn">Incoming Questionnaires</a>
         {% if has_perm(user.role, Permission.CREATE) %}
         <a href="/assets/new?type=answer" class="btn btn-primary">New Answer</a>
         {% endif %}
     </div>
+    <p class="page-intro">Canonical answers to security questionnaires customers send us. Each answer is
+       backed by the Control / Policy / System / Framework / Audit assets that
+       substantiate it (a <code>substantiated_by</code> link), so when those assets
+       change you can tell which answers need a fresh look.</p>
 </div>
-<p>Canonical answers to security questionnaires customers send us. Each answer is
-   backed by the Control / Policy / System / Framework / Audit assets that
-   substantiate it (a <code>substantiated_by</code> link), so when those assets
-   change you can tell which answers need a fresh look.</p>
 
 {% if not answers %}
-<p style="color:#6b7280;">No answers yet. <a href="/assets/new?type=answer">Add the first one</a>.</p>
+{{ empty_state("No answers yet.", "/assets/new?type=answer", "Add the first one") }}
 {% else %}
 {% set review_count = answers | selectattr('needs_review') | list | length %}
 {% if review_count %}
-<p style="background:#fef3c7;border:1px solid #f59e0b;border-radius:4px;padding:0.5rem 0.75rem;">
-   ⚠ {{ review_count }} answer{{ 's' if review_count != 1 else '' }} need review — a substantiating asset has changed or is missing.</p>
+<div class="alert alert-warning" role="status">
+   ⚠ {{ review_count }} answer{{ 's' if review_count != 1 else '' }} need review — a substantiating asset has changed or is missing.</div>
 {% endif %}
 <table class="table">
     <thead>
@@ -31,7 +32,7 @@
             <th>Short answer</th>
             <th>Substantiated by</th>
             <th>Review status</th>
-            <th>Last reviewed</th>
+            <th class="date">Last reviewed</th>
         </tr>
     </thead>
     <tbody>
@@ -40,38 +41,38 @@
             <td>
                 <a href="/assets/{{ a.id }}">{{ a.question }}</a>
                 {% if a.answer %}
-                <br><small style="color:#6b7280;">{{ a.answer | truncate(120) }}</small>
+                <br><small class="text-muted">{{ a.answer | truncate(120) }}</small>
                 {% endif %}
             </td>
             <td>
-                {% if a.short_answer %}{{ a.short_answer | replace('_', ' ') | title }}{% else %}<em style="color:#6b7280;">—</em>{% endif %}
+                {% if a.short_answer %}{{ badge(a.short_answer) }}{% else %}<em class="text-muted">—</em>{% endif %}
             </td>
             <td>
                 {% if a.substantiators %}
-                <ul style="margin:0;padding-left:1.25rem;">
+                <ul class="list-tight">
                 {% for s in a.substantiators %}
                     <li><a href="/assets/{{ s.id }}">{{ s.name }}</a>
-                        <small style="color:#6b7280;">({{ s.type | replace('_', ' ') }})</small></li>
+                        <small class="text-muted">({{ s.type | replace('_', ' ') }})</small></li>
                 {% endfor %}
                 </ul>
                 {% else %}
-                <em style="color:#b91c1c;">unsubstantiated</em>
+                {{ badge('Unsubstantiated', 'danger') }}
                 {% endif %}
             </td>
             <td>
                 {% if a.needs_review %}
-                <span style="color:#b45309;font-weight:600;" title="{{ a.review_reasons | join('; ') }}">⚠ Needs review</span>
-                <ul style="margin:0.25rem 0 0;padding-left:1.1rem;color:#6b7280;font-size:0.8rem;">
+                {{ badge('Needs review', 'warning', title=a.review_reasons | join('; ')) }}
+                <ul class="list-tight text-muted text-xs mt-1">
                 {% for reason in a.review_reasons %}
                     <li>{{ reason }}</li>
                 {% endfor %}
                 </ul>
                 {% else %}
-                <span style="color:#15803d;">✓ Current</span>
+                {{ badge('Current', 'success') }}
                 {% endif %}
             </td>
-            <td>
-                {% if a.last_reviewed %}{{ a.last_reviewed }}{% else %}<em style="color:#6b7280;">never</em>{% endif %}
+            <td class="date">
+                {% if a.last_reviewed %}{{ a.last_reviewed }}{% else %}<em class="text-muted">never</em>{% endif %}
             </td>
         </tr>
     {% endfor %}

@@ -1,10 +1,11 @@
 {% extends "base.html" %}
+{% from "macros.html" import badge, empty_state %}
 {% block title %}{{ asset.name }} - GRCen{% endblock %}
 {% block content %}
 <div class="page-header">
     <h1>{{ asset.name }}</h1>
     <div class="actions">
-        <form method="post" action="/assets/{{ asset.id }}/{{ 'unwatch' if watching else 'watch' }}" style="display:inline">
+        <form class="inline" method="post" action="/assets/{{ asset.id }}/{{ 'unwatch' if watching else 'watch' }}">
             {% include "partials/csrf.html" %}
             <button type="submit" class="btn"
                     title="{{ 'Stop receiving' if watching else 'Receive' }} in-app notifications when this asset changes">
@@ -19,19 +20,19 @@
         <a href="/assets/{{ asset.id }}/audit-report.pdf" class="btn">Audit Report PDF</a>
         {% endif %}
         {% if has_perm(user.role, Permission.EDIT) %}
-        <a href="/assets/{{ asset.id }}/edit" class="btn">Edit</a>
+        <a href="/assets/{{ asset.id }}/edit" class="btn btn-primary">Edit</a>
         {% endif %}
         {% if has_perm(user.role, Permission.CREATE) %}
-        <form method="post" action="/assets/{{ asset.id }}/clone" style="display:inline">
+        <form class="btn-group" method="post" action="/assets/{{ asset.id }}/clone">
             {% include "partials/csrf.html" %}
-            <label style="font-size:0.8rem;cursor:pointer;">
-                <input type="checkbox" name="clone_relationships" style="vertical-align:middle;"> + rels
+            <label class="form-check text-xs mb-0">
+                <input type="checkbox" name="clone_relationships"> + rels
             </label>
             <button type="submit" class="btn">Clone</button>
         </form>
         {% endif %}
         {% if has_perm(user.role, Permission.DELETE) %}
-        <form method="post" action="/assets/{{ asset.id }}/delete" style="display:inline"
+        <form class="inline" method="post" action="/assets/{{ asset.id }}/delete"
               data-confirm="Delete this asset?">
             {% include "partials/csrf.html" %}
             <button type="submit" class="btn btn-danger">Delete</button>
@@ -41,9 +42,9 @@
 </div>
 
 {% if has_perm(user.role, Permission.MANAGE_USERS) and asset_custom_fields %}
-<details class="card" style="margin-bottom:1rem;">
-    <summary style="cursor:pointer;font-weight:600;">Sensitive field overrides (this asset)</summary>
-    <p style="color:#6b7280;font-size:0.9em;">
+<details class="card mb-2">
+    <summary class="fw-semibold">Sensitive field overrides (this asset)</summary>
+    <p class="text-muted text-sm mt-1">
         Per-asset overrides win over the per-type config. Choose <em>Inherit</em> to
         fall back to the org-wide rules.
     </p>
@@ -60,7 +61,7 @@
                 <tr>
                     <td><code>{{ fdef.name }}</code> &mdash; {{ fdef.label }}</td>
                     <td>
-                        <select name="override.{{ fdef.name }}">
+                        <select name="override.{{ fdef.name }}" aria-label="Override for {{ fdef.label }}">
                             <option value="inherit" {% if choice == 'inherit' %}selected{% endif %}>Inherit</option>
                             <option value="sensitive" {% if choice == 'sensitive' %}selected{% endif %}>Sensitive</option>
                             <option value="public" {% if choice == 'public' %}selected{% endif %}>Public</option>
@@ -70,15 +71,17 @@
             {% endfor %}
             </tbody>
         </table>
-        <button type="submit" class="btn">Save overrides</button>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Save overrides</button>
+        </div>
     </form>
 </details>
 {% endif %}
 
 {% if pending_changes %}
-<div class="callout" style="background:#fffbe6;padding:0.75rem;margin-bottom:1rem;border-left:4px solid #d4a017;">
+<div class="alert alert-warning" role="status">
     <strong>{{ pending_changes|length }} pending change{{ '' if pending_changes|length == 1 else 's' }}</strong> on this asset:
-    <ul style="margin:0.25rem 0 0 1.5rem;">
+    <ul class="list-tight mt-1">
     {% for c in pending_changes %}
         <li><a href="/approvals/{{ c.id }}">{{ c.action }} by {{ c.submitted_by_username }} at {{ c.submitted_at.strftime('%Y-%m-%d %H:%M UTC') }}</a></li>
     {% endfor %}
@@ -88,7 +91,7 @@
 
 <div class="detail-grid">
     <div class="detail-field"><strong>Type:</strong> {{ asset.type.value | replace('_', ' ') | title }}</div>
-    <div class="detail-field"><strong>Status:</strong> <span class="badge badge-{{ asset.status.value }}">{{ asset.status.value | title }}</span></div>
+    <div class="detail-field"><strong>Status:</strong> {{ badge(asset.status.value) }}</div>
     <div class="detail-field">
         <strong>{% if asset.type.value == 'person' %}Manager{% else %}Owner{% endif %}:</strong>
         {% if asset.owner_id %}
@@ -99,7 +102,7 @@
     </div>
     <div class="detail-field"><strong>Criticality:</strong>
         {% if asset.criticality %}
-        <span class="badge badge-{{ asset.criticality }}">{{ asset.criticality | title }}</span>
+        {{ badge(asset.criticality) }}
         {% else %}—{% endif %}
     </div>
     <div class="detail-field"><strong>Created:</strong> {{ asset.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
@@ -107,35 +110,35 @@
 </div>
 
 {% if asset.tags %}
-<div class="tags-display" style="margin:0.5rem 0;">
+<div class="tags-display mt-1 mb-1">
     <strong>Tags:</strong>
     {% for tag in asset.tags %}
-    <span class="badge" style="margin-right:0.25rem;">{{ tag }}</span>
+    <a class="tag" href="/assets?tag={{ tag | urlencode }}">{{ tag }}</a>
     {% endfor %}
 </div>
 {% endif %}
 
 {% if linked_user %}
-<div class="detail-grid" style="margin-top:0.5rem">
+<div class="detail-grid mt-1">
     <div class="detail-field">
         <strong>User Account:</strong>
         {{ linked_user.username }}
-        <span class="badge">{{ linked_user.role | title }}</span>
-        {% if not linked_user.is_active %}<span class="badge badge-inactive">Inactive</span>{% endif %}
+        {{ badge(linked_user.role, 'outline') }}
+        {% if not linked_user.is_active %}{{ badge('inactive') }}{% endif %}
     </div>
 </div>
 {% endif %}
 
 {% if asset.description %}
 <div class="description">
-    <h3>Description</h3>
+    <h2>Description</h2>
     <p>{{ asset.description }}</p>
 </div>
 {% endif %}
 
 {% if asset_custom_fields and asset.metadata_ %}
 <div class="custom-details">
-    <h3>Details</h3>
+    <h2>Details</h2>
     <div class="detail-grid">
         {% for f in asset_custom_fields %}
         {% set val = asset.metadata_.get(f.name) %}
@@ -159,8 +162,9 @@
 <h2>Relationships</h2>
 <div id="relationships">
     {% if relationships %}
+    {% set can_manage_rels = has_perm(user.role, Permission.EDIT) or has_perm(user.role, Permission.DELETE) %}
     <table>
-        <thead><tr><th>Relationship</th><th>Related Asset</th><th>Description</th><th>Evidence</th>{% if has_perm(user.role, Permission.EDIT) or has_perm(user.role, Permission.DELETE) %}<th></th>{% endif %}</tr></thead>
+        <thead><tr><th>Relationship</th><th>Related Asset</th><th>Description</th><th>Evidence</th>{% if can_manage_rels %}<th class="actions-cell"></th>{% endif %}</tr></thead>
         <tbody>
             {% for rel in relationships %}
             {% set is_outgoing = rel.source_asset_id == asset.id %}
@@ -179,8 +183,9 @@
                         {% if rel.attachment_count %}{{ rel.attachment_count }} file{{ 's' if rel.attachment_count != 1 }}{% else %}+ add{% endif %}
                     </a>
                 </td>
-                {% if has_perm(user.role, Permission.EDIT) or has_perm(user.role, Permission.DELETE) %}
-                <td>
+                {% if can_manage_rels %}
+                <td class="actions-cell">
+                    <div class="btn-group">
                     {% if has_perm(user.role, Permission.EDIT) %}
                     <a class="btn btn-sm" href="/relationships/{{ rel.id }}/edit?from={{ asset.id }}">Edit</a>
                     {% endif %}
@@ -188,8 +193,9 @@
                     <button hx-delete="/api/relationships/{{ rel.id }}"
                             hx-confirm="Remove this relationship?"
                             hx-target="closest tr" hx-swap="outerHTML"
-                            class="btn btn-sm btn-danger">Remove</button>
+                            class="btn btn-sm btn-outline-danger">Remove</button>
                     {% endif %}
+                    </div>
                 </td>
                 {% endif %}
             </tr>
@@ -197,26 +203,26 @@
         </tbody>
     </table>
     {% else %}
-    <p>No relationships yet.</p>
+    {{ empty_state('No relationships yet.') }}
     {% endif %}
 
     {% if has_perm(user.role, Permission.CREATE) %}
-    <h4>Add Relationship</h4>
+    <h3>Add Relationship</h3>
     <form id="add-relationship-form" data-source-id="{{ asset.id }}">
         <div class="form-row">
             <input type="text" id="rel-target-search" placeholder="Search target asset..."
-                   autocomplete="off">
+                   aria-label="Search target asset" autocomplete="off">
             <div id="target-results" class="autocomplete-results"></div>
             <input type="hidden" name="target_asset_id" id="target_asset_id">
             <input type="text" name="relationship_type" placeholder="Relationship type" required
-                   list="rel-type-options" autocomplete="off">
+                   aria-label="Relationship type" list="rel-type-options" autocomplete="off">
             <datalist id="rel-type-options">
                 {% for rt in relationship_types %}<option value="{{ rt }}"></option>{% endfor %}
             </datalist>
-            <input type="text" name="description" placeholder="Description">
+            <input type="text" name="description" placeholder="Description" aria-label="Description">
             <button type="submit" class="btn btn-primary">Add</button>
         </div>
-        <div id="rel-form-status" class="form-error" role="alert" style="color:#c0392b;margin-top:0.4rem;"></div>
+        <div id="rel-form-status" class="form-error text-danger text-sm mt-1" role="alert"></div>
     </form>
     {% endif %}
 </div>
@@ -225,19 +231,21 @@
 <div id="attachments">
     {% if attachments %}
     <table>
-        <thead><tr><th>Name</th><th>Kind</th><th>Link/Path</th>{% if has_perm(user.role, Permission.DELETE) %}<th></th>{% endif %}</tr></thead>
+        <thead><tr><th>Name</th><th>Kind</th><th>Link/Path</th>{% if has_perm(user.role, Permission.DELETE) %}<th class="actions-cell"></th>{% endif %}</tr></thead>
         <tbody>
             {% for att in attachments %}
             <tr>
                 <td>{{ att.name }}</td>
-                <td>{{ att.kind.value }}</td>
-                <td>{{ att.url_or_path or '—' }}</td>
+                <td>{{ badge(att.kind.value, 'outline') }}</td>
+                <td class="break-all">{{ att.url_or_path or '—' }}</td>
                 {% if has_perm(user.role, Permission.DELETE) %}
-                <td>
+                <td class="actions-cell">
+                    <div class="btn-group">
                     <button hx-delete="/api/assets/{{ asset.id }}/attachments/{{ att.id }}"
                             hx-confirm="Remove this attachment?"
                             hx-target="closest tr" hx-swap="outerHTML"
-                            class="btn btn-sm btn-danger">Remove</button>
+                            class="btn btn-sm btn-outline-danger">Remove</button>
+                    </div>
                 </td>
                 {% endif %}
             </tr>
@@ -245,26 +253,26 @@
         </tbody>
     </table>
     {% else %}
-    <p>No attachments yet.</p>
+    {{ empty_state('No attachments yet.') }}
     {% endif %}
 
     {% if has_perm(user.role, Permission.CREATE) %}
-    <h4>Add URL Attachment</h4>
+    <h3>Add URL Attachment</h3>
     <form hx-post="/api/assets/{{ asset.id }}/attachments/" hx-ext="json-enc"
           hx-swap="none" data-reload-on-success>
         <div class="form-row">
             <input type="hidden" name="kind" value="url">
-            <input type="text" name="name" placeholder="Name" required>
-            <input type="url" name="url_or_path" placeholder="URL" required>
+            <input type="text" name="name" placeholder="Name" aria-label="Attachment name" required>
+            <input type="url" name="url_or_path" placeholder="URL" aria-label="Attachment URL" required>
             <button type="submit" class="btn btn-primary">Add URL</button>
         </div>
     </form>
 
-    <h4>Upload File</h4>
+    <h3>Upload File</h3>
     <form hx-post="/api/assets/{{ asset.id }}/attachments/upload" hx-encoding="multipart/form-data"
           hx-swap="none" data-reload-on-success>
         <div class="form-row">
-            <input type="file" name="file" required>
+            <input type="file" name="file" aria-label="File to upload" required>
             <button type="submit" class="btn btn-primary">Upload</button>
         </div>
     </form>
@@ -277,20 +285,20 @@
 {% endif %}
 {% if alerts %}
 <table>
-    <thead><tr><th>Title</th><th>Schedule</th><th>Next Fire</th><th>Enabled</th></tr></thead>
+    <thead><tr><th>Title</th><th>Schedule</th><th class="date">Next Fire</th><th>Enabled</th></tr></thead>
     <tbody>
         {% for alert in alerts %}
         <tr>
             <td>{{ alert.title }}</td>
-            <td>{{ alert.schedule_type.value }} {% if alert.cron_expression %}({{ alert.cron_expression }}){% endif %}</td>
-            <td>{{ alert.next_fire_at or '—' }}</td>
-            <td>{{ 'Yes' if alert.enabled else 'No' }}</td>
+            <td>{{ alert.schedule_type.value }} {% if alert.cron_expression %}(<span class="mono">{{ alert.cron_expression }}</span>){% endif %}</td>
+            <td class="date">{{ alert.next_fire_at or '—' }}</td>
+            <td>{{ badge('enabled' if alert.enabled else 'disabled') }}</td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
 {% else %}
-<p>No alerts for this asset.</p>
+{{ empty_state('No alerts for this asset.') }}
 {% endif %}
 {% endblock %}
 
